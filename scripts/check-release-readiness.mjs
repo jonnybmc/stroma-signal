@@ -44,7 +44,9 @@ for (const [entry, target] of Object.entries(packageJson.exports ?? {})) {
   'docs/ga4-bigquery-url-builder.sql',
   'docs/normalized-bigquery-validation.sql',
   'docs/normalized-bigquery-url-builder.sql',
-  'docs/launch-troubleshooting.md'
+  'docs/launch-troubleshooting.md',
+  'docs/framework-recipes.md',
+  'docs/spa-ssr-caveats.md'
 ].forEach(assertFile);
 
 console.log('Release-readiness metadata and artifact checks passed.');

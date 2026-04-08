@@ -107,6 +107,13 @@ Next doc: [warehouse schema](./docs/warehouse-schema.md)
 - Own endpoint and full-control paths: validate rows with [normalized-bigquery-validation.sql](./docs/normalized-bigquery-validation.sql), then generate the hosted report with [normalized-bigquery-url-builder.sql](./docs/normalized-bigquery-url-builder.sql).
 - [`/build`](http://signal.stroma.design/build) stays the QA and fallback path, not the primary launch automation flow.
 
+## Framework Recipes
+
+Signal is framework-agnostic. These recipes cover where to initialise, SSR guards, and duplicate-init safety for each environment:
+
+- [Vanilla / React / Next.js / Vue / Nuxt / Angular / Svelte / SvelteKit](./docs/framework-recipes.md)
+- [SPA and SSR caveats](./docs/spa-ssr-caveats.md)
+
 ## Deeper Docs
 
 - [choose your setup](./docs/client-integrations.md)
