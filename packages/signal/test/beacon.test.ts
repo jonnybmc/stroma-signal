@@ -1,6 +1,5 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
-
 import { chromeColdNavFixture } from '@stroma-labs/signal-contracts';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { createBeaconSink } from '../src/sinks/beacon.js';
 
@@ -33,10 +32,13 @@ describe('beacon sink', () => {
     await Promise.resolve();
 
     expect(sendBeacon).toHaveBeenCalledTimes(1);
-    expect(fetch).toHaveBeenCalledWith('https://collector.example/ingest', expect.objectContaining({
-      method: 'POST',
-      keepalive: true
-    }));
+    expect(fetch).toHaveBeenCalledWith(
+      'https://collector.example/ingest',
+      expect.objectContaining({
+        method: 'POST',
+        keepalive: true
+      })
+    );
   });
 
   it('reports fallback failures through the optional error callback', async () => {

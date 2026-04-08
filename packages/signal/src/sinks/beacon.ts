@@ -5,6 +5,13 @@ export interface BeaconSinkOptions {
   onError?: (error: unknown, event: SignalEventV1) => void;
 }
 
+/**
+ * Creates a sink that sends the canonical {@link SignalEventV1} to a
+ * remote endpoint using `navigator.sendBeacon`, falling back to `fetch`
+ * with `keepalive: true` when `sendBeacon` is unavailable or fails.
+ *
+ * @param options - Endpoint URL and optional error handler.
+ */
 export function createBeaconSink(options: BeaconSinkOptions): SignalSink {
   return {
     id: 'beacon',
@@ -21,16 +28,18 @@ export function createBeaconSink(options: BeaconSinkOptions): SignalSink {
           return;
         }
 
-        void globalThis.fetch(options.endpoint, {
-          method: 'POST',
-          headers: {
-            'content-type': 'application/json'
-          },
-          body: payload,
-          keepalive: true
-        }).catch((error) => {
-          options.onError?.(error, event);
-        });
+        void globalThis
+          .fetch(options.endpoint, {
+            method: 'POST',
+            headers: {
+              'content-type': 'application/json'
+            },
+            body: payload,
+            keepalive: true
+          })
+          .catch((error) => {
+            options.onError?.(error, event);
+          });
       } catch (error) {
         options.onError?.(error, event);
       }

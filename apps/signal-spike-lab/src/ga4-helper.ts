@@ -1,4 +1,9 @@
-import { SIGNAL_GA4_EVENT_NAME, flattenSignalEventForGa4, type SignalEventV1, type SignalSink } from '@stroma-labs/signal-contracts';
+import {
+  flattenSignalEventForGa4,
+  SIGNAL_GA4_EVENT_NAME,
+  type SignalEventV1,
+  type SignalSink
+} from '@stroma-labs/signal-contracts';
 
 export type Ga4BootstrapState = 'disabled' | 'skipped' | 'loading' | 'ready' | 'error';
 
@@ -16,25 +21,39 @@ function waitForGa4Script(script: HTMLScriptElement, onStateChange: (state: Ga4B
   }
 
   onStateChange('loading');
-  script.addEventListener('load', () => {
-    script.dataset.loaded = 'true';
-    onStateChange('ready');
-  }, { once: true });
-  script.addEventListener('error', () => {
-    onStateChange('error');
-  }, { once: true });
+  script.addEventListener(
+    'load',
+    () => {
+      script.dataset.loaded = 'true';
+      onStateChange('ready');
+    },
+    { once: true }
+  );
+  script.addEventListener(
+    'error',
+    () => {
+      onStateChange('error');
+    },
+    { once: true }
+  );
 }
 
-export function bootstrapSpikeLabGa4(measurementId: string, isAutomation: boolean, onStateChange: (state: Ga4BootstrapState) => void): void {
+export function bootstrapSpikeLabGa4(
+  measurementId: string,
+  isAutomation: boolean,
+  onStateChange: (state: Ga4BootstrapState) => void
+): void {
   if (!measurementId) {
     onStateChange('disabled');
     return;
   }
 
   window.dataLayer = window.dataLayer ?? [];
-  window.gtag = window.gtag ?? function gtag() {
-    window.dataLayer?.push(arguments);
-  };
+  window.gtag =
+    window.gtag ??
+    function gtag(...args: unknown[]) {
+      window.dataLayer?.push(...args);
+    };
 
   if (isAutomation) {
     onStateChange('skipped');

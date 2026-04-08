@@ -1,8 +1,8 @@
 import {
-  SIGNAL_PREVIEW_MINIMUM_SAMPLE,
-  SIGNAL_REPORT_BASE_URL,
   aggregateSignalEvents,
   encodeSignalReportUrl,
+  SIGNAL_PREVIEW_MINIMUM_SAMPLE,
+  SIGNAL_REPORT_BASE_URL,
   type SignalAggregateV1,
   type SignalEventV1,
   type SignalReportUrlResult,
@@ -27,18 +27,22 @@ function cloneSignalEvent(event: SignalEventV1): SignalEventV1 {
     ...event,
     vitals: {
       ...event.vitals,
-      lcp_attribution: event.vitals.lcp_attribution
-        ? { ...event.vitals.lcp_attribution }
-        : undefined,
-      inp_attribution: event.vitals.inp_attribution
-        ? { ...event.vitals.inp_attribution }
-        : undefined
+      lcp_attribution: event.vitals.lcp_attribution ? { ...event.vitals.lcp_attribution } : undefined,
+      inp_attribution: event.vitals.inp_attribution ? { ...event.vitals.inp_attribution } : undefined
     },
     context: { ...event.context },
     meta: { ...event.meta }
   };
 }
 
+/**
+ * Creates a local preview collector that buffers {@link SignalEventV1}
+ * events in memory and produces an aggregate + hosted report URL on demand.
+ *
+ * Intended for development and QA — not for production data collection.
+ *
+ * @param options - Buffer size, report base URL, and console logging toggle.
+ */
 export function createPreviewCollector(options: PreviewCollectorOptions = {}): PreviewCollector {
   const events: SignalEventV1[] = [];
   const maxEvents = options.maxEvents ?? 200;
@@ -60,10 +64,7 @@ export function createPreviewCollector(options: PreviewCollectorOptions = {}): P
     },
     getReportUrl() {
       const aggregate = collector.getAggregate() ?? aggregateSignalEvents([], 'preview');
-      const result = encodeSignalReportUrl(
-        aggregate,
-        options.reportBaseUrl ?? SIGNAL_REPORT_BASE_URL
-      );
+      const result = encodeSignalReportUrl(aggregate, options.reportBaseUrl ?? SIGNAL_REPORT_BASE_URL);
       return {
         ...result,
         warnings: [

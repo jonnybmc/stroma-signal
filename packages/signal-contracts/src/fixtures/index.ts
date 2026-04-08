@@ -1,5 +1,5 @@
-import type { SignalAggregateV1, SignalEventV1, SignalNetTcpSource } from '../types.js';
 import { aggregateSignalEvents } from '../aggregation.js';
+import type { SignalAggregateV1, SignalEventV1, SignalNetTcpSource } from '../types.js';
 
 export const chromeColdNavFixture: SignalEventV1 = {
   v: 1,
@@ -131,11 +131,7 @@ export const tlsCoalescedFixture: SignalEventV1 = {
   net_tcp_source: 'unavailable_tls_coalesced'
 };
 
-function createFixtureEvent(
-  event_id: string,
-  ts: number,
-  overrides: Partial<SignalEventV1> = {}
-): SignalEventV1 {
+function createFixtureEvent(event_id: string, ts: number, overrides: Partial<SignalEventV1> = {}): SignalEventV1 {
   const {
     event_id: _overrideEventId,
     ts: _overrideTs,
@@ -207,39 +203,29 @@ function createSeries(options: SeriesOptions): SignalEventV1[] {
     const ttfbEnabled = index < Math.round(options.count * ttfbCoverage);
     const isSafari = browser === 'safari';
 
-    return createFixtureEvent(
-      `${options.prefix}_${index}`,
-      options.startTs + index * 1_000,
-      {
-        url: options.path,
-        net_tier: options.tier,
-        net_tcp_source: options.netTcpSource ?? (options.tier == null ? 'unavailable_reused' : 'nav_timing_tcp_isolated'),
-        vitals: {
-          lcp_ms: isSafari || !lcpEnabled ? null : 2_200 + index * 14,
-          cls: isSafari ? null : Number((0.03 + index * 0.0008).toFixed(3)),
-          inp_ms: isSafari ? null : 110 + (index % 8) * 12,
-          fcp_ms: fcpEnabled ? 980 + index * 9 : null,
-          ttfb_ms: ttfbEnabled ? 210 + (index % 11) * 7 : null
-        },
-        meta: {
-          browser,
-          nav_type: 'navigate',
-          navigation_type: 'navigate',
-          pkg_version: '0.1.0'
-        }
+    return createFixtureEvent(`${options.prefix}_${index}`, options.startTs + index * 1_000, {
+      url: options.path,
+      net_tier: options.tier,
+      net_tcp_source: options.netTcpSource ?? (options.tier == null ? 'unavailable_reused' : 'nav_timing_tcp_isolated'),
+      vitals: {
+        lcp_ms: isSafari || !lcpEnabled ? null : 2_200 + index * 14,
+        cls: isSafari ? null : Number((0.03 + index * 0.0008).toFixed(3)),
+        inp_ms: isSafari ? null : 110 + (index % 8) * 12,
+        fcp_ms: fcpEnabled ? 980 + index * 9 : null,
+        ttfb_ms: ttfbEnabled ? 210 + (index % 11) * 7 : null
+      },
+      meta: {
+        browser,
+        nav_type: 'navigate',
+        navigation_type: 'navigate',
+        pkg_version: '0.1.0'
       }
-    );
+    });
   });
 }
 
 export const previewAggregateFixture: SignalAggregateV1 = aggregateSignalEvents(
-  [
-    chromeColdNavFixture,
-    safariFallbackFixture,
-    reusedConnectionFixture,
-    serviceWorkerFixture,
-    tlsCoalescedFixture
-  ],
+  [chromeColdNavFixture, safariFallbackFixture, reusedConnectionFixture, serviceWorkerFixture, tlsCoalescedFixture],
   'preview',
   Date.UTC(2026, 3, 8, 10, 25, 0)
 );

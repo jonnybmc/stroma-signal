@@ -17,12 +17,7 @@ import {
   SIGNAL_REPORT_VERSION
 } from './types.js';
 
-const CLASSIFIED_TIERS: SignalNetworkTier[] = [
-  'urban',
-  'moderate',
-  'constrained_moderate',
-  'constrained'
-];
+const CLASSIFIED_TIERS: SignalNetworkTier[] = ['urban', 'moderate', 'constrained_moderate', 'constrained'];
 
 const ZERO_TIER_DISTRIBUTION: SignalTierDistribution = {
   urban: 0,
@@ -98,8 +93,7 @@ function createEmptyTierSummary(): SignalTierMetricSummary {
 }
 
 function pickComparisonTier(distribution: SignalTierDistribution): SignalComparisonTier {
-  const counts = CLASSIFIED_TIERS
-    .filter((tier) => tier !== 'urban')
+  const counts = CLASSIFIED_TIERS.filter((tier) => tier !== 'urban')
     .map((tier) => ({
       tier,
       count: distribution[tier]

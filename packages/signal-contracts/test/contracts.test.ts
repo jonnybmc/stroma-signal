@@ -2,23 +2,23 @@ import { describe, expect, it } from 'vitest';
 
 import {
   aggregateSignalEvents,
-  SIGNAL_GA4_EVENT_NAME,
   chooseRaceMetric,
+  chromeColdNavFixture,
   decodeSignalReportUrl,
   encodeSignalReportUrl,
   explainSignalAggregateIssues,
   explainSignalEventIssues,
   explainSignalWarehouseRowIssues,
-  flattenSignalEventForGa4,
   fcpFallbackAggregateFixture,
+  flattenSignalEventForGa4,
   highUnclassifiedShareAggregateFixture,
-  toSignalWarehouseRow,
   previewAggregateFixture,
+  SIGNAL_GA4_EVENT_NAME,
+  safariFallbackFixture,
   safariHeavyAggregateFixture,
   signalReportScenarioFixtures,
   strongLcpCoverageAggregateFixture,
-  chromeColdNavFixture,
-  safariFallbackFixture,
+  toSignalWarehouseRow,
   ttfbFallbackAggregateFixture
 } from '../src/index.js';
 
@@ -51,8 +51,22 @@ describe('signal contracts', () => {
   it('prefers fcp when lcp coverage is too low', () => {
     expect(
       chooseRaceMetric({
-        urban: { lcp_observations: 12, fcp_observations: 30, ttfb_observations: 30, lcp_coverage: 40, fcp_coverage: 100, ttfb_coverage: 100 },
-        comparison: { lcp_observations: 14, fcp_observations: 30, ttfb_observations: 30, lcp_coverage: 45, fcp_coverage: 100, ttfb_coverage: 100 }
+        urban: {
+          lcp_observations: 12,
+          fcp_observations: 30,
+          ttfb_observations: 30,
+          lcp_coverage: 40,
+          fcp_coverage: 100,
+          ttfb_coverage: 100
+        },
+        comparison: {
+          lcp_observations: 14,
+          fcp_observations: 30,
+          ttfb_observations: 30,
+          lcp_coverage: 45,
+          fcp_coverage: 100,
+          ttfb_coverage: 100
+        }
       })
     ).toEqual({
       race_metric: 'fcp',

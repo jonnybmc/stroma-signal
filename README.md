@@ -1,5 +1,10 @@
 # Signal by Stroma
 
+[![CI](https://github.com/jonathanbooysen/stroma-signal/actions/workflows/ci.yml/badge.svg)](https://github.com/jonathanbooysen/stroma-signal/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/@stroma-labs/signal)](https://www.npmjs.com/package/@stroma-labs/signal)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
+[![Bundle Size](https://img.shields.io/bundlephobia/minzip/@stroma-labs/signal)](https://bundlephobia.com/package/@stroma-labs/signal)
+
 Native-first browser instrumentation for measuring real-user network, device, and performance tiers without forcing teams into a single analytics stack.
 
 ## Install

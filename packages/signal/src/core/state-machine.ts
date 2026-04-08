@@ -1,9 +1,4 @@
-export type SignalLifecycleState =
-  | 'booting'
-  | 'observing'
-  | 'finalizing'
-  | 'flushed'
-  | 'sealed';
+export type SignalLifecycleState = 'booting' | 'observing' | 'finalizing' | 'flushed' | 'sealed';
 
 export type SignalLifecycleAction =
   | 'start'

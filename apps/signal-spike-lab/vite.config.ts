@@ -7,7 +7,10 @@ const collectedEvents: unknown[] = [];
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 
 function collectorMiddleware() {
-  const handle = async (req: { method?: string; url?: string }, res: { setHeader: (name: string, value: string) => void; end: (body?: string) => void; statusCode: number }): Promise<boolean> => {
+  const handle = async (
+    req: { method?: string; url?: string },
+    res: { setHeader: (name: string, value: string) => void; end: (body?: string) => void; statusCode: number }
+  ): Promise<boolean> => {
     if (req.method === 'POST' && req.url === '/collect') {
       const chunks: Buffer[] = [];
       await new Promise<void>((resolve) => {
@@ -57,9 +60,18 @@ function collectorMiddleware() {
 export default defineConfig({
   resolve: {
     alias: [
-      { find: '@stroma-labs/signal/ga4', replacement: path.resolve(currentDir, '../../packages/signal/src/ga4/index.ts') },
-      { find: '@stroma-labs/signal/report', replacement: path.resolve(currentDir, '../../packages/signal/src/report/index.ts') },
-      { find: '@stroma-labs/signal-contracts', replacement: path.resolve(currentDir, '../../packages/signal-contracts/src/index.ts') },
+      {
+        find: '@stroma-labs/signal/ga4',
+        replacement: path.resolve(currentDir, '../../packages/signal/src/ga4/index.ts')
+      },
+      {
+        find: '@stroma-labs/signal/report',
+        replacement: path.resolve(currentDir, '../../packages/signal/src/report/index.ts')
+      },
+      {
+        find: '@stroma-labs/signal-contracts',
+        replacement: path.resolve(currentDir, '../../packages/signal-contracts/src/index.ts')
+      },
       { find: '@stroma-labs/signal', replacement: path.resolve(currentDir, '../../packages/signal/src/index.ts') }
     ]
   },

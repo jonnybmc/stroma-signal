@@ -1,9 +1,7 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
-
 import type { SignalSink } from '@stroma-labs/signal-contracts';
-
-import { destroy, init } from '../src/index.js';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { transitionSignalLifecycle } from '../src/core/state-machine.js';
+import { destroy, init } from '../src/index.js';
 
 type Listener = {
   callback: (event: Event | PageTransitionEvent) => void;
@@ -13,12 +11,13 @@ type Listener = {
 class MockEventTarget {
   private listeners = new Map<string, Listener[]>();
 
-  addEventListener(type: string, callback: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions): void {
+  addEventListener(
+    type: string,
+    callback: EventListenerOrEventListenerObject,
+    options?: boolean | AddEventListenerOptions
+  ): void {
     const listener: Listener = {
-      callback:
-        typeof callback === 'function'
-          ? callback
-          : ((event) => callback.handleEvent(event)),
+      callback: typeof callback === 'function' ? callback : (event) => callback.handleEvent(event),
       once: typeof options === 'object' && options?.once === true
     };
     const current = this.listeners.get(type) ?? [];
@@ -29,9 +28,7 @@ class MockEventTarget {
   removeEventListener(type: string, callback: EventListenerOrEventListenerObject): void {
     const current = this.listeners.get(type) ?? [];
     const normalized =
-      typeof callback === 'function'
-        ? callback
-        : ((event: Event | PageTransitionEvent) => callback.handleEvent(event));
+      typeof callback === 'function' ? callback : (event: Event | PageTransitionEvent) => callback.handleEvent(event);
 
     this.listeners.set(
       type,
@@ -59,10 +56,7 @@ class MockDocument extends MockEventTarget {
   prerendering = false;
 }
 
-function setupGlobals(options?: {
-  prerendering?: boolean;
-  navigation?: Partial<PerformanceNavigationTiming>;
-}) {
+function setupGlobals(options?: { prerendering?: boolean; navigation?: Partial<PerformanceNavigationTiming> }) {
   const documentTarget = new MockDocument();
   const windowTarget = new MockEventTarget();
 

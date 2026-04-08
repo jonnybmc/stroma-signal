@@ -22,14 +22,24 @@
     "check:boundaries": "node scripts/check-boundaries.mjs",
     "check:exports": "node scripts/check-package-exports.mjs",
     "check:release": "node scripts/check-release-readiness.mjs",
-    "ci": "pnpm typecheck && pnpm test && pnpm build && pnpm check:release"
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "format": "biome format --write .",
+    "ci": "pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm check:release",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{ts,mjs,json}": "biome check --write --no-errors-on-unmatched"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.4.10",
     "@playwright/test": "^1.53.0",
     "@rollup/plugin-node-resolve": "^16.0.1",
     "@rollup/plugin-terser": "^0.4.4",
     "@rollup/plugin-typescript": "^12.1.4",
     "@types/node": "^24.0.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.4.0",
     "rollup": "^4.45.1",
     "rollup-plugin-dts": "^6.2.1",
     "tslib": "^2.8.1",

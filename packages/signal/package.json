@@ -6,19 +6,30 @@
   "author": "Jonathan Booysen",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/jonnybmc/stroma-signal.git",
+    "url": "git+https://github.com/jonathanbooysen/stroma-signal.git",
     "directory": "packages/signal"
   },
-  "homepage": "https://github.com/jonnybmc/stroma-signal#readme",
+  "homepage": "https://github.com/jonathanbooysen/stroma-signal#readme",
   "bugs": {
-    "url": "https://github.com/jonnybmc/stroma-signal/issues"
+    "url": "https://github.com/jonathanbooysen/stroma-signal/issues"
+  },
+  "funding": {
+    "type": "github",
+    "url": "https://github.com/sponsors/jonathanbooysen"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   },
   "keywords": [
     "performance",
     "analytics",
     "signal",
     "ga4",
-    "browser"
+    "browser",
+    "web-vitals",
+    "rum",
+    "real-user-monitoring",
+    "performance-monitoring"
   ],
   "type": "module",
   "main": "./dist/index.mjs",

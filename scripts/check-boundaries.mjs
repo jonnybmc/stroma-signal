@@ -1,4 +1,4 @@
-import { readFile, readdir } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 
 const root = process.cwd();
@@ -6,11 +6,13 @@ const signalRoot = path.join(root, 'packages/signal/src');
 
 async function readAllFiles(dir) {
   const entries = await readdir(dir, { withFileTypes: true });
-  const files = await Promise.all(entries.map(async (entry) => {
-    const fullPath = path.join(dir, entry.name);
-    if (entry.isDirectory()) return readAllFiles(fullPath);
-    return fullPath;
-  }));
+  const files = await Promise.all(
+    entries.map(async (entry) => {
+      const fullPath = path.join(dir, entry.name);
+      if (entry.isDirectory()) return readAllFiles(fullPath);
+      return fullPath;
+    })
+  );
   return files.flat();
 }
 
@@ -23,7 +25,9 @@ function assertNoMatch(content, patterns, filePath, message) {
 }
 
 const files = await readAllFiles(signalRoot);
-const coreFiles = files.filter((file) => file.includes('/core/') || file.endsWith('/src/index.ts') || file.includes('/sinks/'));
+const coreFiles = files.filter(
+  (file) => file.includes('/core/') || file.endsWith('/src/index.ts') || file.includes('/sinks/')
+);
 const optionalFiles = files.filter((file) => file.includes('/ga4/') || file.includes('/report/'));
 
 for (const file of coreFiles) {

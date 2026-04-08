@@ -12,10 +12,7 @@ function assertFile(relativePath) {
 }
 
 function assertIncludes(value, expected, label) {
-  assert.ok(
-    typeof value === 'string' && value.includes(expected),
-    `${label} must include ${expected}`
-  );
+  assert.ok(typeof value === 'string' && value.includes(expected), `${label} must include ${expected}`);
 }
 
 assert.equal(packageJson.name, '@stroma-labs/signal', 'Package name must be @stroma-labs/signal');
@@ -23,9 +20,9 @@ assert.equal(packageJson.license, 'MIT', 'Package license must be MIT');
 assert.equal(packageJson.type, 'module', 'Package should remain ESM-only');
 assert.equal(packageJson.sideEffects, false, 'Package must stay sideEffect-free');
 assert.ok(Array.isArray(packageJson.files) && packageJson.files.includes('dist'), 'Package files must include dist');
-assertIncludes(packageJson.repository?.url, 'github.com/jonnybmc/stroma-signal', 'Repository URL');
-assertIncludes(packageJson.homepage, 'github.com/jonnybmc/stroma-signal', 'Homepage');
-assertIncludes(packageJson.bugs?.url, 'github.com/jonnybmc/stroma-signal/issues', 'Bugs URL');
+assertIncludes(packageJson.repository?.url, 'github.com/jonathanbooysen/stroma-signal', 'Repository URL');
+assertIncludes(packageJson.homepage, 'github.com/jonathanbooysen/stroma-signal', 'Homepage');
+assertIncludes(packageJson.bugs?.url, 'github.com/jonathanbooysen/stroma-signal/issues', 'Bugs URL');
 
 for (const [entry, target] of Object.entries(packageJson.exports ?? {})) {
   assert.ok(target.types, `Missing types export for ${entry}`);

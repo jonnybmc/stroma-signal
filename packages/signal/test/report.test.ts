@@ -1,6 +1,5 @@
-import { describe, expect, it } from 'vitest';
-
 import { chromeColdNavFixture, previewAggregateFixture } from '@stroma-labs/signal-contracts';
+import { describe, expect, it } from 'vitest';
 
 import { createPreviewCollector } from '../src/report/index.js';
 

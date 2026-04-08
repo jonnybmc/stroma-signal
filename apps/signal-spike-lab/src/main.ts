@@ -63,19 +63,15 @@ function refreshGa4Meta(): void {
       ga4Meta.textContent = `Could not load gtag.js for ${measurementId}. Check network access before using this harness for Gate 2.`;
       break;
     default:
-      ga4Meta.textContent = 'Live GA4 transport is disabled. Set VITE_SIGNAL_GA4_MEASUREMENT_ID to enable Gate 2 validation.';
+      ga4Meta.textContent =
+        'Live GA4 transport is disabled. Set VITE_SIGNAL_GA4_MEASUREMENT_ID to enable Gate 2 validation.';
   }
 }
 
 bootstrapSpikeLabGa4(measurementId, isAutomation, setGa4State);
 
 const controller = init({
-  sinks: [
-    createBeaconSink({ endpoint: '/collect' }),
-    createSpikeLabGa4Sink(),
-    createDataLayerSink(),
-    previewCollector
-  ],
+  sinks: [createBeaconSink({ endpoint: '/collect' }), createSpikeLabGa4Sink(), createDataLayerSink(), previewCollector],
   packageVersion: '0.1.0'
 });
 
@@ -86,7 +82,7 @@ window.__STROMA_SIGNAL__ = {
 
 async function refreshCollector(): Promise<void> {
   const response = await fetch('/api/events');
-  const payload = await response.json() as { events: Array<Record<string, unknown>> };
+  const payload = (await response.json()) as { events: Array<Record<string, unknown>> };
   const [latest] = payload.events;
 
   if (collectorMeta) {
@@ -96,9 +92,7 @@ async function refreshCollector(): Promise<void> {
   }
 
   if (collectorJson) {
-    collectorJson.textContent = latest
-      ? JSON.stringify(latest, null, 2)
-      : 'No events captured yet.';
+    collectorJson.textContent = latest ? JSON.stringify(latest, null, 2) : 'No events captured yet.';
   }
 }
 
@@ -120,22 +114,19 @@ function refreshPreview(): void {
 
 function refreshDataLayer(): void {
   const entries = window.dataLayer ?? [];
-  const latest = [...entries].reverse().find(
-    (entry): entry is Record<string, unknown> =>
-      typeof entry === 'object' &&
-      entry !== null &&
-      !Array.isArray(entry) &&
-      'event' in entry
-  );
+  const latest = [...entries]
+    .reverse()
+    .find(
+      (entry): entry is Record<string, unknown> =>
+        typeof entry === 'object' && entry !== null && !Array.isArray(entry) && 'event' in entry
+    );
   if (datalayerMeta) {
     datalayerMeta.textContent = latest
       ? `dataLayer entries=${entries.length} latest event=${String(latest.event)}`
       : 'dataLayer events will appear after flush.';
   }
   if (datalayerJson) {
-    datalayerJson.textContent = latest
-      ? JSON.stringify(latest, null, 2)
-      : 'No dataLayer pushes captured yet.';
+    datalayerJson.textContent = latest ? JSON.stringify(latest, null, 2) : 'No dataLayer pushes captured yet.';
   }
 }
 

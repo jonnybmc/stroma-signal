@@ -34,4 +34,8 @@ const reportModule = await import(pathToFileURL(path.join(packageDir, packageJso
 assert.equal(typeof mainModule.init, 'function', 'Expected main package to export init()');
 assert.equal(typeof mainModule.createBeaconSink, 'function', 'Expected main package to export createBeaconSink()');
 assert.equal(typeof ga4Module.createDataLayerSink, 'function', 'Expected GA4 subpath to export createDataLayerSink()');
-assert.equal(typeof reportModule.createPreviewCollector, 'function', 'Expected report subpath to export createPreviewCollector()');
+assert.equal(
+  typeof reportModule.createPreviewCollector,
+  'function',
+  'Expected report subpath to export createPreviewCollector()'
+);

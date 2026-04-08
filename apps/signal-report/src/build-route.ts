@@ -2,8 +2,8 @@ import {
   decodeSignalReportUrl,
   encodeSignalReportUrl,
   explainSignalAggregateIssues,
-  signalReportScenarioFixtures,
-  type SignalAggregateV1
+  type SignalAggregateV1,
+  signalReportScenarioFixtures
 } from '@stroma-labs/signal-contracts';
 
 import './shared.css';
@@ -94,15 +94,16 @@ function parseAggregateInput(value: string): { aggregate: SignalAggregateV1 | nu
     const message = cause instanceof Error ? cause.message : 'Unknown JSON parse failure.';
     return {
       aggregate: null,
-      issues: [
-        'Malformed JSON. Check quotes, commas, and braces before generating the URL.',
-        message
-      ]
+      issues: ['Malformed JSON. Check quotes, commas, and braces before generating the URL.', message]
     };
   }
 }
 
-function parseReportUrlInput(value: string): { aggregate: SignalAggregateV1 | null; issues: string[]; url: string | null } {
+function parseReportUrlInput(value: string): {
+  aggregate: SignalAggregateV1 | null;
+  issues: string[];
+  url: string | null;
+} {
   const trimmed = value.trim();
   if (!trimmed) {
     return {
@@ -127,10 +128,7 @@ function parseReportUrlInput(value: string): { aggregate: SignalAggregateV1 | nu
     return {
       aggregate: null,
       url: null,
-      issues: [
-        'Could not decode that report URL. Paste the full hosted `/r?...` URL and try again.',
-        message
-      ]
+      issues: ['Could not decode that report URL. Paste the full hosted `/r?...` URL and try again.', message]
     };
   }
 }
@@ -229,7 +227,7 @@ if (
 }
 
 let latestUrl = '';
-let mode: BuilderMode = 'aggregate';
+let _mode: BuilderMode = 'aggregate';
 
 for (const fixture of signalReportScenarioFixtures) {
   const option = document.createElement('option');
@@ -239,7 +237,7 @@ for (const fixture of signalReportScenarioFixtures) {
 }
 
 function setMode(nextMode: BuilderMode): void {
-  mode = nextMode;
+  _mode = nextMode;
   const aggregateActive = nextMode === 'aggregate';
   aggregateField.classList.toggle('is-hidden', !aggregateActive);
   reportUrlField.classList.toggle('is-hidden', aggregateActive);

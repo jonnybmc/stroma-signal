@@ -7,16 +7,11 @@ type ObserverCallback = (entries: PerformanceEntry[]) => void;
 const callbacks = new Map<string, ObserverCallback>();
 
 class MockPerformanceObserver {
-  static supportedEntryTypes = [
-    'event',
-    'largest-contentful-paint',
-    'layout-shift',
-    'paint'
-  ];
+  static supportedEntryTypes = ['event', 'largest-contentful-paint', 'layout-shift', 'paint'];
 
   private callback: ObserverCallback;
 
-  constructor(callback: { (list: PerformanceObserverEntryList): void }) {
+  constructor(callback: (list: PerformanceObserverEntryList) => void) {
     this.callback = (entries) =>
       callback({
         getEntries: () => entries

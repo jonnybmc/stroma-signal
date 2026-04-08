@@ -1,15 +1,19 @@
 import type { SignalContext } from '@stroma-labs/signal-contracts';
 
 export function readSignalContext(): SignalContext {
-  const connection = (globalThis.navigator as Navigator & {
-    connection?: {
-      effectiveType?: string;
-      downlink?: number;
-      rtt?: number;
-      saveData?: boolean;
-      type?: string;
-    };
-  } | undefined)?.connection;
+  const connection = (
+    globalThis.navigator as
+      | (Navigator & {
+          connection?: {
+            effectiveType?: string;
+            downlink?: number;
+            rtt?: number;
+            saveData?: boolean;
+            type?: string;
+          };
+        })
+      | undefined
+  )?.connection;
 
   return {
     effective_type: connection?.effectiveType ?? null,

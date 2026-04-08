@@ -1,3 +1,4 @@
+import { isSignalAggregateV1 } from './guards.js';
 import type {
   SignalAggregateV1,
   SignalComparisonTier,
@@ -7,7 +8,6 @@ import type {
   SignalTierMetricSummary
 } from './types.js';
 import { SIGNAL_PREVIEW_MINIMUM_SAMPLE, SIGNAL_REPORT_BASE_URL } from './types.js';
-import { isSignalAggregateV1 } from './guards.js';
 
 const VALID_COMPARISON_TIERS = new Set<SignalComparisonTier>([
   'urban',
@@ -58,11 +58,7 @@ function encodeAggregate(aggregate: SignalAggregateV1): URLSearchParams {
   );
   params.set(
     'dt',
-    joinInts([
-      aggregate.device_distribution.low,
-      aggregate.device_distribution.mid,
-      aggregate.device_distribution.high
-    ])
+    joinInts([aggregate.device_distribution.low, aggregate.device_distribution.mid, aggregate.device_distribution.high])
   );
   params.set('lu', metricValue(aggregate.vitals.urban, 'lcp_ms'));
   params.set('lt', metricValue(aggregate.vitals.comparison, 'lcp_ms'));
@@ -137,12 +133,7 @@ function readNumberParam(params: URLSearchParams, key: string, fallback = 0): nu
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-function readEnumParam<T extends string>(
-  params: URLSearchParams,
-  key: string,
-  validValues: Set<T>,
-  fallback: T
-): T {
+function readEnumParam<T extends string>(params: URLSearchParams, key: string, validValues: Set<T>, fallback: T): T {
   const raw = params.get(key);
   if (raw == null) return fallback;
   if (!validValues.has(raw as T)) {
@@ -151,11 +142,7 @@ function readEnumParam<T extends string>(
   return raw as T;
 }
 
-function readOptionalEnumParam<T extends string>(
-  params: URLSearchParams,
-  key: string,
-  validValues: Set<T>
-): T | null {
+function readOptionalEnumParam<T extends string>(params: URLSearchParams, key: string, validValues: Set<T>): T | null {
   const raw = params.get(key);
   if (raw == null) return null;
   if (!validValues.has(raw as T)) {
@@ -176,9 +163,7 @@ export function decodeSignalReportUrl(value: string | URL): SignalAggregateV1 {
     generated_at: Date.now(),
     domain: params.get('d') ?? 'unknown.local',
     sample_size: readNumberParam(params, 's'),
-    classified_sample_size: Math.round(
-      (readNumberParam(params, 's') * readNumberParam(params, 'nc')) / 100
-    ),
+    classified_sample_size: Math.round((readNumberParam(params, 's') * readNumberParam(params, 'nc')) / 100),
     period_days: readNumberParam(params, 'p'),
     network_distribution: {
       urban: network[0] ?? 0,

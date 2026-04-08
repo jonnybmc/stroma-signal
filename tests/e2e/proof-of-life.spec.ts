@@ -15,9 +15,7 @@ test('proof-of-life flow flushes one payload into the collector and dataLayer', 
   const dataLayerJson = page.locator('#datalayer-json');
   const previewLink = page.locator('#preview-link');
 
-  await expect
-    .poll(async () => (await readCollectorEvents(request)).length)
-    .toBe(1);
+  await expect.poll(async () => (await readCollectorEvents(request)).length).toBe(1);
   await expect(dataLayerMeta).toContainText('event=perf_tier_report', { timeout: 5_000 });
   await expect(dataLayerJson).toContainText('"event": "perf_tier_report"');
   await expect(previewLink).toHaveAttribute('href', /http:\/\/localhost:4174\/r\?/);
@@ -38,10 +36,8 @@ test('multi-page spike flow preserves collector truth and preview url semantics'
   await page.getByRole('link', { name: 'Visit second route' }).click();
   await page.getByRole('button', { name: 'Flush this page load now' }).click();
 
-  await expect
-    .poll(async () => (await readCollectorEvents(request)).length)
-    .toBe(2);
-  const payload = await readCollectorEvents(request) as Array<{ url?: string }>;
+  await expect.poll(async () => (await readCollectorEvents(request)).length).toBe(2);
+  const payload = (await readCollectorEvents(request)) as Array<{ url?: string }>;
 
   expect(payload).toHaveLength(2);
   expect(payload.map((event) => event.url).sort()).toEqual(['/', '/offers/']);
@@ -118,7 +114,9 @@ test('builder shows friendly validation errors for malformed report urls', async
 
 test('report route renders hostile domain text safely', async ({ page }) => {
   const hostileDomain = encodeURIComponent('<img src=x onerror=alert(1)>');
-  await page.goto(`http://localhost:4174/r?mode=preview&d=${hostileDomain}&nt=25,25,25,25,0&dt=34,33,33&s=100&p=1&nc=100&nu=0&nr=0&lc=0&ct=none&rm=none`);
+  await page.goto(
+    `http://localhost:4174/r?mode=preview&d=${hostileDomain}&nt=25,25,25,25,0&dt=34,33,33&s=100&p=1&nc=100&nu=0&nr=0&lc=0&ct=none&rm=none`
+  );
 
   await expect(page.locator('.headline')).toContainText('<img src=x onerror=alert(1)>');
   await expect(page.locator('.headline img')).toHaveCount(0);

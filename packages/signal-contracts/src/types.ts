@@ -7,11 +7,7 @@ export const SIGNAL_REPORT_BASE_URL = 'https://signal.stroma.design/r';
 export const SIGNAL_BUILDER_BASE_URL = 'https://signal.stroma.design/build';
 export const SIGNAL_GA4_EVENT_NAME = 'perf_tier_report';
 
-export type SignalNetworkTier =
-  | 'urban'
-  | 'moderate'
-  | 'constrained_moderate'
-  | 'constrained';
+export type SignalNetworkTier = 'urban' | 'moderate' | 'constrained_moderate' | 'constrained';
 
 export type SignalDeviceTier = 'low' | 'mid' | 'high';
 
@@ -30,12 +26,7 @@ export type SignalRaceFallbackReason =
   | 'insufficient_comparable_data';
 
 export type SignalComparisonTier = SignalNetworkTier | 'none';
-export type SignalNavigationType =
-  | 'navigate'
-  | 'reload'
-  | 'back-forward'
-  | 'prerender'
-  | 'restore';
+export type SignalNavigationType = 'navigate' | 'reload' | 'back-forward' | 'prerender' | 'restore';
 export type SignalLoadState = 'loading' | 'interactive' | 'complete';
 export type SignalInteractionType = 'pointer' | 'keyboard';
 export type SignalLcpElementType = 'image' | 'text';
@@ -218,8 +209,14 @@ export interface SignalReportUrlResult {
 }
 
 export interface SignalMetricSelectionInput {
-  urban: Pick<SignalTierMetricSummary, 'lcp_observations' | 'fcp_observations' | 'ttfb_observations' | 'lcp_coverage' | 'fcp_coverage' | 'ttfb_coverage'>;
-  comparison: Pick<SignalTierMetricSummary, 'lcp_observations' | 'fcp_observations' | 'ttfb_observations' | 'lcp_coverage' | 'fcp_coverage' | 'ttfb_coverage'>;
+  urban: Pick<
+    SignalTierMetricSummary,
+    'lcp_observations' | 'fcp_observations' | 'ttfb_observations' | 'lcp_coverage' | 'fcp_coverage' | 'ttfb_coverage'
+  >;
+  comparison: Pick<
+    SignalTierMetricSummary,
+    'lcp_observations' | 'fcp_observations' | 'ttfb_observations' | 'lcp_coverage' | 'fcp_coverage' | 'ttfb_coverage'
+  >;
 }
 
 export interface SignalMetricSelectionResult {

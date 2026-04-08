@@ -1,6 +1,5 @@
+import { chromeColdNavFixture, flattenSignalEventForGa4, SIGNAL_GA4_EVENT_NAME } from '@stroma-labs/signal-contracts';
 import { describe, expect, it } from 'vitest';
-
-import { SIGNAL_GA4_EVENT_NAME, chromeColdNavFixture, flattenSignalEventForGa4 } from '@stroma-labs/signal-contracts';
 
 import { createDataLayerSink } from '../src/ga4/index.js';
 

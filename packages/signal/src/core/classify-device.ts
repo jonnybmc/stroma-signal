@@ -30,11 +30,7 @@ function scoreScreen(width: number): number {
   return 3;
 }
 
-export function defaultDeviceTier(
-  cores: number,
-  memory: number | null,
-  screenWidth: number
-): SignalDeviceTier {
+export function defaultDeviceTier(cores: number, memory: number | null, screenWidth: number): SignalDeviceTier {
   const scores = [scoreCores(cores), scoreScreen(screenWidth)];
   const memoryScore = scoreMemory(memory);
   if (memoryScore != null) scores.push(memoryScore);
@@ -51,15 +47,14 @@ export function classifyDevice(
   override?: (cores: number, memory: number | null, screenWidth: number) => SignalDeviceTier
 ): DeviceSnapshot {
   const cores = globalThis.navigator?.hardwareConcurrency ?? 1;
-  const memory = typeof globalThis.navigator !== 'undefined'
-    ? ((globalThis.navigator as Navigator & { deviceMemory?: number }).deviceMemory ?? null)
-    : null;
+  const memory =
+    typeof globalThis.navigator !== 'undefined'
+      ? ((globalThis.navigator as Navigator & { deviceMemory?: number }).deviceMemory ?? null)
+      : null;
   const screenWidth = globalThis.screen?.width ?? 0;
   const screenHeight = globalThis.screen?.height ?? 0;
 
-  const device_tier = override
-    ? override(cores, memory, screenWidth)
-    : defaultDeviceTier(cores, memory, screenWidth);
+  const device_tier = override ? override(cores, memory, screenWidth) : defaultDeviceTier(cores, memory, screenWidth);
 
   return {
     device_tier,

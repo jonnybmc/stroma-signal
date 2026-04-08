@@ -13,7 +13,7 @@ import { classifyNetwork, DEFAULT_NETWORK_THRESHOLDS, getNavigationEntry } from 
 import { readSignalContext } from './context.js';
 import { createEventId } from './create-event-id.js';
 import { observeVitals } from './observe-vitals.js';
-import { transitionSignalLifecycle, type SignalLifecycleState } from './state-machine.js';
+import { type SignalLifecycleState, transitionSignalLifecycle } from './state-machine.js';
 
 const RUNTIME_KEY = Symbol.for('stroma.signal.runtime');
 
@@ -85,7 +85,7 @@ function createRuntime(config: SignalInitConfig): RuntimeInternals {
   let state: SignalLifecycleState = 'booting';
   let eventId = createEventId();
   const startedPrerendered = Boolean(
-    (globalThis.document as Document & { prerendering?: boolean } | undefined)?.prerendering
+    (globalThis.document as (Document & { prerendering?: boolean }) | undefined)?.prerendering
   );
   let navigationType: SignalNavigationType = startedPrerendered ? 'prerender' : 'navigate';
   let vitalObserver = observeVitals({ generateTarget: config.generateTarget });
@@ -209,6 +209,17 @@ function shouldSample(sampleRate: number | undefined): boolean {
   return Math.random() < sampleRate;
 }
 
+/**
+ * Initialises the Signal runtime, attaching page-lifecycle listeners that
+ * automatically collect a {@link SignalEventV1} and flush it to the
+ * configured sinks when the page becomes hidden.
+ *
+ * Calling `init` more than once returns the existing controller without
+ * creating a second runtime.
+ *
+ * @param config - Sinks, sample rate, and optional overrides.
+ * @returns A controller for inspecting state or tearing down the runtime.
+ */
 export function init(config: SignalInitConfig): SignalRuntimeController {
   const existing = (globalThis as Record<PropertyKey, unknown>)[RUNTIME_KEY] as RuntimeInternals | undefined;
   if (existing) return existing.controller;
@@ -241,6 +252,10 @@ export function init(config: SignalInitConfig): SignalRuntimeController {
   return runtime.controller;
 }
 
+/**
+ * Tears down the current Signal runtime, removing all event listeners.
+ * Safe to call even if no runtime has been initialised.
+ */
 export function destroy(): void {
   const existing = (globalThis as Record<PropertyKey, unknown>)[RUNTIME_KEY] as RuntimeInternals | undefined;
   existing?.controller.destroy();

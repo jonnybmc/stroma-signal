@@ -14,11 +14,13 @@ function assertUnderBudget(label, size, budget) {
 
 async function walk(dir) {
   const entries = await readdir(dir, { withFileTypes: true });
-  const files = await Promise.all(entries.map(async (entry) => {
-    const fullPath = path.join(dir, entry.name);
-    if (entry.isDirectory()) return walk(fullPath);
-    return [fullPath];
-  }));
+  const files = await Promise.all(
+    entries.map(async (entry) => {
+      const fullPath = path.join(dir, entry.name);
+      if (entry.isDirectory()) return walk(fullPath);
+      return [fullPath];
+    })
+  );
   return files.flat();
 }
 

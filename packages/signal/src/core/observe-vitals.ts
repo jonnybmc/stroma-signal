@@ -96,7 +96,7 @@ function sanitizeResourceUrl(rawUrl: string | undefined): string | null {
     const base =
       typeof globalThis.location?.href === 'string' && globalThis.location.href.length > 0
         ? globalThis.location.href
-        : origin ?? 'https://signal.invalid/';
+        : (origin ?? 'https://signal.invalid/');
     const parsed = new URL(rawUrl, base);
     const sameOrigin = origin
       ? parsed.origin === origin
@@ -150,8 +150,7 @@ function createInpAttribution(
   const inputDelay = processingStart != null ? processingStart - startTime : undefined;
   const processingDuration =
     processingStart != null && processingEnd != null ? processingEnd - processingStart : undefined;
-  const presentationDelay =
-    processingEnd != null ? duration - (processingEnd - startTime) : undefined;
+  const presentationDelay = processingEnd != null ? duration - (processingEnd - startTime) : undefined;
 
   return {
     load_state: readLoadState(),
@@ -260,9 +259,7 @@ export function observeVitals(options: ObserveVitalsOptions = {}): VitalObserver
           : navigation.startTime
         : 0;
       const ttfb =
-        navigation && navigation.responseStart > 0
-          ? Math.round(navigation.responseStart - navigationStart)
-          : null;
+        navigation && navigation.responseStart > 0 ? Math.round(navigation.responseStart - navigationStart) : null;
       const inpRecord = pickInpRecord([...interactionRecords.values()]);
 
       return {

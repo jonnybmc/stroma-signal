@@ -1,6 +1,5 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
-
 import { chromeColdNavFixture } from '@stroma-labs/signal-contracts';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { bootstrapSpikeLabGa4, createSpikeLabGa4Sink } from './ga4-helper.js';
 
@@ -18,9 +17,13 @@ describe('spike-lab ga4 helper', () => {
 
     createSpikeLabGa4Sink().handle(chromeColdNavFixture);
 
-    expect(gtag).toHaveBeenCalledWith('event', 'perf_tier_report', expect.objectContaining({
-      event_id: chromeColdNavFixture.event_id
-    }));
+    expect(gtag).toHaveBeenCalledWith(
+      'event',
+      'perf_tier_report',
+      expect.objectContaining({
+        event_id: chromeColdNavFixture.event_id
+      })
+    );
   });
 
   it('attaches to an existing loading script and transitions to ready once it loads', () => {
@@ -45,7 +48,7 @@ describe('spike-lab ga4 helper', () => {
     } as unknown as Document);
 
     bootstrapSpikeLabGa4('G-TEST123', false, onStateChange);
-    listeners.get('load')?.forEach((callback) => callback());
+    for (const callback of listeners.get('load') ?? []) callback();
 
     expect(onStateChange).toHaveBeenCalledWith('loading');
     expect(onStateChange).toHaveBeenCalledWith('ready');

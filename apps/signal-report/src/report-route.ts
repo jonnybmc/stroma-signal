@@ -1,13 +1,12 @@
-import {
-  decodeSignalReportUrl,
-  encodeSignalReportUrl,
-  previewAggregateFixture
-} from '@stroma-labs/signal-contracts';
+import { decodeSignalReportUrl, encodeSignalReportUrl, previewAggregateFixture } from '@stroma-labs/signal-contracts';
 
 import './shared.css';
 import { escapeHtml } from './render-utils';
 
-function metricValue(metric: 'lcp' | 'fcp' | 'ttfb' | 'none', scope: { lcp_ms: number | null; fcp_ms: number | null; ttfb_ms: number | null }): number | null {
+function metricValue(
+  metric: 'lcp' | 'fcp' | 'ttfb' | 'none',
+  scope: { lcp_ms: number | null; fcp_ms: number | null; ttfb_ms: number | null }
+): number | null {
   switch (metric) {
     case 'lcp':
       return scope.lcp_ms;
@@ -62,9 +61,7 @@ function renderInvalidReportState(message: string): void {
 let aggregate = previewAggregateFixture;
 let decodeFailed = false;
 try {
-  aggregate = location.search
-    ? decodeSignalReportUrl(location.href)
-    : previewAggregateFixture;
+  aggregate = location.search ? decodeSignalReportUrl(location.href) : previewAggregateFixture;
 } catch (error) {
   const message = error instanceof Error ? error.message : 'Unknown report decode failure.';
   renderInvalidReportState(message);
@@ -111,7 +108,9 @@ if (decodeFailed) {
         ['constrained_moderate', aggregate.network_distribution.constrained_moderate],
         ['constrained', aggregate.network_distribution.constrained],
         ['unknown', aggregate.network_distribution.unknown]
-      ].map(([tier, value]) => `
+      ]
+        .map(
+          ([tier, value]) => `
         <article class="tier-card" data-tier="${tier}">
           <p class="label">${humanizeTier(String(tier))}</p>
           <div class="metric-value">${value}%</div>
@@ -119,7 +118,9 @@ if (decodeFailed) {
             <span style="width:${value}%"></span>
           </div>
         </article>
-      `).join('')}
+      `
+        )
+        .join('')}
     </div>
   </section>
 
