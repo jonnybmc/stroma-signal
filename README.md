@@ -10,11 +10,20 @@ pnpm add @stroma-labs/signal
 
 `@stroma-labs/signal` is published as an ESM-only package.
 
-## Public Integration Modes
-
 Signal is event-first and analytics-agnostic. Pick the sink that matches your environment.
 
-### GTM / dataLayer
+## Choose Your Setup
+
+### I already have GTM / GA4
+
+Use this if: your site already uses GTM and you want Signal to emit the canonical event into `window.dataLayer`.
+
+Exact import:
+
+```ts
+import { init } from '@stroma-labs/signal';
+import { createDataLayerSink } from '@stroma-labs/signal/ga4';
+```
 
 ```ts
 import { init } from '@stroma-labs/signal';
@@ -25,7 +34,19 @@ init({
 });
 ```
 
-### Own endpoint
+Success check: `perf_tier_report` appears in GTM Preview, then in GA4 DebugView.
+
+Next doc: [marketer quickstart](./docs/marketer-quickstart.md)
+
+### I want to send to my own endpoint
+
+Use this if: you already have a collector or backend endpoint and want warehouse truth without GTM.
+
+Exact import:
+
+```ts
+import { init, createBeaconSink } from '@stroma-labs/signal';
+```
 
 ```ts
 import { init, createBeaconSink } from '@stroma-labs/signal';
@@ -35,7 +56,19 @@ init({
 });
 ```
 
-### Full control in app code
+Success check: one request lands at your collector and the payload contains `event_id`.
+
+Next doc: [collector contract](./docs/collector-contract.md)
+
+### I want full control in app code
+
+Use this if: you already have an internal analytics wrapper or want to decide in app code what happens to each canonical event.
+
+Exact import:
+
+```ts
+import { init, createCallbackSink } from '@stroma-labs/signal';
+```
 
 ```ts
 import { init, createCallbackSink } from '@stroma-labs/signal';
@@ -47,14 +80,40 @@ init({
         console.log(event.event_id);
       }
     })
-  ],
-  generateTarget(element) {
-    if (!element) return null;
-    if (element.tagName.toLowerCase() === 'button') return 'primary-cta';
-    return element.tagName.toLowerCase();
-  }
+  ]
 });
 ```
+
+Success check: your callback fires once and exposes the canonical event object.
+
+Next doc: [warehouse schema](./docs/warehouse-schema.md)
+
+## First 5 Minutes
+
+1. Choose your integration mode.
+2. Paste the matching snippet into app code.
+3. Verify one event locally.
+4. Verify GTM / GA4 or endpoint landing.
+5. Generate the first report URL.
+
+## Report URL Paths
+
+- GTM / GA4 path: validate rows with [ga4-bigquery-validation.sql](./docs/ga4-bigquery-validation.sql), then generate the hosted report with [ga4-bigquery-url-builder.sql](./docs/ga4-bigquery-url-builder.sql).
+- Own endpoint and full-control paths: validate rows with [normalized-bigquery-validation.sql](./docs/normalized-bigquery-validation.sql), then generate the hosted report with [normalized-bigquery-url-builder.sql](./docs/normalized-bigquery-url-builder.sql).
+- [`/build`](http://signal.stroma.design/build) stays the QA and fallback path, not the primary launch automation flow.
+
+## Deeper Docs
+
+- [choose your setup](./docs/client-integrations.md)
+- [public API freeze (v0.1)](./docs/public-api-v0.1.md)
+- [marketer quickstart](./docs/marketer-quickstart.md)
+- [GTM recipe](./docs/gtm-recipe.md)
+- [collector contract](./docs/collector-contract.md)
+- [warehouse schema](./docs/warehouse-schema.md)
+- [BigQuery saved query setup](./docs/bigquery-saved-query-setup.md)
+- [launch troubleshooting](./docs/launch-troubleshooting.md)
+
+## Additional Diagnostics
 
 Signal also emits additive, capability-gated diagnostics for richer warehouse analysis:
 
@@ -63,14 +122,6 @@ Signal also emits additive, capability-gated diagnostics for richer warehouse an
 - `vitals.inp_attribution` for load-state and interaction timing splits
 
 These fields stay optional and nullable, and the launch report schema remains unchanged.
-
-More detail:
-
-- [public API freeze (v0.1)](./docs/public-api-v0.1.md)
-- [client integrations](./docs/client-integrations.md)
-- [GTM recipe](./docs/gtm-recipe.md)
-- [collector contract](./docs/collector-contract.md)
-- [warehouse schema](./docs/warehouse-schema.md)
 
 ## Launch Automation Pack
 
