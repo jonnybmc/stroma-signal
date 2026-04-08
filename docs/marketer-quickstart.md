@@ -34,7 +34,6 @@ Use these two assets together:
 
 - [gtm-recipe.md](./gtm-recipe.md)
 - [gtm-workspace-template.json](./gtm-workspace-template.json)
-- [screenshot-capture-checklist.md](./screenshot-capture-checklist.md)
 
 The GTM setup must include:
 

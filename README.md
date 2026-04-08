@@ -69,7 +69,8 @@ More detail:
 - [public API freeze (v0.1)](./docs/public-api-v0.1.md)
 - [client integrations](./docs/client-integrations.md)
 - [GTM recipe](./docs/gtm-recipe.md)
-- [functional validation checklist](./docs/functional-validation-checklist.md)
+- [collector contract](./docs/collector-contract.md)
+- [warehouse schema](./docs/warehouse-schema.md)
 
 ## Launch Automation Pack
 
@@ -85,11 +86,7 @@ Start here:
 - [marketer quickstart](./docs/marketer-quickstart.md)
 - [GTM workspace template](./docs/gtm-workspace-template.json)
 - [BigQuery saved query setup](./docs/bigquery-saved-query-setup.md)
-- [release checklist (v0.1)](./docs/release-checklist-v0.1.md)
-- [release notes (v0.1.0)](./docs/release-notes-v0.1.0.md)
-- [screenshot capture checklist](./docs/screenshot-capture-checklist.md)
 - [launch troubleshooting](./docs/launch-troubleshooting.md)
-- [internal onboarding checklist](./docs/internal-onboarding-checklist.md)
 
 ## Workspace Layout
 

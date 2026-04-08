@@ -37,18 +37,17 @@ for (const [entry, target] of Object.entries(packageJson.exports ?? {})) {
   'LICENSE',
   'README.md',
   'docs/public-api-v0.1.md',
-  'docs/release-checklist-v0.1.md',
-  'docs/release-notes-v0.1.0.md',
   'docs/marketer-quickstart.md',
+  'docs/client-integrations.md',
+  'docs/collector-contract.md',
+  'docs/warehouse-schema.md',
   'docs/gtm-recipe.md',
   'docs/gtm-workspace-template.json',
   'docs/ga4-bigquery-validation.sql',
   'docs/ga4-bigquery-url-builder.sql',
   'docs/normalized-bigquery-validation.sql',
   'docs/normalized-bigquery-url-builder.sql',
-  'docs/screenshot-capture-checklist.md',
-  'docs/launch-troubleshooting.md',
-  'docs/internal-onboarding-checklist.md'
+  'docs/launch-troubleshooting.md'
 ].forEach(assertFile);
 
 console.log('Release-readiness metadata and artifact checks passed.');

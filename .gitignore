@@ -16,3 +16,11 @@ npm-debug.log*
 pnpm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Internal and release-ops docs that should not live in the public repo
+docs/internal/
+docs/functional-validation-checklist.md
+docs/internal-onboarding-checklist.md
+docs/release-checklist-v*.md
+docs/release-notes-v*.md
+docs/screenshot-capture-checklist.md
