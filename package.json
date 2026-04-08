@@ -1,0 +1,39 @@
+{
+  "name": "stroma-signal",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Signal by Stroma monorepo",
+  "packageManager": "pnpm@10.28.2",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "build": "pnpm build:contracts && pnpm build:signal && pnpm build:apps && pnpm check:exports && pnpm check:boundaries && pnpm check:budgets",
+    "build:contracts": "pnpm --filter @stroma-labs/signal-contracts build",
+    "build:signal": "pnpm --filter @stroma-labs/signal build",
+    "build:apps": "pnpm --filter @stroma-labs/signal-spike-lab build && pnpm --filter @stroma-labs/signal-report-app build",
+    "dev:spike": "pnpm --filter @stroma-labs/signal-spike-lab dev",
+    "dev:report": "pnpm --filter @stroma-labs/signal-report-app dev",
+    "typecheck": "pnpm -r run typecheck",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "check:budgets": "node scripts/check-budgets.mjs",
+    "check:boundaries": "node scripts/check-boundaries.mjs",
+    "check:exports": "node scripts/check-package-exports.mjs",
+    "ci": "pnpm test && pnpm build"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.53.0",
+    "@rollup/plugin-node-resolve": "^16.0.1",
+    "@rollup/plugin-terser": "^0.4.4",
+    "@rollup/plugin-typescript": "^12.1.4",
+    "@types/node": "^24.0.0",
+    "rollup": "^4.45.1",
+    "rollup-plugin-dts": "^6.2.1",
+    "tslib": "^2.8.1",
+    "typescript": "^5.8.3",
+    "vite": "^6.3.5",
+    "vitest": "^3.2.4"
+  }
+}

@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Signal Report Routes</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: "Avenir Next", "Segoe UI", sans-serif;
+        background: #f5efe2;
+        color: #171c22;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        background:
+          radial-gradient(circle at top left, rgba(55, 138, 221, 0.14), transparent 28%),
+          radial-gradient(circle at bottom right, rgba(213, 152, 49, 0.16), transparent 28%),
+          #f5efe2;
+      }
+
+      main {
+        width: min(680px, calc(100vw - 32px));
+        padding: 28px;
+        border: 1px solid rgba(23, 28, 34, 0.12);
+        border-radius: 28px;
+        background: rgba(255, 255, 255, 0.82);
+        box-shadow: 0 14px 44px rgba(23, 28, 34, 0.08);
+      }
+
+      p {
+        line-height: 1.6;
+      }
+
+      .eyebrow {
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        font-size: 0.78rem;
+        font-weight: 700;
+        color: #6d706c;
+      }
+
+      .actions {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-top: 20px;
+      }
+
+      a {
+        text-decoration: none;
+        border-radius: 999px;
+        padding: 12px 18px;
+      }
+
+      .primary {
+        background: #171c22;
+        color: white;
+      }
+
+      .secondary {
+        border: 1px solid rgba(23, 28, 34, 0.12);
+        color: #171c22;
+        background: rgba(255, 255, 255, 0.7);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p class="eyebrow">Signal by Stroma</p>
+      <h1>Local report routes</h1>
+      <p>
+        The report app exposes the hosted report shell at <code>/r</code> and the zero-code builder
+        at <code>/build</code>. This root page exists so the local Vite URL has a useful landing
+        point during validation.
+      </p>
+      <div class="actions">
+        <a class="primary" href="/build/">Open builder</a>
+        <a class="secondary" href="/r/">Open report shell</a>
+      </div>
+    </main>
+  </body>
+</html>

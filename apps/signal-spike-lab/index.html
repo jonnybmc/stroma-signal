@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Signal Spike Lab</title>
+    <script type="module" src="/src/main.ts"></script>
+  </head>
+  <body data-page-title="Landing">
+    <main class="page-shell">
+      <section class="hero">
+        <p class="eyebrow">Signal by Stroma</p>
+        <h1>Spike lab: one page load to one report shell</h1>
+        <p class="lede">
+          This harness wires the canonical runtime into a local collector, a preview collector,
+          the public dataLayer path, and a spike-lab-only live dev-stream gtag transport so we can
+          verify the production-truth chain quickly.
+        </p>
+        <div class="hero-actions">
+          <a class="primary" href="/offers/">Visit second route</a>
+          <button id="flush-now" type="button">Flush this page load now</button>
+          <button id="reset-events" type="button">Reset collector</button>
+        </div>
+      </section>
+
+      <section class="card-grid">
+        <article class="card">
+          <p class="card-label">Preview URL</p>
+          <a id="preview-link" class="link-block" href="#" target="_blank" rel="noreferrer">Waiting for flush...</a>
+          <p id="preview-meta" class="muted">No preview aggregate yet.</p>
+        </article>
+
+        <article class="card">
+          <p class="card-label">GA4 Dev Stream</p>
+          <p class="mono" id="measurement-id">Not configured</p>
+          <p id="ga4-meta" class="muted">Live GA4 transport is booting.</p>
+          <p id="datalayer-meta" class="muted">dataLayer events will appear after flush.</p>
+        </article>
+
+        <article class="card">
+          <p class="card-label">Collector</p>
+          <p id="collector-meta" class="muted">No collector payload received yet.</p>
+        </article>
+      </section>
+
+      <section class="two-up">
+        <article class="card">
+          <p class="card-label">Latest Collector Event</p>
+          <pre id="collector-json">No events captured yet.</pre>
+        </article>
+        <article class="card">
+          <p class="card-label">Latest dataLayer Event</p>
+          <pre id="datalayer-json">No dataLayer pushes captured yet.</pre>
+        </article>
+      </section>
+    </main>
+  </body>
+</html>

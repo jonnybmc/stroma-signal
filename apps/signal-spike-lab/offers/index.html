@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Signal Spike Lab - Offers</title>
+    <script type="module" src="/src/main.ts"></script>
+  </head>
+  <body data-page-title="Offers">
+    <main class="page-shell">
+      <section class="hero alt">
+        <p class="eyebrow">Signal by Stroma</p>
+        <h1>Offers route</h1>
+        <p class="lede">
+          This second route exists so we can exercise navigation timing on another real page and
+          verify the collector path separately from the landing view.
+        </p>
+        <div class="hero-actions">
+          <a class="primary" href="/">Back to landing</a>
+          <button id="flush-now" type="button">Flush this page load now</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <p class="card-label">Page state</p>
+        <p class="lede">This page uses the same runtime wiring and local collector endpoints.</p>
+      </section>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,54 @@
+{
+  "name": "@stroma-labs/signal",
+  "version": "0.1.0",
+  "description": "Native-first browser performance tier collector for Signal by Stroma.",
+  "license": "MIT",
+  "author": "Jonathan Booysen",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jonnybmc/stroma-signal.git",
+    "directory": "packages/signal"
+  },
+  "homepage": "https://github.com/jonnybmc/stroma-signal#readme",
+  "bugs": {
+    "url": "https://github.com/jonnybmc/stroma-signal/issues"
+  },
+  "keywords": [
+    "performance",
+    "analytics",
+    "signal",
+    "ga4",
+    "browser"
+  ],
+  "type": "module",
+  "main": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "default": "./dist/index.mjs"
+    },
+    "./ga4": {
+      "types": "./dist/ga4/index.d.ts",
+      "import": "./dist/ga4/index.mjs",
+      "default": "./dist/ga4/index.mjs"
+    },
+    "./report": {
+      "types": "./dist/report/index.d.ts",
+      "import": "./dist/report/index.mjs",
+      "default": "./dist/report/index.mjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "rollup -c rollup.config.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "@stroma-labs/signal-contracts": "workspace:*"
+  }
+}
