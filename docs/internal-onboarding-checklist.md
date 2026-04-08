@@ -2,6 +2,8 @@
 
 Use this checklist when Stroma is onboarding a launch client onto Signal.
 
+Use [public-api-v0.1.md](./public-api-v0.1.md) as the canonical package contract during onboarding and review.
+
 ## 1. Choose The Sink
 
 - GTM / GA4 via `createDataLayerSink()`

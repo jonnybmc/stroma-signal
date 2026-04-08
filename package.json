@@ -21,7 +21,8 @@
     "check:budgets": "node scripts/check-budgets.mjs",
     "check:boundaries": "node scripts/check-boundaries.mjs",
     "check:exports": "node scripts/check-package-exports.mjs",
-    "ci": "pnpm test && pnpm build"
+    "check:release": "node scripts/check-release-readiness.mjs",
+    "ci": "pnpm typecheck && pnpm test && pnpm build && pnpm check:release"
   },
   "devDependencies": {
     "@playwright/test": "^1.53.0",

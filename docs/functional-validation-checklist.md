@@ -63,6 +63,8 @@ Recommended sequence:
 5. Wait for BigQuery export and run the GA4 SQL template.
 6. Open the generated report URL and compare it to fixture semantics.
 
+Gate 2 is not closed until the exported BigQuery row has produced a hosted `/r?...` URL that matches fixture semantics exactly.
+
 ## Gate 3: Warehouse Parity and Transport Survival
 
 Run the normalized path with [normalized-bigquery-url-builder.sql](./normalized-bigquery-url-builder.sql).

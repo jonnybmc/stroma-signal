@@ -66,6 +66,7 @@ These fields stay optional and nullable, and the launch report schema remains un
 
 More detail:
 
+- [public API freeze (v0.1)](./docs/public-api-v0.1.md)
 - [client integrations](./docs/client-integrations.md)
 - [GTM recipe](./docs/gtm-recipe.md)
 - [functional validation checklist](./docs/functional-validation-checklist.md)
@@ -84,6 +85,8 @@ Start here:
 - [marketer quickstart](./docs/marketer-quickstart.md)
 - [GTM workspace template](./docs/gtm-workspace-template.json)
 - [BigQuery saved query setup](./docs/bigquery-saved-query-setup.md)
+- [release checklist (v0.1)](./docs/release-checklist-v0.1.md)
+- [release notes (v0.1.0)](./docs/release-notes-v0.1.0.md)
 - [screenshot capture checklist](./docs/screenshot-capture-checklist.md)
 - [launch troubleshooting](./docs/launch-troubleshooting.md)
 - [internal onboarding checklist](./docs/internal-onboarding-checklist.md)
@@ -133,3 +136,14 @@ During Playwright runs, the live GA4 transport is intentionally skipped so brows
 - production truth from analytics-derived aggregation
 - preview explicitly limited to sanity-check use
 - report hostname standardized to `https://signal.stroma.design`
+
+## Release Boundary
+
+The v0.1 release boundary is:
+
+- one canonical public package contract
+- one verified GTM / GA4 launch pack
+- one proven GA4 -> BigQuery -> hosted report URL path
+- one published npm package and tagged GitHub release
+
+Until the warehouse-derived report URL matches fixture semantics exactly, the repo should be treated as release-candidate software rather than a fully closed 0.1 release.

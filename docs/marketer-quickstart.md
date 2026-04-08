@@ -26,6 +26,8 @@ init({
 
 Signal does not need your GTM container ID and does not load GTM or GA4 for you.
 
+For the canonical v0.1 package contract, see [public-api-v0.1.md](./public-api-v0.1.md).
+
 ## 2. Configure GTM
 
 Use these two assets together:
