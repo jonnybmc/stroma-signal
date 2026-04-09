@@ -24,8 +24,9 @@ test('proof-of-life flow flushes one payload into the collector and dataLayer', 
 
   const previewHref = await previewLink.getAttribute('href');
   expect(previewHref).toBeTruthy();
+  if (!previewHref) throw new Error('Expected preview href to be present.');
 
-  await page.goto(previewHref!);
+  await page.goto(previewHref);
   await expect(page.locator('.headline')).toContainText('localhost:4173');
 });
 
@@ -63,8 +64,9 @@ test('builder-generated report urls preserve fallback params end to end', async 
 
   const href = await link.getAttribute('href');
   expect(href).toBeTruthy();
+  if (!href) throw new Error('Expected generated href to be present.');
 
-  await page.goto(href!);
+  await page.goto(href);
 
   const params = new URL(page.url()).searchParams;
   expect(params.get('ct')).toBe('constrained_moderate');
@@ -82,15 +84,31 @@ test('builder validates a hosted report url and decodes the same semantics', asy
   await expect(generatedLink).toBeVisible();
   const href = await generatedLink.getAttribute('href');
   expect(href).toBeTruthy();
+  if (!href) throw new Error('Expected generated href to be present.');
 
   await page.locator('#mode-report-url').click();
-  await page.locator('#report-url-input').fill(href!);
+  await page.locator('#report-url-input').fill(href);
   await page.getByRole('button', { name: 'Validate report URL' }).click();
 
   await expect(page.locator('#builder-success')).toContainText('Validated URL');
   await expect(page.locator('#builder-summary')).toContainText('TTFB');
   await expect(page.locator('#builder-summary')).toContainText('fcp unavailable');
   await expect(page.locator('#builder-summary')).toContainText('constrained');
+});
+
+test('builder keeps mixed lifecycle fixtures load-shaped by default', async ({ page }) => {
+  await page.goto('http://localhost:4174/build/');
+  await page.selectOption('#fixture-select', 'mixed-lifecycle');
+  await page.getByRole('button', { name: 'Load selected fixture' }).click();
+  await page.getByRole('button', { name: 'Generate report URL' }).click();
+
+  const link = page.locator('#builder-success a');
+  await expect(link).toBeVisible();
+  await expect(link).toHaveAttribute('href', /[?&]s=1/);
+  await expect(link).toHaveAttribute('href', /[?&]rm=none/);
+  await expect(link).toHaveAttribute('href', /[?&]rr=insufficient_comparable_data/);
+  await expect(page.locator('#fixture-description')).toContainText('excluded from default load-shaped reporting');
+  await expect(page.locator('#builder-summary')).toContainText('Sample');
 });
 
 test('builder shows friendly validation errors for malformed aggregate input', async ({ page }) => {

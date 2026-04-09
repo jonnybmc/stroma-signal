@@ -12,9 +12,10 @@ export interface DataLayerSinkOptions {
 }
 
 /**
- * Creates a sink that pushes a GA4-compatible flat object into
+ * Creates a sink that pushes a compact GA4-safe flat object into
  * `window.dataLayer` (or a custom data layer), ready for GTM to
- * forward as a GA4 event.
+ * forward as a GA4 event while staying under the standard-property
+ * event parameter cap.
  *
  * @param options - Optional overrides for data layer name, event name, and target window.
  */

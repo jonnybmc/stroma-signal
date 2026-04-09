@@ -131,6 +131,57 @@ export const tlsCoalescedFixture: SignalEventV1 = {
   net_tcp_source: 'unavailable_tls_coalesced'
 };
 
+export const restoreLifecycleFixture: SignalEventV1 = {
+  ...chromeColdNavFixture,
+  event_id: 'evt_restore',
+  ts: Date.UTC(2026, 3, 8, 10, 30, 0),
+  net_tier: null,
+  net_tcp_ms: null,
+  net_tcp_source: 'unavailable_missing_timing',
+  vitals: {
+    lcp_ms: null,
+    cls: 0.02,
+    inp_ms: 120,
+    fcp_ms: null,
+    ttfb_ms: null,
+    inp_attribution: {
+      load_state: 'complete',
+      interaction_target: 'button',
+      interaction_type: 'pointer',
+      interaction_time_ms: 740,
+      input_delay_ms: 18,
+      processing_duration_ms: 54,
+      presentation_delay_ms: 48
+    }
+  },
+  meta: {
+    ...chromeColdNavFixture.meta,
+    nav_type: 'back_forward',
+    navigation_type: 'restore'
+  }
+};
+
+export const prerenderLifecycleFixture: SignalEventV1 = {
+  ...chromeColdNavFixture,
+  event_id: 'evt_prerender',
+  ts: Date.UTC(2026, 3, 8, 10, 35, 0),
+  net_tier: null,
+  net_tcp_ms: null,
+  net_tcp_source: 'unavailable_missing_timing',
+  vitals: {
+    lcp_ms: null,
+    cls: 0.01,
+    inp_ms: null,
+    fcp_ms: null,
+    ttfb_ms: null
+  },
+  meta: {
+    ...chromeColdNavFixture.meta,
+    nav_type: 'navigate',
+    navigation_type: 'prerender'
+  }
+};
+
 function createFixtureEvent(event_id: string, ts: number, overrides: Partial<SignalEventV1> = {}): SignalEventV1 {
   const {
     event_id: _overrideEventId,
@@ -228,6 +279,12 @@ export const previewAggregateFixture: SignalAggregateV1 = aggregateSignalEvents(
   [chromeColdNavFixture, safariFallbackFixture, reusedConnectionFixture, serviceWorkerFixture, tlsCoalescedFixture],
   'preview',
   Date.UTC(2026, 3, 8, 10, 25, 0)
+);
+
+export const mixedLifecycleAggregateFixture: SignalAggregateV1 = aggregateSignalEvents(
+  [chromeColdNavFixture, restoreLifecycleFixture, prerenderLifecycleFixture],
+  'preview',
+  Date.UTC(2026, 3, 8, 10, 40, 0)
 );
 
 export const strongLcpCoverageAggregateFixture: SignalAggregateV1 = aggregateSignalEvents(
@@ -397,6 +454,12 @@ export const signalReportScenarioFixtures: SignalReportScenarioFixture[] = [
     label: 'Preview sanity check',
     description: 'Small preview-mode aggregate with an insufficient race and mixed classified coverage.',
     aggregate: previewAggregateFixture
+  },
+  {
+    id: 'mixed-lifecycle',
+    label: 'Mixed lifecycle traffic',
+    description: 'Restore and prerender events stay in raw data but are excluded from default load-shaped reporting.',
+    aggregate: mixedLifecycleAggregateFixture
   },
   {
     id: 'strong-lcp',

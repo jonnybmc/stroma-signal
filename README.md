@@ -17,11 +17,43 @@ pnpm add @stroma-labs/signal
 
 Signal is event-first and analytics-agnostic. Pick the sink that matches your environment.
 
+## Choose Your Role
+
+### I need the shareable report URL
+
+Use this if: you own launch, martech, analytics, or product ops and want the shortest path from installed Signal to an always-current hosted report URL.
+
+Start here:
+
+- [marketer quickstart](./docs/marketer-quickstart.md)
+- [production report automation](./docs/production-report-automation.md)
+
+### I need to implement Signal
+
+Use this if: you are the engineer wiring Signal into app code, GTM, or a warehouse flow.
+
+Start here:
+
+- [choose your setup](./docs/client-integrations.md)
+- [framework recipes](./docs/framework-recipes.md)
+
+## What Signal Automates
+
+Signal automates browser-side collection and gives you canonical SQL templates for the final hosted report URL.
+
+Your team still configures the warehouse refresh once:
+
+- GTM / GA4 or your own collector must land rows in BigQuery
+- your team saves or schedules the provided URL-builder query
+- the final artifact is a hosted `signal_report_url` that you can share internally
+
+Signal does not create BigQuery scheduled queries, persistence tables, or dashboards for you in v0.1.
+
 ## Choose Your Setup
 
 ### I already have GTM / GA4
 
-Use this if: your site already uses GTM and you want Signal to emit the canonical event into `window.dataLayer`.
+Use this if: your site already uses GTM and you want Signal to emit a compact GA4-safe subset into `window.dataLayer`.
 
 Exact import:
 
@@ -107,6 +139,10 @@ Next doc: [warehouse schema](./docs/warehouse-schema.md)
 - Own endpoint and full-control paths: validate rows with [normalized-bigquery-validation.sql](./docs/normalized-bigquery-validation.sql), then generate the hosted report with [normalized-bigquery-url-builder.sql](./docs/normalized-bigquery-url-builder.sql).
 - [`/build`](http://signal.stroma.design/build) stays the QA and fallback path, not the primary launch automation flow.
 
+If you want the plain-English production operating model for the BigQuery step, use [production report automation](./docs/production-report-automation.md).
+
+The validation queries show raw rows, including `navigation_type = restore` and `navigation_type = prerender`. The URL-builder queries exclude those non-load-shaped rows by default so shared reports stay tied to normal load performance.
+
 ## Framework Recipes
 
 Signal is framework-agnostic. These recipes cover where to initialise, SSR guards, and duplicate-init safety for each environment:
@@ -119,6 +155,7 @@ Signal is framework-agnostic. These recipes cover where to initialise, SSR guard
 - [choose your setup](./docs/client-integrations.md)
 - [public API freeze (v0.1)](./docs/public-api-v0.1.md)
 - [marketer quickstart](./docs/marketer-quickstart.md)
+- [production report automation](./docs/production-report-automation.md)
 - [GTM recipe](./docs/gtm-recipe.md)
 - [collector contract](./docs/collector-contract.md)
 - [warehouse schema](./docs/warehouse-schema.md)
@@ -135,18 +172,22 @@ Signal also emits additive, capability-gated diagnostics for richer warehouse an
 
 These fields stay optional and nullable, and the launch report schema remains unchanged.
 
+`restore` and `prerender` events are preserved in raw runtime and warehouse data, but the default report SQL excludes them from paint and network percentile calculations in v0.1.
+
 ## Launch Automation Pack
 
 For v0.1 launch, the primary automation path is:
 
 - Signal deployed with automatic collection
 - client-owned warehouse receives rows
-- a saved BigQuery query returns a final hosted `signal_report_url`
+- a BigQuery URL-builder query returns a final hosted `signal_report_url`
+- the user team decides whether that query is rerun manually or on a schedule
 - that URL is the shareable internal asset
 
 Start here:
 
 - [marketer quickstart](./docs/marketer-quickstart.md)
+- [production report automation](./docs/production-report-automation.md)
 - [GTM workspace template](./docs/gtm-workspace-template.json)
 - [BigQuery saved query setup](./docs/bigquery-saved-query-setup.md)
 - [launch troubleshooting](./docs/launch-troubleshooting.md)
@@ -167,7 +208,7 @@ Start here:
 
 ```bash
 pnpm install
-pnpm test
+pnpm test:unit
 pnpm build
 ```
 
@@ -187,6 +228,7 @@ If you set `VITE_SIGNAL_GA4_MEASUREMENT_ID`, the spike lab will also boot a spik
 - real `gtag` delivery into your dev GA4 property
 
 During Playwright runs, the live GA4 transport is intentionally skipped so browser tests stay deterministic.
+The local spike lab enables `debug: true` so the browser console shows raw FCP/LCP observations, the flush reason, and the final payload before sink emission.
 
 ## v0.1 Scope
 
@@ -207,3 +249,10 @@ The v0.1 release boundary is:
 - one published npm package and tagged GitHub release
 
 Until the warehouse-derived report URL matches fixture semantics exactly, the repo should be treated as release-candidate software rather than a fully closed 0.1 release.
+
+The release-facing launch docs are a coordinated public surface and should stay aligned:
+
+- `README.md`
+- `docs/marketer-quickstart.md`
+- `docs/production-report-automation.md`
+- `docs/bigquery-saved-query-setup.md`

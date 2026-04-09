@@ -33,6 +33,10 @@ const ZERO_DEVICE_DISTRIBUTION: SignalDeviceDistribution = {
   high: 0
 };
 
+function isLoadShapedEvent(event: SignalEventV1): boolean {
+  return event.meta.navigation_type !== 'restore' && event.meta.navigation_type !== 'prerender';
+}
+
 function asPercent(part: number, total: number): number {
   if (total <= 0) return 0;
   return Math.round((part / total) * 100);
@@ -42,7 +46,8 @@ function p75(values: number[]): number | null {
   if (values.length === 0) return null;
   const sorted = [...values].sort((a, b) => a - b);
   const index = Math.max(0, Math.ceil(sorted.length * 0.75) - 1);
-  return Math.round(sorted[index] ?? sorted[sorted.length - 1]!);
+  const fallback = sorted[sorted.length - 1];
+  return Math.round(sorted[index] ?? fallback ?? 0);
 }
 
 interface TierAccumulator {
@@ -151,8 +156,9 @@ export function aggregateSignalEvents(
   mode: SignalAggregateV1['mode'] = 'preview',
   now = Date.now()
 ): SignalAggregateV1 {
-  const total = events.length;
-  const domain = events[0]?.host ?? 'unknown.local';
+  const reportEvents = events.filter(isLoadShapedEvent);
+  const total = reportEvents.length;
+  const domain = reportEvents[0]?.host ?? events[0]?.host ?? 'unknown.local';
   let earliest = now;
   let latest = now;
   let hasTimestamp = false;
@@ -169,7 +175,7 @@ export function aggregateSignalEvents(
     constrained: createTierAccumulator()
   };
 
-  for (const event of events) {
+  for (const event of reportEvents) {
     if (!hasTimestamp) {
       earliest = event.ts;
       latest = event.ts;

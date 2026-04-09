@@ -49,4 +49,24 @@ describe('dataLayer sink', () => {
     const payload = (target as unknown as { dataLayer: Array<Record<string, unknown>> }).dataLayer[0];
     expect(payload.event).toBe(SIGNAL_GA4_EVENT_NAME);
   });
+
+  it('keeps the dataLayer payload on the compact GA4-safe subset', () => {
+    const target = {} as Window & typeof globalThis;
+    const sink = createDataLayerSink({ target });
+
+    sink.handle(chromeColdNavFixture);
+
+    const payload = (target as unknown as { dataLayer: Array<Record<string, unknown>> }).dataLayer[0];
+    expect(Object.keys(payload)).toHaveLength(21);
+    expect(payload).not.toHaveProperty('device_cores');
+    expect(payload).not.toHaveProperty('device_memory_gb');
+    expect(payload).not.toHaveProperty('device_screen_w');
+    expect(payload).not.toHaveProperty('device_screen_h');
+    expect(payload).not.toHaveProperty('effective_type');
+    expect(payload).not.toHaveProperty('downlink_mbps');
+    expect(payload).not.toHaveProperty('rtt_ms');
+    expect(payload).not.toHaveProperty('save_data');
+    expect(payload).not.toHaveProperty('connection_type');
+    expect(payload).not.toHaveProperty('pkg_version');
+  });
 });

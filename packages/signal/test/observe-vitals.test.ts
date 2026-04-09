@@ -4,12 +4,18 @@ import { observeVitals } from '../src/core/observe-vitals.js';
 
 type ObserverCallback = (entries: PerformanceEntry[]) => void;
 
-const callbacks = new Map<string, ObserverCallback>();
+interface ObserverRegistration {
+  callback: ObserverCallback;
+  pending: PerformanceEntry[];
+}
+
+const registrations = new Map<string, ObserverRegistration[]>();
 
 class MockPerformanceObserver {
   static supportedEntryTypes = ['event', 'largest-contentful-paint', 'layout-shift', 'paint'];
 
   private callback: ObserverCallback;
+  private registration: ObserverRegistration | null = null;
 
   constructor(callback: (list: PerformanceObserverEntryList) => void) {
     this.callback = (entries) =>
@@ -20,14 +26,34 @@ class MockPerformanceObserver {
 
   observe(options?: PerformanceObserverInit): void {
     const type = options?.type;
-    if (type) callbacks.set(type, this.callback);
+    if (!type) return;
+
+    this.registration = {
+      callback: this.callback,
+      pending: []
+    };
+    const current = registrations.get(type) ?? [];
+    current.push(this.registration);
+    registrations.set(type, current);
+  }
+
+  takeRecords(): PerformanceEntry[] {
+    return this.registration?.pending.splice(0) ?? [];
   }
 
   disconnect(): void {}
 }
 
 function emitEntries(type: string, entries: PerformanceEntry[]): void {
-  callbacks.get(type)?.(entries);
+  for (const registration of registrations.get(type) ?? []) {
+    registration.callback(entries);
+  }
+}
+
+function queueEntries(type: string, entries: PerformanceEntry[]): void {
+  for (const registration of registrations.get(type) ?? []) {
+    registration.pending.push(...entries);
+  }
 }
 
 function setupObserverTest(options?: {
@@ -62,7 +88,7 @@ function setupObserverTest(options?: {
 }
 
 afterEach(() => {
-  callbacks.clear();
+  registrations.clear();
   vi.unstubAllGlobals();
 });
 
@@ -114,6 +140,27 @@ describe('observeVitals', () => {
       target: 'img',
       element_type: 'image',
       resource_url: '/assets/hero.webp'
+    });
+  });
+
+  it('drains pending observer records before building the vitals snapshot', () => {
+    setupObserverTest();
+
+    const observer = observeVitals();
+    queueEntries('largest-contentful-paint', [
+      {
+        startTime: 3_100,
+        element: { tagName: 'IMG' },
+        url: 'https://example.co.za/assets/hero.webp?cache=1'
+      } as PerformanceEntry
+    ]);
+
+    expect(observer.snapshot()).toMatchObject({
+      lcp_ms: 3_100,
+      lcp_attribution: {
+        target: 'img',
+        resource_url: '/assets/hero.webp'
+      }
     });
   });
 

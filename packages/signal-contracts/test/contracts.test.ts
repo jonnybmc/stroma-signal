@@ -12,8 +12,12 @@ import {
   fcpFallbackAggregateFixture,
   flattenSignalEventForGa4,
   highUnclassifiedShareAggregateFixture,
+  mixedLifecycleAggregateFixture,
+  prerenderLifecycleFixture,
   previewAggregateFixture,
+  restoreLifecycleFixture,
   SIGNAL_GA4_EVENT_NAME,
+  SIGNAL_GA4_FIELD_MAP_V1,
   safariFallbackFixture,
   safariHeavyAggregateFixture,
   signalReportScenarioFixtures,
@@ -78,6 +82,7 @@ describe('signal contracts', () => {
     const flattened = flattenSignalEventForGa4(chromeColdNavFixture);
 
     expect(flattened.event).toBe(SIGNAL_GA4_EVENT_NAME);
+    expect(Object.keys(flattened)).toHaveLength(21);
     expect(flattened.net_tier).toBe(chromeColdNavFixture.net_tier);
     expect(flattened.lcp_ms).toBe(chromeColdNavFixture.vitals.lcp_ms);
     expect(flattened.navigation_type).toBe('navigate');
@@ -92,6 +97,30 @@ describe('signal contracts', () => {
     expect(flattened).not.toHaveProperty('lcp_resource_url');
     expect(flattened).not.toHaveProperty('interaction_target');
     expect(flattened).not.toHaveProperty('interaction_time_ms');
+    expect(flattened).not.toHaveProperty('v');
+    expect(flattened).not.toHaveProperty('ts');
+    expect(flattened).not.toHaveProperty('ref');
+    expect(flattened).not.toHaveProperty('device_cores');
+    expect(flattened).not.toHaveProperty('device_memory_gb');
+    expect(flattened).not.toHaveProperty('device_screen_w');
+    expect(flattened).not.toHaveProperty('device_screen_h');
+    expect(flattened).not.toHaveProperty('cls');
+    expect(flattened).not.toHaveProperty('inp_ms');
+    expect(flattened).not.toHaveProperty('effective_type');
+    expect(flattened).not.toHaveProperty('downlink_mbps');
+    expect(flattened).not.toHaveProperty('rtt_ms');
+    expect(flattened).not.toHaveProperty('save_data');
+    expect(flattened).not.toHaveProperty('connection_type');
+    expect(flattened).not.toHaveProperty('pkg_version');
+  });
+
+  it('keeps the canonical GA4-safe subset under the standard-property event parameter limit', () => {
+    const flattened = flattenSignalEventForGa4(chromeColdNavFixture);
+    const ga4SafeFieldCount = Object.keys(SIGNAL_GA4_FIELD_MAP_V1.fields).length;
+
+    expect(ga4SafeFieldCount).toBe(20);
+    expect(ga4SafeFieldCount).toBeLessThanOrEqual(25);
+    expect(Object.keys(flattened).filter((key) => key !== 'event')).toHaveLength(ga4SafeFieldCount);
   });
 
   it('preserves nullable safari vitals in the normalized warehouse row', () => {
@@ -143,9 +172,27 @@ describe('signal contracts', () => {
     expect(aggregate.top_page_path).toBe('/pricing');
   });
 
+  it('excludes restore and prerender events from default report aggregates', () => {
+    const aggregate = aggregateSignalEvents(
+      [chromeColdNavFixture, restoreLifecycleFixture, prerenderLifecycleFixture],
+      'preview',
+      Date.UTC(2026, 3, 8, 11, 0, 0)
+    );
+
+    expect(aggregate.sample_size).toBe(1);
+    expect(aggregate.classified_sample_size).toBe(1);
+    expect(aggregate.top_page_path).toBe('/personal-loans');
+    expect(aggregate.coverage.network_coverage).toBe(100);
+    expect(aggregate.coverage.lcp_coverage).toBe(100);
+    expect(aggregate.vitals.urban.observations).toBe(0);
+    expect(aggregate.vitals.comparison.observations).toBe(1);
+    expect(aggregate.domain).toBe('example.co.za');
+  });
+
   it('ships scenario fixtures that cover the intended report fallbacks and edge cases', () => {
     expect(signalReportScenarioFixtures.map((fixture) => fixture.id)).toEqual([
       'preview',
+      'mixed-lifecycle',
       'strong-lcp',
       'fcp-fallback',
       'ttfb-fallback',
@@ -153,6 +200,7 @@ describe('signal contracts', () => {
       'high-unclassified',
       'safari-heavy'
     ]);
+    expect(mixedLifecycleAggregateFixture.sample_size).toBe(1);
     expect(strongLcpCoverageAggregateFixture.race_metric).toBe('lcp');
     expect(fcpFallbackAggregateFixture.race_metric).toBe('fcp');
     expect(ttfbFallbackAggregateFixture.race_metric).toBe('ttfb');
@@ -166,6 +214,9 @@ describe('signal contracts', () => {
   });
 
   it('rejects invalid diagnostic enums in canonical events and warehouse rows', () => {
+    const lcpAttribution = chromeColdNavFixture.vitals.lcp_attribution;
+    if (!lcpAttribution) throw new Error('Expected chromeColdNavFixture to include lcp_attribution.');
+
     const invalidEvent = {
       ...chromeColdNavFixture,
       meta: {
@@ -175,7 +226,7 @@ describe('signal contracts', () => {
       vitals: {
         ...chromeColdNavFixture.vitals,
         lcp_attribution: {
-          ...chromeColdNavFixture.vitals.lcp_attribution!,
+          ...lcpAttribution,
           load_state: 'hydrating'
         }
       }

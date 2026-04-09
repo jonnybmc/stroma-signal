@@ -72,6 +72,7 @@ bootstrapSpikeLabGa4(measurementId, isAutomation, setGa4State);
 
 const controller = init({
   sinks: [createBeaconSink({ endpoint: '/collect' }), createSpikeLabGa4Sink(), createDataLayerSink(), previewCollector],
+  debug: true,
   packageVersion: '0.1.0'
 });
 

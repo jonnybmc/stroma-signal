@@ -8,7 +8,7 @@ Thanks for your interest in contributing! This guide covers the basics.
 git clone https://github.com/jonathanbooysen/stroma-signal.git
 cd stroma-signal
 pnpm install
-pnpm test
+pnpm test:unit
 pnpm build
 ```
 
@@ -26,7 +26,7 @@ pnpm dev:spike    # Spike lab at localhost:4173
 ## Testing
 
 ```bash
-pnpm test          # Unit tests (Vitest)
+pnpm test:unit     # Unit tests (Vitest)
 pnpm test:e2e      # E2E tests (Playwright, requires build first)
 pnpm typecheck     # Full workspace type check
 ```
@@ -37,6 +37,22 @@ pnpm typecheck     # Full workspace type check
 2. Bundle size budgets must not be exceeded
 3. Import boundaries must be respected (core cannot import optional subpaths)
 4. All export entry points must resolve correctly
+5. Husky pre-commit runs `lint-staged` plus `pnpm test:unit`, so expect the full unit suite locally before each commit
+
+## Public Launch Docs
+
+These docs are a coordinated public onboarding surface and should stay aligned when launch guidance changes:
+
+- `README.md`
+- `docs/marketer-quickstart.md`
+- `docs/production-report-automation.md`
+- `docs/bigquery-saved-query-setup.md`
+
+In particular, keep the automation boundary consistent:
+
+- Signal automates collection
+- the repo provides canonical SQL templates
+- recurring refresh is warehouse-configured by the user team
 
 ## Code Style
 

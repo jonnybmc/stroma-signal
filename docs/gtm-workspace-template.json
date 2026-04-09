@@ -4,7 +4,8 @@
   "notes": [
     "This artifact is the canonical trigger/variable/tag blueprint for launch.",
     "It is intentionally container-agnostic, so names and mappings stay stable across client GTM workspaces.",
-    "Use it alongside docs/gtm-recipe.md when recreating or templating the GTM setup."
+    "Use it alongside docs/gtm-recipe.md when recreating or templating the GTM setup.",
+    "The dataLayer payload is intentionally compact for GA4 standard-property compatibility. Use the normalized warehouse path if you need the full schema."
   ],
   "customEventTrigger": {
     "name": "CE - perf_tier_report",
@@ -34,18 +35,7 @@
     { "name": "DLV - processing_duration_ms", "type": "data_layer", "dataLayerName": "processing_duration_ms", "dataLayerVersion": 2, "required": false },
     { "name": "DLV - presentation_delay_ms", "type": "data_layer", "dataLayerName": "presentation_delay_ms", "dataLayerVersion": 2, "required": false }
   ],
-  "recommendedDataLayerVariables": [
-    { "name": "DLV - device_cores", "type": "data_layer", "dataLayerName": "device_cores", "dataLayerVersion": 2 },
-    { "name": "DLV - device_memory_gb", "type": "data_layer", "dataLayerName": "device_memory_gb", "dataLayerVersion": 2 },
-    { "name": "DLV - device_screen_w", "type": "data_layer", "dataLayerName": "device_screen_w", "dataLayerVersion": 2 },
-    { "name": "DLV - device_screen_h", "type": "data_layer", "dataLayerName": "device_screen_h", "dataLayerVersion": 2 },
-    { "name": "DLV - effective_type", "type": "data_layer", "dataLayerName": "effective_type", "dataLayerVersion": 2 },
-    { "name": "DLV - downlink_mbps", "type": "data_layer", "dataLayerName": "downlink_mbps", "dataLayerVersion": 2 },
-    { "name": "DLV - rtt_ms", "type": "data_layer", "dataLayerName": "rtt_ms", "dataLayerVersion": 2 },
-    { "name": "DLV - save_data", "type": "data_layer", "dataLayerName": "save_data", "dataLayerVersion": 2 },
-    { "name": "DLV - connection_type", "type": "data_layer", "dataLayerName": "connection_type", "dataLayerVersion": 2 },
-    { "name": "DLV - pkg_version", "type": "data_layer", "dataLayerName": "pkg_version", "dataLayerVersion": 2 }
-  ],
+  "recommendedDataLayerVariables": [],
   "ga4EventTag": {
     "name": "GA4 - perf_tier_report",
     "type": "ga4_event",
