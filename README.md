@@ -1,5 +1,3 @@
-# Signal by Stroma
-
 <img src="./docs/images/signal-stroma-logo.png" alt="Signal by Stroma logo" width="360" />
 
 [![CI](https://github.com/jonathanbooysen/stroma-signal/actions/workflows/ci.yml/badge.svg)](https://github.com/jonathanbooysen/stroma-signal/actions/workflows/ci.yml)
