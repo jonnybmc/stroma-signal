@@ -27,7 +27,8 @@ pnpm dev:spike    # Spike lab at localhost:4173
 
 ```bash
 pnpm test:unit     # Unit tests (Vitest)
-pnpm test:e2e      # E2E tests (Playwright, requires build first)
+pnpm test:e2e      # Full Playwright suite across configured browsers
+pnpm test:e2e:smoke # Chromium smoke lane used in merge CI
 pnpm typecheck     # Full workspace type check
 ```
 
@@ -38,6 +39,7 @@ pnpm typecheck     # Full workspace type check
 3. Import boundaries must be respected (core cannot import optional subpaths)
 4. All export entry points must resolve correctly
 5. Husky pre-commit runs `lint-staged` plus `pnpm test:unit`, so expect the full unit suite locally before each commit
+6. Merge CI currently runs the Chromium-only `pnpm test:e2e:smoke` lane; use `pnpm test:e2e` when you want the full browser matrix locally
 
 ## Public Launch Docs
 

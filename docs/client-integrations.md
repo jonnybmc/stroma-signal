@@ -1,5 +1,7 @@
 # Choose Your Signal Setup
 
+<img src="./images/signal-stroma-logo.png" alt="Signal by Stroma logo" width="320" />
+
 `@stroma-labs/signal` is configured in application code. The browser package does not expose a runtime GUI, CLI flag, GTM container ID, or GA4 measurement ID.
 
 Signal is event-first, sink-based, analytics-agnostic, and ESM-only. Signal emits canonical `SignalEventV1` payloads, and your team decides where those events go.

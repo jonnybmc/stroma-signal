@@ -19,6 +19,7 @@
     "test:unit": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
+    "test:e2e:smoke": "playwright test --project=chromium",
     "check:budgets": "node scripts/check-budgets.mjs",
     "check:boundaries": "node scripts/check-boundaries.mjs",
     "check:exports": "node scripts/check-package-exports.mjs",

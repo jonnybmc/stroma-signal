@@ -1,5 +1,7 @@
 # Signal by Stroma
 
+<img src="./docs/images/signal-stroma-logo.png" alt="Signal by Stroma logo" width="360" />
+
 [![CI](https://github.com/jonathanbooysen/stroma-signal/actions/workflows/ci.yml/badge.svg)](https://github.com/jonathanbooysen/stroma-signal/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/@stroma-labs/signal)](https://www.npmjs.com/package/@stroma-labs/signal)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)

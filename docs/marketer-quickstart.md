@@ -1,5 +1,7 @@
 # Marketer Quickstart: GTM To Shareable Signal URL
 
+<img src="./images/signal-stroma-logo.png" alt="Signal by Stroma logo" width="320" />
+
 This is the fastest launch path for a GTM/GA4-led team.
 
 If you are looking for the production operating model after rows land in BigQuery, pair this with [production-report-automation.md](./production-report-automation.md).

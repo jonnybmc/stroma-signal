@@ -1,5 +1,7 @@
 # Production Report Automation
 
+<img src="./images/signal-stroma-logo.png" alt="Signal by Stroma logo" width="320" />
+
 Use this when Signal is already landing rows in BigQuery and your team wants an always-updated hosted `signal_report_url` with as little manual work as possible.
 
 This is an operating recommendation for v0.1. Signal gives you the event payloads and the canonical SQL templates. Your team configures the warehouse refresh once.
