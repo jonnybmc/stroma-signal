@@ -51,3 +51,5 @@ Notes:
 - Prefer `navigation_type` in new warehouse models and analysis.
 - Default Signal URL-builder templates exclude `navigation_type = restore` and `navigation_type = prerender` before computing coverage and percentiles.
 - Treat target/resource fields as diagnostic hints, not stable identifiers.
+
+See also: [Collector Contract](./collector-contract.md) for endpoint requirements, [Aggregation Spec](./aggregation-spec.md) for how warehouse rows feed report generation.

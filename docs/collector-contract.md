@@ -26,3 +26,5 @@ These fields are optional, nullable, and capability-gated. Unsupported browsers 
 `restore` and `prerender` lifecycle rows should stay queryable in raw warehouse data even though the default report aggregation excludes them.
 
 This endpoint should be same-origin where possible to minimize CSP and ad-blocker friction.
+
+For the recommended warehouse table structure, see [Warehouse Schema](./warehouse-schema.md). For aggregation rules and report generation, see [Aggregation Spec](./aggregation-spec.md).

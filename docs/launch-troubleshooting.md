@@ -92,7 +92,7 @@ If GTM, GA4, and BigQuery all look healthy but `fcp_ms` or `lcp_ms` still look s
 - compare the flush reason (`manual`, `visibilitychange`, or `pagehide`)
 - compare the final payload before it reaches the sink
 
-The local spike lab enables this debug logging by default.
+The local spike lab enables this debug logging by default. For the full list of vitals fields and their browser support boundaries, see the [Signal Technical Reference](./signal-technical-reference.md).
 
 ## The Hosted Report URL Renders But Looks Wrong
 

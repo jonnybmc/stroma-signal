@@ -69,7 +69,7 @@ describe('spike-lab ga4 helper', () => {
   });
 
   it('queues bootstrap commands into dataLayer as single gtag command tuples', () => {
-    const dataLayer: Array<Record<string, unknown> | unknown[]> = [];
+    const dataLayer: Array<Record<string, unknown> | unknown[] | IArguments> = [];
     const onStateChange = vi.fn();
 
     vi.stubGlobal('window', {
@@ -86,8 +86,8 @@ describe('spike-lab ga4 helper', () => {
 
     bootstrapSpikeLabGa4('G-TEST123', false, onStateChange);
 
-    expect(dataLayer[0]).toEqual(['js', expect.any(Date)]);
-    expect(dataLayer[1]).toEqual([
+    expect(Array.from(dataLayer[0] as IArguments)).toEqual(['js', expect.any(Date)]);
+    expect(Array.from(dataLayer[1] as IArguments)).toEqual([
       'config',
       'G-TEST123',
       expect.objectContaining({

@@ -9,6 +9,8 @@ Signal is framework-agnostic. These are installation notes, not framework integr
 - How to avoid duplicate init
 - Which sink to use
 
+For Safari-specific validation after installation, see [Safari Manual Checklist](./safari-manual-checklist.md). For SPA and SSR lifecycle caveats, see [SPA / SSR Caveats](./spa-ssr-caveats.md).
+
 **Duplicate init is safe.** Signal uses a global singleton — calling `init()` more than once returns the existing controller. You do not need your own guard.
 
 **Choose your sink:**
