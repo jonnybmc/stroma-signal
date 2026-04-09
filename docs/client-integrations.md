@@ -10,7 +10,7 @@ If you are not implementing code and only need the launch recipe for a shareable
 
 ### I already have GTM / GA4
 
-Use this if: your site already uses GTM and you want Signal to push the canonical event into `window.dataLayer`.
+Use this if: your site already uses GTM and you want Signal to push a compact GA4-safe subset into `window.dataLayer`.
 
 Exact import:
 
@@ -37,7 +37,7 @@ What happens next:
 - Signal pushes `perf_tier_report` into `window.dataLayer`
 - GTM listens for that custom event
 - GTM forwards the mapped params into GA4
-- GA4 exports the event to BigQuery
+- GA4 exports that compact event subset to BigQuery
 
 Verification detail:
 
@@ -53,6 +53,7 @@ Notes:
 - Signal does not need your GTM container ID.
 - Signal does not load GTM or GA4 scripts for you.
 - Keep the event name frozen as `perf_tier_report`.
+- The GA4 path is intentionally compact for standard-property compatibility. If you need the full warehouse schema, prefer `beacon` or `callback`.
 - Signal can optionally annotate LCP and INP targets via `generateTarget()` if you want human-readable warehouse diagnostics.
 - `restore` and `prerender` rows may still appear in raw data. Default report SQL excludes them so shared URLs stay load-shaped.
 

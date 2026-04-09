@@ -41,6 +41,7 @@ init({
 ```
 
 Signal does not need your GTM container ID and does not load GTM or GA4 for you.
+The GTM/GA4 path intentionally sends a compact subset. If you need the full warehouse schema, use the endpoint or callback path instead.
 
 For the canonical v0.1 package contract, see [public-api-v0.1.md](./public-api-v0.1.md).
 

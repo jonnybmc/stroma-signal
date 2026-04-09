@@ -53,7 +53,7 @@ Signal does not create BigQuery scheduled queries, persistence tables, or dashbo
 
 ### I already have GTM / GA4
 
-Use this if: your site already uses GTM and you want Signal to emit the canonical event into `window.dataLayer`.
+Use this if: your site already uses GTM and you want Signal to emit a compact GA4-safe subset into `window.dataLayer`.
 
 Exact import:
 

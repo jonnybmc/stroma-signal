@@ -9,7 +9,7 @@ export type Ga4BootstrapState = 'disabled' | 'skipped' | 'loading' | 'ready' | '
 
 declare global {
   interface Window {
-    dataLayer?: Array<Record<string, unknown> | unknown[] | IArguments>;
+    dataLayer?: Array<Record<string, unknown> | unknown[]>;
     gtag?: (...args: unknown[]) => void;
   }
 }
@@ -53,7 +53,7 @@ export function bootstrapSpikeLabGa4(
     window.gtag ??
     function gtag(...args: unknown[]) {
       if (args.length === 0) return;
-      window.dataLayer?.push(arguments);
+      window.dataLayer?.push(args);
     };
 
   if (isAutomation) {

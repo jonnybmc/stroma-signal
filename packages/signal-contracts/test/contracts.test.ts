@@ -17,6 +17,7 @@ import {
   previewAggregateFixture,
   restoreLifecycleFixture,
   SIGNAL_GA4_EVENT_NAME,
+  SIGNAL_GA4_FIELD_MAP_V1,
   safariFallbackFixture,
   safariHeavyAggregateFixture,
   signalReportScenarioFixtures,
@@ -81,6 +82,7 @@ describe('signal contracts', () => {
     const flattened = flattenSignalEventForGa4(chromeColdNavFixture);
 
     expect(flattened.event).toBe(SIGNAL_GA4_EVENT_NAME);
+    expect(Object.keys(flattened)).toHaveLength(21);
     expect(flattened.net_tier).toBe(chromeColdNavFixture.net_tier);
     expect(flattened.lcp_ms).toBe(chromeColdNavFixture.vitals.lcp_ms);
     expect(flattened.navigation_type).toBe('navigate');
@@ -95,6 +97,30 @@ describe('signal contracts', () => {
     expect(flattened).not.toHaveProperty('lcp_resource_url');
     expect(flattened).not.toHaveProperty('interaction_target');
     expect(flattened).not.toHaveProperty('interaction_time_ms');
+    expect(flattened).not.toHaveProperty('v');
+    expect(flattened).not.toHaveProperty('ts');
+    expect(flattened).not.toHaveProperty('ref');
+    expect(flattened).not.toHaveProperty('device_cores');
+    expect(flattened).not.toHaveProperty('device_memory_gb');
+    expect(flattened).not.toHaveProperty('device_screen_w');
+    expect(flattened).not.toHaveProperty('device_screen_h');
+    expect(flattened).not.toHaveProperty('cls');
+    expect(flattened).not.toHaveProperty('inp_ms');
+    expect(flattened).not.toHaveProperty('effective_type');
+    expect(flattened).not.toHaveProperty('downlink_mbps');
+    expect(flattened).not.toHaveProperty('rtt_ms');
+    expect(flattened).not.toHaveProperty('save_data');
+    expect(flattened).not.toHaveProperty('connection_type');
+    expect(flattened).not.toHaveProperty('pkg_version');
+  });
+
+  it('keeps the canonical GA4-safe subset under the standard-property event parameter limit', () => {
+    const flattened = flattenSignalEventForGa4(chromeColdNavFixture);
+    const ga4SafeFieldCount = Object.keys(SIGNAL_GA4_FIELD_MAP_V1.fields).length;
+
+    expect(ga4SafeFieldCount).toBe(20);
+    expect(ga4SafeFieldCount).toBeLessThanOrEqual(25);
+    expect(Object.keys(flattened).filter((key) => key !== 'event')).toHaveLength(ga4SafeFieldCount);
   });
 
   it('preserves nullable safari vitals in the normalized warehouse row', () => {

@@ -34,6 +34,17 @@ Check:
 
 If the browser shows a `google-analytics.com/...collect...` request with `en=perf_tier_report`, the transport path is working and the issue is likely property/config visibility rather than Signal.
 
+## A Specific Param Is Missing In GA4
+
+Check:
+
+- the param is part of Signal's compact GA4 subset and not a warehouse-only field
+- the GTM Event tag maps that Data Layer Variable into the GA4 tag
+- the GA4 property is not exceeding its standard event parameter cap through extra custom mappings
+- you are not expecting a BigQuery-only field to appear in GA4 DebugView or GA4 UI reports
+
+Use [gtm-recipe.md](./gtm-recipe.md) and [public-api-v0.1.md](./public-api-v0.1.md) as the source of truth for the supported compact subset.
+
 ## BigQuery Rows Are Not Landing
 
 Run [ga4-bigquery-validation.sql](./ga4-bigquery-validation.sql).

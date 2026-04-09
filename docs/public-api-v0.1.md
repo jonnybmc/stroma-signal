@@ -76,6 +76,7 @@ Use this when the client wants full app-level control over forwarding or enrichm
 Use this when the client already has GTM and wants Signal to emit `perf_tier_report` into a data layer.
 
 Signal does not load GTM or GA4 scripts in the public package.
+The data-layer payload is intentionally a compact GA4-safe subset, not the full warehouse schema.
 
 ## Frozen event and integration names
 
@@ -104,8 +105,20 @@ These fields are:
 
 ### GA4-safe subset
 
-The GTM / GA4 path emits only this compact diagnostic subset:
+The GTM / GA4 path emits this compact report-and-debug subset:
 
+- `event_id`
+- `host`
+- `url`
+- `net_tier`
+- `net_tcp_ms`
+- `net_tcp_source`
+- `device_tier`
+- `lcp_ms`
+- `fcp_ms`
+- `ttfb_ms`
+- `browser`
+- `nav_type`
 - `navigation_type`
 - `lcp_load_state`
 - `lcp_element_type`
@@ -115,7 +128,51 @@ The GTM / GA4 path emits only this compact diagnostic subset:
 - `processing_duration_ms`
 - `presentation_delay_ms`
 
-The GTM / GA4 path does not emit these high-cardinality fields in v0.1:
+These fields stay under the standard GA4 event parameter cap and are enough for the provided GTM recipe, GA4 BigQuery validation, and URL-builder SQL.
+
+These fields are commonly useful in GA4 custom definitions:
+
+- `navigation_type`
+- `lcp_load_state`
+- `lcp_element_type`
+- `inp_load_state`
+- `interaction_type`
+- `net_tier`
+- `device_tier`
+- `browser`
+- `lcp_ms`
+- `fcp_ms`
+- `ttfb_ms`
+- `input_delay_ms`
+- `processing_duration_ms`
+- `presentation_delay_ms`
+
+These fields are kept mainly for DebugView or BigQuery validation and are not good default custom-definition candidates:
+
+- `event_id`
+- `host`
+- `url`
+- `net_tcp_ms`
+- `net_tcp_source`
+- `nav_type`
+
+The GTM / GA4 path does not emit these warehouse-only fields in v0.1:
+
+- `v`
+- `ts`
+- `ref`
+- `device_cores`
+- `device_memory_gb`
+- `device_screen_w`
+- `device_screen_h`
+- `cls`
+- `inp_ms`
+- `effective_type`
+- `downlink_mbps`
+- `rtt_ms`
+- `save_data`
+- `connection_type`
+- `pkg_version`
 
 - `lcp_target`
 - `lcp_resource_url`
