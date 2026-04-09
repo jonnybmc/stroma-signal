@@ -58,7 +58,7 @@ init({
 - `networkTierThresholds?: SignalNetworkTierThresholds`
 - `deviceTierOverride?: (cores: number, memory: number | null, screenWidth: number) => SignalDeviceTier`
 - `generateTarget?: (element: Element | null) => string | null`
-- `debug?: boolean`
+- `debug?: boolean` logs raw FCP/LCP observations, the flush reason, and the final payload before sink emission
 - `packageVersion?: string`
 
 ## Public sinks
@@ -99,6 +99,8 @@ These fields are:
 - nullable
 - capability-gated
 - not part of the frozen `SignalAggregateV1` report schema yet
+
+`restore` and `prerender` remain valid raw `SignalEventV1` lifecycle rows in v0.1, but the provided report aggregation defaults exclude them from load-shaped paint and network reporting.
 
 ### GA4-safe subset
 

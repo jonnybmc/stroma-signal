@@ -2,6 +2,8 @@
 
 This is the fastest launch path for a GTM/GA4-led team.
 
+If you are looking for the production operating model after rows land in BigQuery, pair this with [production-report-automation.md](./production-report-automation.md).
+
 ## Outcome
 
 By the end of this flow you should have:
@@ -9,7 +11,21 @@ By the end of this flow you should have:
 - `perf_tier_report` appearing in GTM Preview
 - `perf_tier_report` appearing in GA4 DebugView
 - BigQuery rows landing
-- a saved query returning a final hosted `signal_report_url`
+- a final hosted `signal_report_url` with a documented manual or scheduled refresh path
+
+## Who Does What
+
+- engineering deploys Signal with the public dataLayer sink
+- martech configures GTM and the GA4 event forwarding
+- analytics or ops saves the query and decides whether it runs manually or on a schedule
+
+## Plain-English Terms
+
+- validation query: a diagnostic query that answers, "are rows landing at all?"
+- URL-builder query: the query that returns the final hosted `signal_report_url`
+- saved query: a query stored in BigQuery for reuse; it does not refresh anything by itself
+- scheduled query: a BigQuery job that reruns a saved query on a cadence you choose
+- `signal_report_url`: the hosted `/r?...` link that becomes the shareable internal artifact
 
 ## 1. Deploy Signal
 
@@ -68,14 +84,24 @@ This answers the simple question:
 > Are `perf_tier_report` rows landing in BigQuery?
 
 Do not move to the URL-builder query until this query returns rows.
+This validation step shows raw exported rows, including `navigation_type = restore` and `navigation_type = prerender` when they occur.
 
-## 5. Save The Final URL Query
+Once this succeeds, switch to [production-report-automation.md](./production-report-automation.md) to choose the production refresh pattern and the place where the latest URL will live.
+
+## 5. Save Or Schedule The Final URL Query
 
 Once rows are landing, save the query in [ga4-bigquery-url-builder.sql](./ga4-bigquery-url-builder.sql) using the setup guide in [bigquery-saved-query-setup.md](./bigquery-saved-query-setup.md).
+
+That query excludes `navigation_type = restore` and `navigation_type = prerender` by default so the hosted report stays tied to normal load performance.
 
 That query should return a single field:
 
 - `signal_report_url`
+
+Important:
+
+- a saved query gives you a reusable query definition
+- a scheduled query is what creates automatic refresh
 
 ## 6. Open And Share The URL
 

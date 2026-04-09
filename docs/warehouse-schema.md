@@ -10,19 +10,19 @@ Recommended flat warehouse row shape for non-GA4 collection:
 | `host` | STRING | Domain/host name |
 | `path` | STRING | Path and query if retained |
 | `referrer` | STRING | Nullable |
-| `net_tier` | STRING | Nullable: `urban`, `moderate`, `constrained_moderate`, `constrained` |
-| `net_tcp_ms` | INT64 | Nullable |
+| `net_tier` | STRING | Nullable: `urban`, `moderate`, `constrained_moderate`, `constrained`; null for non-load-shaped `restore`/`prerender` rows |
+| `net_tcp_ms` | INT64 | Nullable and null for non-load-shaped `restore`/`prerender` rows |
 | `net_tcp_source` | STRING | Includes unavailable reasons |
 | `device_tier` | STRING | `low`, `mid`, `high` |
 | `device_cores` | INT64 | Browser logical cores |
 | `device_memory_gb` | FLOAT64 | Nullable |
 | `device_screen_w` | INT64 | CSS pixels |
 | `device_screen_h` | INT64 | CSS pixels |
-| `lcp_ms` | INT64 | Nullable outside Chromium |
+| `lcp_ms` | INT64 | Nullable outside Chromium and null for non-load-shaped `restore`/`prerender` rows |
 | `cls` | FLOAT64 | Nullable outside Chromium |
 | `inp_ms` | INT64 | Nullable outside Chromium |
-| `fcp_ms` | INT64 | Nullable |
-| `ttfb_ms` | INT64 | Nullable |
+| `fcp_ms` | INT64 | Nullable and null for non-load-shaped `restore`/`prerender` rows |
+| `ttfb_ms` | INT64 | Nullable and null for non-load-shaped `restore`/`prerender` rows |
 | `effective_type` | STRING | Nullable |
 | `downlink_mbps` | FLOAT64 | Nullable |
 | `rtt_ms` | INT64 | Nullable |
@@ -49,4 +49,5 @@ Notes:
 
 - `nav_type` remains the legacy raw navigation timing value for backward compatibility.
 - Prefer `navigation_type` in new warehouse models and analysis.
+- Default Signal URL-builder templates exclude `navigation_type = restore` and `navigation_type = prerender` before computing coverage and percentiles.
 - Treat target/resource fields as diagnostic hints, not stable identifiers.

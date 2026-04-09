@@ -52,7 +52,8 @@ export function bootstrapSpikeLabGa4(
   window.gtag =
     window.gtag ??
     function gtag(...args: unknown[]) {
-      window.dataLayer?.push(...args);
+      if (args.length === 0) return;
+      window.dataLayer?.push(arguments);
     };
 
   if (isAutomation) {

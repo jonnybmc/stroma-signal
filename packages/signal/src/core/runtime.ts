@@ -16,6 +16,13 @@ import { observeVitals } from './observe-vitals.js';
 import { type SignalLifecycleState, transitionSignalLifecycle } from './state-machine.js';
 
 const RUNTIME_KEY = Symbol.for('stroma.signal.runtime');
+const EMPTY_VITALS = {
+  lcp_ms: null,
+  cls: null,
+  inp_ms: null,
+  fcp_ms: null,
+  ttfb_ms: null
+} satisfies SignalEventV1['vitals'];
 
 export interface SignalInitConfig {
   sinks: SignalSink[];
@@ -41,6 +48,8 @@ interface RuntimeInternals {
   teardown: () => void;
   controller: SignalRuntimeController;
 }
+
+type FinalizeReason = 'manual' | 'visibilitychange' | 'pagehide';
 
 function readPageUrl(): string {
   return globalThis.location?.pathname ?? '/';
@@ -81,6 +90,38 @@ function mapNavigationType(rawType: string | undefined): SignalNavigationType {
   }
 }
 
+function isLoadShapedNavigationType(navigationType: SignalNavigationType): boolean {
+  return navigationType !== 'restore' && navigationType !== 'prerender';
+}
+
+function createLoadScopedVitals(
+  vitals: SignalEventV1['vitals'],
+  navigationType: SignalNavigationType
+): SignalEventV1['vitals'] {
+  if (isLoadShapedNavigationType(navigationType)) return vitals;
+
+  return {
+    ...vitals,
+    lcp_ms: null,
+    fcp_ms: null,
+    ttfb_ms: null,
+    lcp_attribution: undefined
+  };
+}
+
+function createLoadScopedNetwork(
+  event: Pick<SignalEventV1, 'net_tier' | 'net_tcp_ms' | 'net_tcp_source'>,
+  navigationType: SignalNavigationType
+): Pick<SignalEventV1, 'net_tier' | 'net_tcp_ms' | 'net_tcp_source'> {
+  if (isLoadShapedNavigationType(navigationType)) return event;
+
+  return {
+    net_tier: null,
+    net_tcp_ms: null,
+    net_tcp_source: 'unavailable_missing_timing'
+  };
+}
+
 function createRuntime(config: SignalInitConfig): RuntimeInternals {
   let state: SignalLifecycleState = 'booting';
   let eventId = createEventId();
@@ -88,15 +129,35 @@ function createRuntime(config: SignalInitConfig): RuntimeInternals {
     (globalThis.document as (Document & { prerendering?: boolean }) | undefined)?.prerendering
   );
   let navigationType: SignalNavigationType = startedPrerendered ? 'prerender' : 'navigate';
-  let vitalObserver = observeVitals({ generateTarget: config.generateTarget });
+  let vitalObserver: ReturnType<typeof observeVitals> | null = null;
 
-  const finalize = (): void => {
+  const startVitalObserver = (): void => {
+    vitalObserver?.disconnect();
+    vitalObserver = observeVitals({ generateTarget: config.generateTarget });
+  };
+
+  const logDebugPayload = (reason: FinalizeReason, vitals: SignalEventV1['vitals'], event: SignalEventV1): void => {
+    if (!config.debug) return;
+    const debugSnapshot = vitalObserver?.debugSnapshot();
+
+    console.info('[signal] finalize', {
+      reason,
+      navigation_type: navigationType,
+      raw_fcp_entry: debugSnapshot?.rawFcpEntry ?? null,
+      raw_lcp_entry: debugSnapshot?.rawLcpEntry ?? null,
+      vitals,
+      event
+    });
+  };
+
+  const finalize = (reason: FinalizeReason): void => {
     if (state !== 'observing') return;
     state = transitionSignalLifecycle(state, 'page_hidden');
     const navigation = getNavigationEntry();
     const thresholds = config.networkTierThresholds ?? DEFAULT_NETWORK_THRESHOLDS;
-    const network = classifyNetwork(navigation, thresholds);
+    const network = createLoadScopedNetwork(classifyNetwork(navigation, thresholds), navigationType);
     const device = classifyDevice(config.deviceTierOverride);
+    const vitals = createLoadScopedVitals(vitalObserver?.snapshot() ?? { ...EMPTY_VITALS }, navigationType);
     const event: SignalEventV1 = {
       v: SIGNAL_EVENT_VERSION,
       event_id: eventId,
@@ -112,7 +173,7 @@ function createRuntime(config: SignalInitConfig): RuntimeInternals {
       device_memory_gb: device.device_memory_gb,
       device_screen_w: device.device_screen_w,
       device_screen_h: device.device_screen_h,
-      vitals: vitalObserver.snapshot(),
+      vitals,
       context: readSignalContext(),
       meta: {
         pkg_version: config.packageVersion ?? '0.1.0',
@@ -121,7 +182,9 @@ function createRuntime(config: SignalInitConfig): RuntimeInternals {
         navigation_type: navigationType
       }
     };
-    vitalObserver.disconnect();
+    logDebugPayload(reason, vitals, event);
+    vitalObserver?.disconnect();
+    vitalObserver = null;
     try {
       emitToSinks(config.sinks, event);
       state = transitionSignalLifecycle(state, 'flush_success');
@@ -132,17 +195,17 @@ function createRuntime(config: SignalInitConfig): RuntimeInternals {
   };
 
   const onVisibilityChange = (): void => {
-    if (globalThis.document?.visibilityState === 'hidden') finalize();
+    if (globalThis.document?.visibilityState === 'hidden') finalize('visibilitychange');
   };
 
-  const onPageHide = (): void => finalize();
+  const onPageHide = (): void => finalize('pagehide');
 
   const onPageShow = (event: PageTransitionEvent): void => {
     if (!event.persisted || state !== 'flushed') return;
     state = transitionSignalLifecycle(state, 'bfcache_restore');
     eventId = createEventId();
     navigationType = 'restore';
-    vitalObserver = observeVitals({ generateTarget: config.generateTarget });
+    startVitalObserver();
   };
 
   const startObserving = (): void => {
@@ -151,6 +214,7 @@ function createRuntime(config: SignalInitConfig): RuntimeInternals {
       navigationType = mapNavigationType(getNavigationEntry()?.type);
     }
     state = transitionSignalLifecycle(state, 'start');
+    startVitalObserver();
   };
 
   if (startedPrerendered) {
@@ -167,7 +231,8 @@ function createRuntime(config: SignalInitConfig): RuntimeInternals {
     globalThis.document?.removeEventListener('visibilitychange', onVisibilityChange);
     globalThis.removeEventListener?.('pagehide', onPageHide);
     globalThis.removeEventListener?.('pageshow', onPageShow);
-    vitalObserver.disconnect();
+    vitalObserver?.disconnect();
+    vitalObserver = null;
     state = transitionSignalLifecycle(state, 'destroy');
   };
 
@@ -177,7 +242,7 @@ function createRuntime(config: SignalInitConfig): RuntimeInternals {
       delete (globalThis as Record<PropertyKey, unknown>)[RUNTIME_KEY];
     },
     flushNow() {
-      finalize();
+      finalize('manual');
     },
     getState() {
       return state;

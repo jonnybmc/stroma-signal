@@ -122,8 +122,10 @@ In GA4 DebugView:
 ## 6. After BigQuery Export Lands
 
 First run [ga4-bigquery-validation.sql](./ga4-bigquery-validation.sql) to confirm the rows are landing.
+That validation query shows raw exported rows, including `navigation_type = restore` and `navigation_type = prerender` when they occur.
 
 Then use [ga4-bigquery-url-builder.sql](./ga4-bigquery-url-builder.sql) to generate the final hosted report URL. Save it using [bigquery-saved-query-setup.md](./bigquery-saved-query-setup.md) so marketers can rerun the flow without editing SQL.
+The URL-builder query excludes those non-load-shaped lifecycle rows by default.
 
 ## Rules To Keep Stable
 

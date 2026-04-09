@@ -12,7 +12,10 @@ import {
   fcpFallbackAggregateFixture,
   flattenSignalEventForGa4,
   highUnclassifiedShareAggregateFixture,
+  mixedLifecycleAggregateFixture,
+  prerenderLifecycleFixture,
   previewAggregateFixture,
+  restoreLifecycleFixture,
   SIGNAL_GA4_EVENT_NAME,
   safariFallbackFixture,
   safariHeavyAggregateFixture,
@@ -143,9 +146,27 @@ describe('signal contracts', () => {
     expect(aggregate.top_page_path).toBe('/pricing');
   });
 
+  it('excludes restore and prerender events from default report aggregates', () => {
+    const aggregate = aggregateSignalEvents(
+      [chromeColdNavFixture, restoreLifecycleFixture, prerenderLifecycleFixture],
+      'preview',
+      Date.UTC(2026, 3, 8, 11, 0, 0)
+    );
+
+    expect(aggregate.sample_size).toBe(1);
+    expect(aggregate.classified_sample_size).toBe(1);
+    expect(aggregate.top_page_path).toBe('/personal-loans');
+    expect(aggregate.coverage.network_coverage).toBe(100);
+    expect(aggregate.coverage.lcp_coverage).toBe(100);
+    expect(aggregate.vitals.urban.observations).toBe(0);
+    expect(aggregate.vitals.comparison.observations).toBe(1);
+    expect(aggregate.domain).toBe('example.co.za');
+  });
+
   it('ships scenario fixtures that cover the intended report fallbacks and edge cases', () => {
     expect(signalReportScenarioFixtures.map((fixture) => fixture.id)).toEqual([
       'preview',
+      'mixed-lifecycle',
       'strong-lcp',
       'fcp-fallback',
       'ttfb-fallback',
@@ -153,6 +174,7 @@ describe('signal contracts', () => {
       'high-unclassified',
       'safari-heavy'
     ]);
+    expect(mixedLifecycleAggregateFixture.sample_size).toBe(1);
     expect(strongLcpCoverageAggregateFixture.race_metric).toBe('lcp');
     expect(fcpFallbackAggregateFixture.race_metric).toBe('fcp');
     expect(ttfbFallbackAggregateFixture.race_metric).toBe('ttfb');
@@ -166,6 +188,9 @@ describe('signal contracts', () => {
   });
 
   it('rejects invalid diagnostic enums in canonical events and warehouse rows', () => {
+    const lcpAttribution = chromeColdNavFixture.vitals.lcp_attribution;
+    if (!lcpAttribution) throw new Error('Expected chromeColdNavFixture to include lcp_attribution.');
+
     const invalidEvent = {
       ...chromeColdNavFixture,
       meta: {
@@ -175,7 +200,7 @@ describe('signal contracts', () => {
       vitals: {
         ...chromeColdNavFixture.vitals,
         lcp_attribution: {
-          ...chromeColdNavFixture.vitals.lcp_attribution!,
+          ...lcpAttribution,
           load_state: 'hydrating'
         }
       }

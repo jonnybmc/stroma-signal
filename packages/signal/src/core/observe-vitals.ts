@@ -11,9 +11,28 @@ export interface ObserveVitalsOptions {
   generateTarget?: (element: Element | null) => string | null;
 }
 
+interface RawPaintDebugEntry {
+  entry_type: 'paint';
+  name: string;
+  start_time_ms: number;
+}
+
+interface RawLcpDebugEntry {
+  entry_type: 'largest-contentful-paint';
+  start_time_ms: number;
+  url: string | null;
+  element_tag: string | null;
+}
+
+interface VitalObserverDebugSnapshot {
+  rawFcpEntry: RawPaintDebugEntry | null;
+  rawLcpEntry: RawLcpDebugEntry | null;
+}
+
 export interface VitalObserverController {
   disconnect: () => void;
   snapshot: () => SignalVitals;
+  debugSnapshot: () => VitalObserverDebugSnapshot;
 }
 
 interface InpInteractionRecord {
@@ -46,6 +65,11 @@ type EventTimingEntry = PerformanceEntry & {
   name?: string;
   target?: Element | null;
 };
+
+interface ObservedPerformanceStream {
+  observer: PerformanceObserver;
+  handle: (entry: PerformanceEntry) => void;
+}
 
 function percentileIndex(length: number, ratio: number): number {
   return Math.max(0, Math.ceil(length * ratio) - 1);
@@ -170,8 +194,69 @@ export function observeVitals(options: ObserveVitalsOptions = {}): VitalObserver
   let cumulativeLayoutShift = 0;
   const interactionRecords = new Map<number, InpInteractionRecord>();
   let firstContentfulPaint: number | null = null;
+  let rawFcpEntry: RawPaintDebugEntry | null = null;
+  let rawLcpEntry: RawLcpDebugEntry | null = null;
 
-  const observers: PerformanceObserver[] = [];
+  const observers: ObservedPerformanceStream[] = [];
+
+  const handleLcpEntry = (entry: PerformanceEntry): void => {
+    const lcpEntry = entry as LargestContentfulPaintEntry;
+    largestContentfulPaint = Math.round(lcpEntry.startTime);
+    rawLcpEntry = {
+      entry_type: 'largest-contentful-paint',
+      start_time_ms: Math.round(lcpEntry.startTime),
+      url: lcpEntry.url ?? null,
+      element_tag: lcpEntry.element?.tagName?.toLowerCase() ?? null
+    };
+    const resourceUrl = sanitizeResourceUrl(lcpEntry.url);
+    lcpAttribution = {
+      load_state: readLoadState(),
+      target: generateTarget(lcpEntry.element ?? null),
+      element_type: inferLcpElementType(lcpEntry.element ?? null, resourceUrl),
+      resource_url: resourceUrl
+    };
+  };
+
+  const handleLayoutShiftEntry = (entry: PerformanceEntry): void => {
+    const layoutShift = entry as LayoutShiftEntry;
+    if (!layoutShift.hadRecentInput) {
+      cumulativeLayoutShift += layoutShift.value ?? 0;
+    }
+  };
+
+  const handlePaintEntry = (entry: PerformanceEntry): void => {
+    const paintEntry = entry as PaintEntry;
+    if (paintEntry.name === 'first-contentful-paint') {
+      firstContentfulPaint = Math.round(paintEntry.startTime);
+      rawFcpEntry = {
+        entry_type: 'paint',
+        name: paintEntry.name,
+        start_time_ms: Math.round(paintEntry.startTime)
+      };
+    }
+  };
+
+  const handleEventTimingEntry = (entry: PerformanceEntry): void => {
+    const eventEntry = entry as EventTimingEntry;
+    const duration = eventEntry.duration ?? null;
+    const interactionId = eventEntry.interactionId ?? 0;
+    if (duration == null || !Number.isFinite(duration) || interactionId <= 0) return;
+
+    const current = interactionRecords.get(interactionId);
+    if (!current || duration > current.duration) {
+      interactionRecords.set(interactionId, {
+        duration,
+        attribution: createInpAttribution(eventEntry, generateTarget)
+      });
+    }
+  };
+
+  const drainPendingRecords = (): void => {
+    for (const { observer, handle } of observers) {
+      const records = typeof observer.takeRecords === 'function' ? observer.takeRecords() : [];
+      for (const entry of records) handle(entry);
+    }
+  };
 
   const createObserver = (
     type: string,
@@ -185,78 +270,34 @@ export function observeVitals(options: ObserveVitalsOptions = {}): VitalObserver
       for (const entry of list.getEntries()) callback(entry);
     });
     observer.observe(options ?? { type, buffered: true });
-    observers.push(observer);
+    observers.push({ observer, handle: callback });
   };
 
-  createObserver(
-    'largest-contentful-paint',
-    (entry) => {
-      const lcpEntry = entry as LargestContentfulPaintEntry;
-      largestContentfulPaint = Math.round(lcpEntry.startTime);
-      const resourceUrl = sanitizeResourceUrl(lcpEntry.url);
-      lcpAttribution = {
-        load_state: readLoadState(),
-        target: generateTarget(lcpEntry.element ?? null),
-        element_type: inferLcpElementType(lcpEntry.element ?? null, resourceUrl),
-        resource_url: resourceUrl
-      };
-    },
-    { type: 'largest-contentful-paint', buffered: true }
-  );
+  createObserver('largest-contentful-paint', handleLcpEntry, { type: 'largest-contentful-paint', buffered: true });
 
-  createObserver(
-    'layout-shift',
-    (entry) => {
-      const layoutShift = entry as LayoutShiftEntry;
-      if (!layoutShift.hadRecentInput) {
-        cumulativeLayoutShift += layoutShift.value ?? 0;
-      }
-    },
-    { type: 'layout-shift', buffered: true }
-  );
+  createObserver('layout-shift', handleLayoutShiftEntry, { type: 'layout-shift', buffered: true });
 
-  createObserver(
-    'paint',
-    (entry) => {
-      const paintEntry = entry as PaintEntry;
-      if (paintEntry.name === 'first-contentful-paint') {
-        firstContentfulPaint = Math.round(paintEntry.startTime);
-      }
-    },
-    { type: 'paint', buffered: true }
-  );
+  createObserver('paint', handlePaintEntry, { type: 'paint', buffered: true });
 
-  createObserver(
-    'event',
-    (entry) => {
-      const eventEntry = entry as EventTimingEntry;
-      const duration = eventEntry.duration ?? null;
-      const interactionId = eventEntry.interactionId ?? 0;
-      if (duration == null || !Number.isFinite(duration) || interactionId <= 0) return;
-
-      const current = interactionRecords.get(interactionId);
-      if (!current || duration > current.duration) {
-        interactionRecords.set(interactionId, {
-          duration,
-          attribution: createInpAttribution(eventEntry, generateTarget)
-        });
-      }
-    },
-    { type: 'event', buffered: true, durationThreshold: 40 } as PerformanceObserverInit
-  );
+  createObserver('event', handleEventTimingEntry, {
+    type: 'event',
+    buffered: true,
+    durationThreshold: 40
+  } as PerformanceObserverInit);
 
   return {
     disconnect() {
-      for (const observer of observers) observer.disconnect();
+      for (const { observer } of observers) observer.disconnect();
     },
     snapshot() {
+      drainPendingRecords();
       const navigation = globalThis.performance?.getEntriesByType?.('navigation')?.[0] as
         | (PerformanceNavigationTiming & { activationStart?: number })
         | undefined;
       const navigationStart = navigation
-        ? navigation.activationStart && navigation.activationStart > 0
+        ? navigation.activationStart != null && navigation.activationStart > 0
           ? navigation.activationStart
-          : navigation.startTime
+          : (navigation.startTime ?? 0)
         : 0;
       const ttfb =
         navigation && navigation.responseStart > 0 ? Math.round(navigation.responseStart - navigationStart) : null;
@@ -270,6 +311,13 @@ export function observeVitals(options: ObserveVitalsOptions = {}): VitalObserver
         ttfb_ms: ttfb,
         lcp_attribution: largestContentfulPaint != null ? lcpAttribution : undefined,
         inp_attribution: inpRecord?.attribution
+      };
+    },
+    debugSnapshot() {
+      drainPendingRecords();
+      return {
+        rawFcpEntry,
+        rawLcpEntry
       };
     }
   };

@@ -15,7 +15,8 @@
     "dev:spike": "pnpm --filter @stroma-labs/signal-spike-lab dev",
     "dev:report": "pnpm --filter @stroma-labs/signal-report-app dev",
     "typecheck": "pnpm -r run typecheck",
-    "test": "vitest run",
+    "test": "pnpm test:unit",
+    "test:unit": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "check:budgets": "node scripts/check-budgets.mjs",
@@ -25,7 +26,7 @@
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "format": "biome format --write .",
-    "ci": "pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm check:release",
+    "ci": "pnpm lint && pnpm typecheck && pnpm test:unit && pnpm build && pnpm check:release",
     "prepare": "husky"
   },
   "lint-staged": {

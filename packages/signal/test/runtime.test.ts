@@ -56,9 +56,14 @@ class MockDocument extends MockEventTarget {
   prerendering = false;
 }
 
-function setupGlobals(options?: { prerendering?: boolean; navigation?: Partial<PerformanceNavigationTiming> }) {
+function setupGlobals(options?: {
+  prerendering?: boolean;
+  navigation?: Partial<PerformanceNavigationTiming>;
+  supportedEntryTypes?: string[];
+}) {
   const documentTarget = new MockDocument();
   const windowTarget = new MockEventTarget();
+  const observedTypes: string[] = [];
 
   if (options?.prerendering) {
     documentTarget.prerendering = true;
@@ -77,9 +82,15 @@ function setupGlobals(options?: { prerendering?: boolean; navigation?: Partial<P
   Object.assign(navigation, options?.navigation);
 
   class MockPerformanceObserver {
-    static supportedEntryTypes: string[] = [];
+    static supportedEntryTypes: string[] = options?.supportedEntryTypes ?? [];
 
-    observe(): void {}
+    observe(options?: PerformanceObserverInit): void {
+      if (options?.type) observedTypes.push(options.type);
+    }
+
+    takeRecords(): PerformanceEntry[] {
+      return [];
+    }
 
     disconnect(): void {}
   }
@@ -118,7 +129,8 @@ function setupGlobals(options?: { prerendering?: boolean; navigation?: Partial<P
 
   return {
     documentTarget,
-    windowTarget
+    windowTarget,
+    observedTypes
   };
 }
 
@@ -211,11 +223,15 @@ describe('signal runtime integration', () => {
   });
 
   it('waits for prerender activation before observing and flushing', () => {
-    const { documentTarget } = setupGlobals({ prerendering: true });
+    const { documentTarget, observedTypes } = setupGlobals({
+      prerendering: true,
+      supportedEntryTypes: ['event', 'largest-contentful-paint', 'layout-shift', 'paint']
+    });
     const sink = createSink();
     const controller = init({ sinks: [sink], packageVersion: 'test' });
 
     expect(controller.getState()).toBe('booting');
+    expect(observedTypes).toEqual([]);
 
     controller.flushNow();
     expect(sink.handle).not.toHaveBeenCalled();
@@ -223,10 +239,17 @@ describe('signal runtime integration', () => {
     documentTarget.prerendering = false;
     documentTarget.dispatch('prerenderingchange', new Event('prerenderingchange'));
     expect(controller.getState()).toBe('observing');
+    expect(observedTypes).toEqual(['largest-contentful-paint', 'layout-shift', 'paint', 'event']);
 
     controller.flushNow();
     expect(sink.handle).toHaveBeenCalledTimes(1);
     expect(sink.handle.mock.calls[0]?.[0].meta.navigation_type).toBe('prerender');
+    expect(sink.handle.mock.calls[0]?.[0].net_tier).toBeNull();
+    expect(sink.handle.mock.calls[0]?.[0].net_tcp_ms).toBeNull();
+    expect(sink.handle.mock.calls[0]?.[0].net_tcp_source).toBe('unavailable_missing_timing');
+    expect(sink.handle.mock.calls[0]?.[0].vitals.lcp_ms).toBeNull();
+    expect(sink.handle.mock.calls[0]?.[0].vitals.fcp_ms).toBeNull();
+    expect(sink.handle.mock.calls[0]?.[0].vitals.ttfb_ms).toBeNull();
   });
 
   it('starts a fresh navigation instance after a bfcache restore', () => {
@@ -246,6 +269,12 @@ describe('signal runtime integration', () => {
     expect(sink.handle).toHaveBeenCalledTimes(2);
     expect(secondEventId).not.toBe(firstEventId);
     expect(sink.handle.mock.calls[1]?.[0].meta.navigation_type).toBe('restore');
+    expect(sink.handle.mock.calls[1]?.[0].net_tier).toBeNull();
+    expect(sink.handle.mock.calls[1]?.[0].net_tcp_ms).toBeNull();
+    expect(sink.handle.mock.calls[1]?.[0].net_tcp_source).toBe('unavailable_missing_timing');
+    expect(sink.handle.mock.calls[1]?.[0].vitals.lcp_ms).toBeNull();
+    expect(sink.handle.mock.calls[1]?.[0].vitals.fcp_ms).toBeNull();
+    expect(sink.handle.mock.calls[1]?.[0].vitals.ttfb_ms).toBeNull();
   });
 
   it('keeps runtime internals in sync with the active closure state and event id', () => {
@@ -282,6 +311,36 @@ describe('signal runtime integration', () => {
 
     expect(sink.handle).toHaveBeenCalledTimes(1);
     expect(warn).toHaveBeenCalledWith('[signal] sink failed', 'async-sink', expect.any(Error));
+  });
+
+  it('logs finalize diagnostics when debug mode is enabled', () => {
+    setupGlobals();
+    const info = vi.spyOn(console, 'info').mockImplementation(() => {});
+    const sink = createSink();
+
+    const controller = init({ sinks: [sink], packageVersion: 'test', debug: true });
+    controller.flushNow();
+
+    expect(info).toHaveBeenCalledWith(
+      '[signal] finalize',
+      expect.objectContaining({
+        reason: 'manual',
+        navigation_type: 'navigate',
+        raw_fcp_entry: null,
+        raw_lcp_entry: null,
+        vitals: expect.objectContaining({
+          lcp_ms: null,
+          fcp_ms: null,
+          ttfb_ms: 180
+        }),
+        event: expect.objectContaining({
+          event_id: controller.getEventId(),
+          meta: expect.objectContaining({
+            navigation_type: 'navigate'
+          })
+        })
+      })
+    );
   });
 
   it('exposes sampled-out sessions explicitly to consumers', () => {

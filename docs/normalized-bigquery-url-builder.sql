@@ -1,5 +1,6 @@
 -- Signal by Stroma
 -- BigQuery URL builder for a flat SignalWarehouseRowV1 table
+-- Default report math excludes non-load-shaped restore/prerender rows.
 
 WITH source_events AS (
   SELECT
@@ -8,12 +9,14 @@ WITH source_events AS (
     net_tier,
     net_tcp_source,
     device_tier,
+    navigation_type,
     lcp_ms,
     fcp_ms,
     ttfb_ms,
     TIMESTAMP(observed_at) AS observed_at
   FROM `your-project.signal.signal_events`
   WHERE DATE(observed_at) BETWEEN DATE_SUB(CURRENT_DATE(), INTERVAL 7 DAY) AND CURRENT_DATE()
+    AND COALESCE(navigation_type, 'navigate') NOT IN ('restore', 'prerender')
 ),
 counts AS (
   SELECT

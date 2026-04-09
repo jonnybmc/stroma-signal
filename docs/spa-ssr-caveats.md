@@ -42,13 +42,25 @@ Just call `init()`. It is idempotent.
 
 ## Back/forward cache
 
-Signal detects `pageshow` events with `event.persisted === true` (back/forward cache restores). On a bfcache restore, Signal resets the event ID and re-observes vitals, producing a fresh event for the restored page view.
+Signal detects `pageshow` events with `event.persisted === true` (back/forward cache restores). On a bfcache restore, Signal resets the event ID and re-observes vitals, producing a fresh raw event for the restored page view.
+
+In v0.1, that restore event is preserved in raw data but treated as non-load-shaped by default:
+
+- `meta.navigation_type` is `restore`
+- load-shaped timing fields such as `lcp_ms`, `fcp_ms`, `ttfb_ms`, `net_tier`, and `net_tcp_ms` are emitted as `null`
+- the default report SQL excludes restore rows from coverage and percentile calculations
 
 This works automatically across all frameworks.
 
 ## Prerendered pages
 
 Signal detects pages that start in a prerendered state (Speculation Rules API). It defers observation until `prerenderingchange` fires, then begins normal collection.
+
+In v0.1, prerender navigations are also preserved as raw lifecycle rows but treated as non-load-shaped by default:
+
+- `meta.navigation_type` is `prerender`
+- load-shaped timing fields such as `lcp_ms`, `fcp_ms`, `ttfb_ms`, `net_tier`, and `net_tcp_ms` are emitted as `null`
+- the default report SQL excludes prerender rows from coverage and percentile calculations
 
 No framework-specific handling needed.
 

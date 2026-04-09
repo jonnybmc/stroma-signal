@@ -4,6 +4,8 @@
 
 Signal is event-first, sink-based, analytics-agnostic, and ESM-only. Signal emits canonical `SignalEventV1` payloads, and your team decides where those events go.
 
+If you are not implementing code and only need the launch recipe for a shareable report URL, start with [marketer-quickstart.md](./marketer-quickstart.md) and [production-report-automation.md](./production-report-automation.md).
+
 ## Choose Your Setup
 
 ### I already have GTM / GA4
@@ -52,6 +54,7 @@ Notes:
 - Signal does not load GTM or GA4 scripts for you.
 - Keep the event name frozen as `perf_tier_report`.
 - Signal can optionally annotate LCP and INP targets via `generateTarget()` if you want human-readable warehouse diagnostics.
+- `restore` and `prerender` rows may still appear in raw data. Default report SQL excludes them so shared URLs stay load-shaped.
 
 ### I want to send to my own endpoint
 
@@ -150,6 +153,8 @@ Verification detail:
 - Full-control path: hand off the canonical event into your own pipeline, keep canonical field names, then use [normalized-bigquery-validation.sql](./normalized-bigquery-validation.sql) and [normalized-bigquery-url-builder.sql](./normalized-bigquery-url-builder.sql).
 - [`/build`](http://signal.stroma.design/build) is the QA and fallback path, not the primary launch automation path.
 
+Validation queries prove the raw rows are landing. The provided URL-builder queries then filter out `navigation_type = restore` and `navigation_type = prerender` by default before computing coverage and percentiles.
+
 ## Integration Rules
 
 - `perf_tier_report` is the canonical GTM/GA4 event name.
@@ -157,6 +162,7 @@ Verification detail:
 - Direct `gtag` transport exists only in the local spike lab for Gate 2 validation.
 - Preview aggregation is a sanity-check path only. Production truth comes from warehouse aggregation.
 - `meta.nav_type` remains for backward compatibility. Prefer `meta.navigation_type` in new warehouse work.
+- `restore` and `prerender` stay in raw events, but default load-performance reporting excludes them in v0.1.
 - Keep `generateTarget()` conservative: return a safe label, not raw text or user content.
 
 ## Launch Pack

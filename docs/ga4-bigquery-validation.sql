@@ -1,12 +1,14 @@
 -- Signal by Stroma
 -- GA4 BigQuery validation query
 -- Use this first to prove perf_tier_report rows are landing before running the URL-builder query.
+-- The URL-builder query excludes navigation_type = restore/prerender by default.
 
 SELECT
   TIMESTAMP_MICROS(event_timestamp) AS observed_at,
   (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'event_id') AS event_id,
   (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'host') AS host,
   (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'url') AS url,
+  (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'navigation_type') AS navigation_type,
   (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'net_tier') AS net_tier,
   (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'device_tier') AS device_tier,
   (SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'fcp_ms') AS fcp_ms,

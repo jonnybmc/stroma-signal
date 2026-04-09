@@ -37,6 +37,7 @@ function expectSharedUrlContract(sql: string): void {
   expect(sql).toContain('comparison_lcp_observations >= 25');
   expect(sql).toContain('urban_lcp_coverage >= 50');
   expect(sql).toContain('comparison_lcp_coverage >= 50');
+  expect(sql).toContain("NOT IN ('restore', 'prerender')");
 }
 
 describe('bigquery sql templates', () => {

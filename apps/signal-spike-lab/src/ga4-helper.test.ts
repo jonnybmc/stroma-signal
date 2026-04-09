@@ -53,4 +53,33 @@ describe('spike-lab ga4 helper', () => {
     expect(onStateChange).toHaveBeenCalledWith('loading');
     expect(onStateChange).toHaveBeenCalledWith('ready');
   });
+
+  it('queues bootstrap commands into dataLayer as single gtag command tuples', () => {
+    const dataLayer: Array<Record<string, unknown> | unknown[] | IArguments> = [];
+    const onStateChange = vi.fn();
+
+    vi.stubGlobal('window', {
+      dataLayer
+    });
+    vi.stubGlobal('document', {
+      getElementById: () => null,
+      createElement: vi.fn(() => ({
+        dataset: { loaded: 'false' },
+        addEventListener: vi.fn()
+      })),
+      head: { append: vi.fn() }
+    } as unknown as Document);
+
+    bootstrapSpikeLabGa4('G-TEST123', false, onStateChange);
+
+    expect(Array.from(dataLayer[0] as IArguments)).toEqual(['js', expect.any(Date)]);
+    expect(Array.from(dataLayer[1] as IArguments)).toEqual([
+      'config',
+      'G-TEST123',
+      expect.objectContaining({
+        send_page_view: false,
+        debug_mode: true
+      })
+    ]);
+  });
 });
