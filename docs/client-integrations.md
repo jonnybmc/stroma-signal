@@ -6,6 +6,8 @@
 
 Signal is event-first, sink-based, analytics-agnostic, and ESM-only. Signal emits canonical `SignalEventV1` payloads, and your team decides where those events go.
 
+You do not need the hosted report shell, the builder route, or the local spike lab to adopt the npm package. Those stay as companion repo tooling.
+
 If you are not implementing code and only need the launch recipe for a shareable report URL, start with [marketer-quickstart.md](./marketer-quickstart.md) and [production-report-automation.md](./production-report-automation.md).
 
 ## Choose Your Setup

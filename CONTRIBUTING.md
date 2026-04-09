@@ -45,7 +45,9 @@ pnpm typecheck     # Full workspace type check
 
 These docs are a coordinated public onboarding surface and should stay aligned when launch guidance changes:
 
+- `packages/signal/README.md`
 - `README.md`
+- `docs/why-signal.md`
 - `docs/marketer-quickstart.md`
 - `docs/production-report-automation.md`
 - `docs/bigquery-saved-query-setup.md`
@@ -55,6 +57,7 @@ In particular, keep the automation boundary consistent:
 - Signal automates collection
 - the repo provides canonical SQL templates
 - recurring refresh is warehouse-configured by the user team
+- local spike-lab and report-shell tooling remain companion repo assets, not required package setup
 
 ## Code Style
 

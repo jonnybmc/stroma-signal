@@ -1,7 +1,7 @@
 {
   "name": "@stroma-labs/signal",
   "version": "0.1.0",
-  "description": "Native-first browser performance tier collector for Signal by Stroma.",
+  "description": "Browser instrumentation package for measuring real-user network, device, and performance tiers.",
   "license": "MIT",
   "author": "Jonathan Booysen",
   "repository": {

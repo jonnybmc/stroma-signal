@@ -8,9 +8,9 @@ If another doc, plan, or old PRD example disagrees with this file, this file win
 
 - Published package: `@stroma-labs/signal`
 - Public subpath exports:
-  - `@stroma-labs/signal`
-  - `@stroma-labs/signal/ga4`
-  - `@stroma-labs/signal/report`
+  - `@stroma-labs/signal` as the core runtime surface
+  - `@stroma-labs/signal/ga4` as the GTM / GA4 integration helper
+  - `@stroma-labs/signal/report` as an optional preview/report helper
 
 ## Canonical Runtime API
 
@@ -36,6 +36,8 @@ import { createDataLayerSink } from '@stroma-labs/signal/ga4';
 ```ts
 import { createPreviewCollector } from '@stroma-labs/signal/report';
 ```
+
+This subpath is optional and not part of the minimum instrumentation path.
 
 ## `init()` contract
 
@@ -178,6 +180,12 @@ The GTM / GA4 path does not emit these warehouse-only fields in v0.1:
 - `lcp_resource_url`
 - `interaction_target`
 - `interaction_time_ms`
+
+## Related documentation
+
+- [Signal Technical Reference](./signal-technical-reference.md) — full field definitions, browser support matrices, classification logic, and aggregation rules
+- [Aggregation Spec](./aggregation-spec.md) — comparison tier selection, race metric fallback cascade, and coverage honesty rules
+- [Why Signal Exists](./why-signal.md) — positioning and product context
 
 ## Explicitly not part of v0.1
 

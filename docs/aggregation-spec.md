@@ -40,3 +40,9 @@ All labels in Act 2 must explicitly name the selected metric.
 ## Proxy / CDN Truth Boundary
 
 Network classification reflects the effective path to the serving edge or proxy in many real deployments. It is operationally useful, but should not be framed as pure last-mile truth.
+
+## Related documentation
+
+- [Signal Technical Reference](./signal-technical-reference.md) — full field definitions, browser support, and classification thresholds
+- [Public API v0.1](./public-api-v0.1.md) — canonical package contract and frozen field names
+- [Warehouse Schema](./warehouse-schema.md) — recommended table structure for non-GA4 collection

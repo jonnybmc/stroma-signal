@@ -17,6 +17,21 @@ pnpm add @stroma-labs/signal
 
 Signal is event-first and analytics-agnostic. Pick the sink that matches your environment.
 
+## What Ships On npm
+
+The published npm surface is the browser package and its public helper subpaths:
+
+- `@stroma-labs/signal`
+- `@stroma-labs/signal/ga4`
+- `@stroma-labs/signal/report`
+
+For most teams, the shortest path is:
+
+- `@stroma-labs/signal` for the runtime and sinks
+- `@stroma-labs/signal/ga4` if you already use GTM / GA4
+
+`@stroma-labs/signal/report` is optional. It is a helper surface for preview/report workflows, not part of the minimum instrumentation setup.
+
 ## Choose Your Role
 
 ### I need the shareable report URL
@@ -48,6 +63,16 @@ Your team still configures the warehouse refresh once:
 - the final artifact is a hosted `signal_report_url` that you can share internally
 
 Signal does not create BigQuery scheduled queries, persistence tables, or dashboards for you in v0.1.
+
+## Companion Tooling In This Repo
+
+This monorepo also includes companion tooling that supports QA, demos, and contributor workflows:
+
+- `apps/signal-spike-lab`: local proof-of-life harness
+- `apps/signal-report` at `/r`: hosted report shell
+- `apps/signal-report` at `/build`: zero-code builder and validator
+
+These are useful repo assets, but they are not required for basic npm package adoption.
 
 ## Choose Your Setup
 
@@ -137,7 +162,7 @@ Next doc: [warehouse schema](./docs/warehouse-schema.md)
 
 - GTM / GA4 path: validate rows with [ga4-bigquery-validation.sql](./docs/ga4-bigquery-validation.sql), then generate the hosted report with [ga4-bigquery-url-builder.sql](./docs/ga4-bigquery-url-builder.sql).
 - Own endpoint and full-control paths: validate rows with [normalized-bigquery-validation.sql](./docs/normalized-bigquery-validation.sql), then generate the hosted report with [normalized-bigquery-url-builder.sql](./docs/normalized-bigquery-url-builder.sql).
-- [`/build`](http://signal.stroma.design/build) stays the QA and fallback path, not the primary launch automation flow.
+- [`/build`](http://signal.stroma.design/build) stays the optional QA and fallback path, not the primary launch automation flow.
 
 If you want the plain-English production operating model for the BigQuery step, use [production report automation](./docs/production-report-automation.md).
 
@@ -152,6 +177,7 @@ Signal is framework-agnostic. These recipes cover where to initialise, SSR guard
 
 ## Deeper Docs
 
+- [why Signal exists](./docs/why-signal.md)
 - [choose your setup](./docs/client-integrations.md)
 - [public API freeze (v0.1)](./docs/public-api-v0.1.md)
 - [marketer quickstart](./docs/marketer-quickstart.md)
@@ -202,7 +228,7 @@ Start here:
 - `apps/signal-spike-lab`
   - local proof-of-life harness with a collector endpoint
 - `apps/signal-report`
-  - static report shell at `/r` and zero-code builder at `/build`
+  - companion report shell at `/r` and optional builder at `/build`
 
 ## Local Development
 
