@@ -259,6 +259,7 @@ If you set `VITE_SIGNAL_GA4_MEASUREMENT_ID`, the spike lab will also boot a spik
 - real `gtag` delivery into your dev GA4 property
 
 During Playwright runs, the live GA4 transport is intentionally skipped so browser tests stay deterministic.
+`pnpm test:e2e:smoke` is the Chromium functional smoke lane used in merge CI, while `pnpm test:e2e:visual` and `pnpm test:e2e:visual:update` are local-only visual regression helpers with platform-specific baselines.
 The local spike lab enables `debug: true` so the browser console shows raw FCP/LCP observations, the flush reason, and the final payload before sink emission.
 
 ## v0.1 Scope

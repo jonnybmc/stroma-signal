@@ -34,7 +34,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - run: pnpm exec playwright install --with-deps chromium
-      - run: pnpm test:e2e:smoke
+      - name: Run Chromium functional smoke
+        run: pnpm test:e2e:smoke
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
         with:
