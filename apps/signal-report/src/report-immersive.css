@@ -1,0 +1,3323 @@
+/* -------------------------------------------------------------------------
+ * Signal Tier Report — immersive four-act experience.
+ * Scoped under .sr-root. Uses --sr-* tokens from report-tokens.css.
+ * Loaded only by report-route.ts; the builder route is unaffected.
+ *
+ * Typography: system font stack only. Inter + JetBrains Mono were evaluated
+ * and land on a clean editorial surface, but their combined woff2 weight
+ * (~89 KB) would push the report past the 150 KB static budget guardrail
+ * in scripts/check-budgets.mjs. Modern system fonts (SF Pro, Segoe UI
+ * Variable, Roboto) already carry the premium feel this report needs.
+ * ----------------------------------------------------------------------- */
+
+/* Overrides only when the app-shell hosts the immersive experience. */
+.app-shell:has(.sr-root) {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  background: var(--sr-bg);
+}
+
+html:has(.sr-root) {
+  scroll-behavior: smooth;
+}
+
+html:has(.sr-root),
+body:has(.sr-root) {
+  background: var(--sr-bg);
+}
+
+body:has(.sr-root) {
+  background: var(--sr-bg);
+  color: var(--sr-fg);
+  font-family: var(--sr-sans);
+  margin: 0;
+  overflow-x: hidden;
+}
+
+.sr-root {
+  position: relative;
+  width: 100%;
+  min-height: 100vh;
+  color: var(--sr-fg);
+  font-family: var(--sr-sans);
+  font-size: var(--sr-type-body);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* -------- Canvas (fixed background particle layer) ---------------------- */
+.sr-canvas {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: var(--sr-z-canvas);
+  pointer-events: none;
+}
+
+.sr-root[data-motion="reduced"] .sr-canvas {
+  display: none;
+}
+
+/* -------- Chrome: progress bar, deck arrows, pagination ----------------- */
+.sr-progress {
+  position: fixed;
+  inset: 0 0 auto 0;
+  height: 2px;
+  background: rgba(232, 230, 223, 0.08);
+  z-index: var(--sr-z-chrome);
+}
+
+.sr-progress-fill {
+  width: 0%;
+  height: 100%;
+  background: var(--sr-accent);
+  transition: width 80ms linear;
+}
+
+.sr-root[data-motion="reduced"] .sr-progress-fill {
+  width: 100%;
+  transition: none;
+}
+
+.sr-wordmark {
+  width: auto;
+  height: 1.5rem;
+  display: block;
+  filter: brightness(1.05) saturate(0.95);
+}
+
+.sr-mood-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.625rem;
+  border: 1px solid var(--sr-border);
+  border-radius: 999px;
+  background: rgba(10, 10, 15, 0.88);
+  color: var(--sr-fg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: var(--sr-type-mono-sm);
+}
+
+.sr-mood-dot {
+  width: 0.4375rem;
+  height: 0.4375rem;
+  border-radius: 999px;
+  background: var(--sr-accent);
+  box-shadow: 0 0 8px var(--sr-accent-soft);
+}
+
+/* -------- Typography primitives ---------------------------------------- */
+.sr-eyebrow {
+  font-family: var(--sr-sans);
+  font-size: var(--sr-type-eyebrow);
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--sr-fg-muted);
+  margin: 0;
+}
+
+.sr-hero {
+  margin: 0.5rem 0 var(--sr-space-3);
+  font-family: var(--sr-sans);
+  font-size: var(--sr-type-hero);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  color: var(--sr-fg);
+  text-wrap: balance;
+}
+
+.sr-act-title {
+  margin: 0.5rem 0 var(--sr-space-3);
+  font-family: var(--sr-sans);
+  font-size: var(--sr-type-act);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  color: var(--sr-fg);
+  text-wrap: balance;
+  max-width: 24ch;
+}
+
+.sr-lede {
+  margin: 0 0 var(--sr-space-3);
+  font-size: var(--sr-type-lede);
+  line-height: 1.6;
+  color: var(--sr-fg);
+  max-width: 50ch;
+}
+
+.sr-act-lede {
+  margin: 0;
+  font-size: var(--sr-type-lede);
+  line-height: 1.6;
+  color: var(--sr-fg-muted);
+  max-width: 55ch;
+}
+
+.sr-boundary {
+  margin: var(--sr-space-3) 0 0;
+  font-size: var(--sr-type-body);
+  line-height: 1.55;
+  color: var(--sr-fg-muted);
+  max-width: 52ch;
+}
+
+.sr-support {
+  font-size: var(--sr-type-mono-md);
+  line-height: 1.55;
+  color: var(--sr-fg-muted);
+}
+
+.sr-mono {
+  font-family: var(--sr-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+.sr-mono-sm {
+  font-size: var(--sr-type-mono-sm);
+}
+
+.sr-mono-md {
+  font-size: var(--sr-type-mono-md);
+}
+
+.sr-mono-lg {
+  font-size: var(--sr-type-mono-lg);
+}
+
+.sr-mono-xl {
+  font-size: clamp(1.75rem, 3vw, 2.25rem);
+}
+
+.sr-mono-xxl {
+  font-size: clamp(2.5rem, 5vw, 4rem);
+  line-height: 1;
+  font-weight: 500;
+}
+
+/* -------- Deck container + slide mechanics ---------------------------- */
+/* On desktop (≥1024px) the report becomes a horizontal presentation     */
+/* deck: a fixed-size container with absolutely-positioned slides that    */
+/* translate horizontally via a --deck-current custom property on the    */
+/* container. Each slide carries its own --slide-index and computes its  */
+/* translateX relative to the active slide. On mobile the deck collapses */
+/* to block flow and each slide reverts to a scroll-driven act section.  */
+.sr-deck {
+  position: relative;
+  z-index: var(--sr-z-content);
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+.sr-slide {
+  position: absolute;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  padding: clamp(3.5rem, 7vh, 5rem) clamp(1.5rem, 5vw, 4.5rem) clamp(7rem, 11vh, 9rem);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sr-space-3);
+  overflow: hidden;
+  /* Deck mode: slides are always opacity-visible; the translateX position */
+  /* moves them on/off screen. Reveal staggering happens via child         */
+  /* [data-reveal] atoms triggered by data-visible="true" on the slide.    */
+  opacity: 1;
+  transform: translate3d(calc((var(--slide-index) - var(--deck-current, 0)) * 100vw), 0, 0);
+  transition: transform 700ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+
+.sr-root[data-motion="reduced"] .sr-slide {
+  transition: none;
+}
+
+/* Mobile fallback: revert to the original scroll-driven experience. */
+@media (max-width: 1023px) {
+  .sr-deck {
+    width: auto;
+    height: auto;
+    overflow: visible;
+  }
+  .sr-slide {
+    position: static;
+    inset: auto;
+    width: 100%;
+    height: auto;
+    min-height: 100vh;
+    min-height: 100dvh;
+    padding: clamp(4rem, 10vh, 6rem) clamp(1.5rem, 5vw, 4.5rem);
+    transform: none;
+    transition: none;
+    will-change: auto;
+  }
+  /* On mobile, the scroll-reveal hidden state for act sections is         */
+  /* declared on .sr-act below via its own @media scoped rule.             */
+}
+
+/* Deck pagination — bottom-center fixed bar with dots + counter. Sits
+ * above the persistent footer on desktop (≥1024px) so the two don't
+ * collide. On narrower viewports the footer is static so the pagination
+ * can return to its closer-to-edge position.
+ */
+.sr-deck-pagination {
+  position: fixed;
+  left: 50%;
+  bottom: 1.25rem;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sr-space-2);
+  padding: 0.5rem 0.875rem;
+  border: 1px solid var(--sr-border);
+  border-radius: 999px;
+  background: rgba(10, 10, 15, 0.88);
+  color: var(--sr-fg-muted);
+  z-index: var(--sr-z-chrome);
+}
+
+@media (min-width: 1024px) {
+  .sr-deck-pagination {
+    bottom: 4.25rem;
+  }
+}
+
+.sr-deck-counter {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: var(--sr-type-mono-sm);
+  letter-spacing: 0.04em;
+}
+
+.sr-deck-counter > span[data-role="deck-current-label"] {
+  color: var(--sr-fg);
+}
+
+.sr-deck-counter-sep {
+  opacity: 0.5;
+}
+
+.sr-deck-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0 0 0 var(--sr-space-2);
+  border-left: 1px solid var(--sr-border);
+  list-style: none;
+}
+
+.sr-deck-dots li {
+  display: inline-flex;
+}
+
+.sr-deck-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+  border: 1px solid var(--sr-fg-muted);
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  transition:
+    background-color var(--sr-motion-micro) var(--sr-ease-out),
+    border-color var(--sr-motion-micro) var(--sr-ease-out),
+    transform var(--sr-motion-micro) var(--sr-ease-out);
+}
+
+.sr-deck-dot:hover,
+.sr-deck-dot:focus-visible {
+  border-color: var(--sr-accent);
+  transform: scale(1.15);
+}
+
+.sr-deck-dot[data-visited="true"] {
+  border-color: var(--sr-fg);
+}
+
+.sr-deck-dot[data-active="true"] {
+  background: var(--sr-accent);
+  border-color: var(--sr-accent);
+  transform: scale(1.15);
+}
+
+/* Edge prev/next arrows */
+.sr-deck-arrow {
+  position: fixed;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 2.75rem;
+  height: 2.75rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--sr-border);
+  border-radius: 999px;
+  background: rgba(10, 10, 15, 0.8);
+  color: var(--sr-fg-muted);
+  font-size: 1.125rem;
+  cursor: pointer;
+  opacity: 0.45;
+  z-index: var(--sr-z-chrome);
+  transition:
+    opacity var(--sr-motion-micro) var(--sr-ease-out),
+    border-color var(--sr-motion-micro) var(--sr-ease-out),
+    color var(--sr-motion-micro) var(--sr-ease-out);
+}
+
+.sr-deck-arrow:hover,
+.sr-deck-arrow:focus-visible {
+  opacity: 1;
+  border-color: var(--sr-accent);
+  color: var(--sr-accent);
+}
+
+.sr-deck-arrow:disabled {
+  opacity: 0.12;
+  cursor: not-allowed;
+}
+
+.sr-deck-arrow-prev {
+  left: 1.25rem;
+}
+
+.sr-deck-arrow-next {
+  right: 1.25rem;
+}
+
+/* One-shot keyboard hint pill */
+.sr-deck-hint {
+  position: fixed;
+  left: 50%;
+  top: 4.25rem;
+  transform: translateX(-50%);
+  padding: 0.5rem 0.875rem;
+  border: 1px solid var(--sr-border);
+  border-radius: 999px;
+  background: rgba(10, 10, 15, 0.88);
+  color: var(--sr-fg-muted);
+  opacity: 0;
+  pointer-events: none;
+  z-index: var(--sr-z-chrome);
+  transition: opacity 320ms var(--sr-ease-out);
+}
+
+.sr-deck-hint[data-visible="true"] {
+  opacity: 1;
+}
+
+/* Mobile fallback: hide deck chrome entirely. */
+@media (max-width: 1023px) {
+  .sr-deck-pagination,
+  .sr-deck-arrow,
+  .sr-deck-hint {
+    display: none;
+  }
+}
+
+.sr-root[data-motion="reduced"] .sr-deck-hint {
+  display: none;
+}
+
+/* -------- Legacy scroll container (still used where referenced) ------- */
+.sr-main {
+  position: relative;
+  z-index: var(--sr-z-content);
+}
+
+/* Base flex composition only — NO position, min-height, or padding on   */
+/* desktop. The .sr-slide rule (defined earlier) owns those in deck mode. */
+/* Positioning and scroll-mode visibility are restored inside the mobile  */
+/* media query below.                                                     */
+.sr-act {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: var(--sr-space-4);
+}
+
+@media (max-width: 1023px) {
+  .sr-act {
+    position: relative;
+    min-height: 100vh;
+    min-height: 100dvh;
+    padding: clamp(4rem, 10vh, 6rem) clamp(1.5rem, 5vw, 4.5rem);
+    opacity: 0;
+    transform: translateY(16px);
+    transition:
+      opacity var(--sr-motion-reveal) var(--sr-ease-out),
+      transform var(--sr-motion-reveal) var(--sr-ease-out);
+  }
+
+  .sr-act[data-visible="true"],
+  .sr-root[data-motion="reduced"] .sr-act {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* -------- Staggered reveal orchestration ------------------------------ */
+/* Each act contains a sequence of [data-reveal] atoms with an inline    */
+/* --reveal-order custom property. When the parent act flips to visible, */
+/* atoms fade + translate up in sequence, so each section unfolds like   */
+/* pages turning — headline → lede → takeaway → legend → supporting      */
+/* detail — instead of everything snapping in at once. Delays collapse    */
+/* to 0 under reduced motion.                                            */
+/* Note: no global will-change here — promoting 30+ staggered atoms to    */
+/* their own GPU layers causes layer explosion and costs more than it    */
+/* saves on a page that already hosts an animated canvas. Browsers       */
+/* auto-optimize short opacity/transform transitions without the hint.   */
+[data-reveal] {
+  --reveal-stagger: 110ms;
+  --reveal-duration: 520ms;
+  opacity: 0;
+  transform: translateY(14px);
+  transition:
+    opacity var(--reveal-duration) var(--sr-ease-out),
+    transform var(--reveal-duration) var(--sr-ease-out);
+  transition-delay: calc(var(--reveal-order, 0) * var(--reveal-stagger));
+}
+
+/* Reveal trigger — any ancestor carrying [data-visible="true"] (the act */
+/* wrappers AND the landing section) flips its [data-reveal] descendants */
+/* to their visible state.                                                */
+[data-visible="true"] [data-reveal] {
+  opacity: 1;
+  transform: none;
+}
+
+.sr-root[data-motion="reduced"] [data-reveal] {
+  opacity: 1;
+  transform: none;
+  transition-duration: 0ms;
+  transition-delay: 0ms;
+}
+
+.sr-act-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-width: 64rem;
+}
+
+/* -------- Landing section (executive summary layer) ------------------- */
+/* The landing carries the domain, lede, the one hero takeaway the reader */
+/* should leave with, and both segmentation rails (network + device).     */
+/* It is NOT part of the four-act narrative — it's the scan layer that    */
+/* the acts below expound on. Always visible on page load.                */
+/* Base flex composition only; .sr-slide owns position + padding on       */
+/* desktop deck mode. Mobile fallback reinstates scroll-mode layout.      */
+/* Landing — MCP-inspired centered single-column flow. Hero at the top     */
+/* (centered), KPI cards below, then two side-by-side table cards. All      */
+/* centered within a max-width container so the page reads like a premium  */
+/* analytics landing, not a cramped two-column dashboard.                   */
+.sr-landing {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 0;
+  z-index: var(--sr-z-content);
+}
+
+@media (max-width: 1023px) {
+  .sr-landing {
+    position: relative;
+    min-height: 100vh;
+    min-height: 100dvh;
+    padding: clamp(5rem, 12vh, 7rem) clamp(1.5rem, 5vw, 4.5rem) clamp(3rem, 8vh, 5rem);
+  }
+}
+
+.sr-landing-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(1rem, 2vh, 1.5rem);
+  width: 100%;
+  max-width: 72rem;
+  flex: 1;
+  min-height: 0;
+}
+
+/* Landing hero — centered title + lede block with mood badge at top.      */
+.sr-landing-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--sr-space-3);
+  max-width: 48rem;
+}
+
+.sr-landing-hero .sr-hero {
+  margin: 0;
+  text-align: center;
+  font-size: clamp(1.75rem, 4vw, 2.75rem);
+}
+
+.sr-landing-hero .sr-lede {
+  margin: 0;
+  text-align: center;
+  max-width: 56ch;
+  font-size: var(--sr-type-02);
+  line-height: 1.5;
+}
+
+/* Two side-by-side table cards below the KPI grid.                        */
+.sr-landing-tables {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--sr-space-3);
+  width: 100%;
+  align-items: start;
+}
+
+@media (min-width: 1024px) {
+  .sr-landing-tables {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.sr-landing-tables .sr-rail-section {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.sr-landing-tables .sr-tier-labels {
+  width: 100%;
+}
+
+
+/* Persistent footer — boundary statement + Stroma wordmark. Rendered once
+ * at the root chrome layer so it stays visible across every slide of the
+ * desktop keyboard deck. On mobile (scroll fallback) it flows naturally
+ * at the end of the document as the true scroll-footer.
+ */
+/* Persistent footer — glassmorphic bar with blur + layered depth.         */
+.sr-landing-footer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sr-space-3);
+  padding: var(--sr-space-3) clamp(1.5rem, 5vw, 4.5rem) var(--sr-space-3);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(10, 10, 15, 0.82);
+  backdrop-filter: blur(16px);
+}
+
+@media (min-width: 768px) {
+  .sr-landing-footer {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sr-space-4);
+  }
+}
+
+@media (min-width: 1024px) {
+  .sr-landing-footer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: var(--sr-z-chrome);
+    padding-block: var(--sr-space-2);
+  }
+}
+
+/* Discreet boundary footnote. Small, muted, generous line-height — the    */
+/* honesty-gate copy exec readers don't need to inspect, but that must    */
+/* still be on the page for the report to be legally/editorially sound.   */
+.sr-landing-boundary {
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.6;
+  color: var(--sr-fg-muted);
+  opacity: 0.72;
+  max-width: 72ch;
+  letter-spacing: 0.01em;
+}
+
+/* Brand lockup now lives inside the landing footer, right-aligned so it  */
+/* sits flush with the right edge of the two-column content above.       */
+.sr-landing-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--sr-space-2);
+  flex-shrink: 0;
+}
+
+/* -------- Evidence rail — tone-coded provenance pills on the landing ---- */
+.sr-evidence-rail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: center;
+  max-width: 72rem;
+  width: 100%;
+}
+
+.sr-evidence-pill {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--sr-border);
+  border-radius: 8px;
+  background: rgba(18, 18, 26, 0.5);
+  min-width: 0;
+}
+
+.sr-evidence-label {
+  font-size: var(--sr-type-00);
+  color: var(--sr-fg-muted);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.sr-evidence-value {
+  font-size: var(--sr-type-01);
+  font-weight: 600;
+  color: var(--sr-fg);
+  white-space: nowrap;
+}
+
+.sr-evidence-pill[data-tone="steady"] { border-color: var(--sr-tone-steady-edge); }
+.sr-evidence-pill[data-tone="watch"] { border-color: var(--sr-tone-watch-edge); }
+.sr-evidence-pill[data-tone="alert"] { border-color: var(--sr-tone-alert-edge); }
+
+/* -------- Credibility strip — compact footer provenance line ------------ */
+.sr-credibility-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.5rem;
+  align-items: center;
+  font-family: var(--sr-mono);
+  font-size: var(--sr-type-00);
+  color: var(--sr-fg-muted);
+  opacity: 0.72;
+}
+
+.sr-credibility-sep {
+  opacity: 0.4;
+}
+
+.sr-warnings {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.sr-warning {
+  margin: 0;
+  font-size: var(--sr-type-00);
+  color: var(--sr-tone-watch-fg);
+  opacity: 0.82;
+}
+
+/* -------- Act 1 — centered container matching landing layout ----------- */
+.sr-act-1 {
+  align-items: center;
+  gap: clamp(1rem, 2vh, 1.5rem);
+}
+
+.sr-act-1 .sr-act-header {
+  text-align: center;
+  align-items: center;
+  max-width: 72rem;
+  width: 100%;
+}
+
+.sr-act-1 .sr-act-title {
+  font-size: clamp(1.5rem, 3vw, 2rem);
+  max-width: none;
+  letter-spacing: -0.02em;
+  text-align: center;
+}
+
+.sr-act-1 .sr-act-lede {
+  font-size: var(--sr-type-02);
+  color: rgba(255, 255, 255, 0.5);
+  line-height: 1.5;
+  max-width: 56ch;
+  text-align: center;
+}
+
+/* Two side-by-side persona cards — same glassmorphic treatment as the      */
+/* landing KPI cards and rail sections. Best-connected on the left (teal     */
+/* accent), most-constrained on the right (red accent).                     */
+.sr-persona-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--sr-space-3);
+  width: 100%;
+  max-width: 72rem;
+}
+
+@media (min-width: 768px) {
+  .sr-persona-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.sr-persona-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 0;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  backdrop-filter: blur(12px);
+  overflow: hidden;
+  transition:
+    transform 300ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 300ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 300ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.sr-persona-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+}
+
+.sr-persona-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--sr-space-3);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.sr-persona-card-title {
+  margin: 0;
+  font-size: var(--sr-type-02);
+  font-weight: 600;
+  color: var(--sr-fg);
+  letter-spacing: -0.01em;
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+}
+
+.sr-persona-card-title::before {
+  content: "";
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.sr-persona-card[data-tone="steady"] .sr-persona-card-title::before {
+  background: var(--sr-tier-moderate);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--sr-tier-moderate) 40%, transparent);
+}
+
+.sr-persona-card[data-tone="alert"] .sr-persona-card-title::before {
+  background: var(--sr-tier-constrained);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--sr-tier-constrained) 40%, transparent);
+}
+
+.sr-persona-card-share {
+  font-size: var(--sr-type-05);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--sr-fg);
+}
+
+.sr-persona-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 0;
+}
+
+.sr-persona-row {
+  display: grid;
+  grid-template-columns: auto 5.5rem 1fr;
+  align-items: center;
+  gap: var(--sr-space-2);
+  padding: var(--sr-space-2) var(--sr-space-3);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.sr-persona-row:last-child {
+  border-bottom: none;
+}
+
+.sr-persona-row-icon {
+  display: inline-flex;
+  color: var(--sr-fg-muted);
+  opacity: 0.5;
+}
+
+.sr-persona-row-label {
+  font-size: var(--sr-type-mono-sm);
+  color: rgba(255, 255, 255, 0.5);
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.sr-persona-row-value {
+  font-size: var(--sr-type-mono-sm);
+  color: var(--sr-fg);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Act 1 is split into two stacked sub-sections: Network reality and       */
+/* Device reality. Each section owns its own eyebrow, audience strip, and  */
+/* narrative-card grid; a subtle divider separates them without breaking   */
+/* the one-slide vertical rhythm.                                           */
+/* Act 1 sections — same glassmorphic card treatment as landing rail        */
+/* sections. Consistent surface, border, blur, shadow, and padding so       */
+/* both slides read from the same visual vocabulary.                         */
+.sr-act1-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sr-space-2);
+  max-width: 72rem;
+  padding: var(--sr-space-3);
+  background: rgba(18, 18, 26, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  backdrop-filter: blur(8px);
+  box-shadow:
+    0 1px 0 rgba(0, 0, 0, 0.3),
+    0 4px 14px rgba(0, 0, 0, 0.3);
+}
+
+.sr-act1-section + .sr-act1-section {
+  margin-top: var(--sr-space-3);
+}
+
+/* Device reality (second section) is visually subordinate — lighter        */
+/* surface, more compact cards with smaller numbers.                         */
+.sr-act1-section + .sr-act1-section {
+  background: rgba(18, 18, 26, 0.4);
+  padding: var(--sr-space-2) var(--sr-space-3);
+}
+
+.sr-act1-section + .sr-act1-section .sr-tier-narrative {
+  padding: var(--sr-space-2);
+  gap: 0.5rem;
+}
+
+.sr-act1-section + .sr-act1-section .sr-tier-narrative-share {
+  font-size: clamp(1.5rem, 3vw, 2rem);
+}
+
+.sr-act1-section + .sr-act1-section .sr-tier-narrative-body {
+  font-size: var(--sr-type-00);
+}
+
+/* Section eyebrow — matches landing rail eyebrow: icon in a rounded       */
+/* badge box + title with border-bottom separator.                          */
+.sr-act1-section-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.625rem;
+  margin: 0;
+  padding-bottom: var(--sr-space-2);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: var(--sr-type-01);
+  font-weight: 600;
+  color: var(--sr-fg);
+  letter-spacing: 0.12em;
+}
+
+.sr-act1-section-eyebrow .sr-icon {
+  padding: 0.375rem;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0.5rem;
+}
+
+/* Actionable signals slide — standalone slide titled "What can your team  */
+/* act on?" Each cell is tied to a concrete product-team decision via      */
+/* Supporting evidence drawer — 21st.dev-inspired collapsible card with     */
+/* dark surface, rounded corners, shadow depth, and smooth open/close.      */
+.sr-supporting-evidence {
+  grid-column: 1 / -1;
+  margin-block-start: var(--sr-space-4);
+  background: #12121a;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.65),
+    0 18px 40px rgba(0, 0, 0, 0.45);
+  max-width: 84rem;
+}
+
+.sr-supporting-evidence-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--sr-space-3) var(--sr-space-4);
+  cursor: pointer;
+  transition:
+    background-color 300ms var(--sr-ease-out),
+    border-color 300ms var(--sr-ease-out);
+  list-style: none;
+}
+
+.sr-supporting-evidence-trigger::-webkit-details-marker {
+  display: none;
+}
+
+.sr-supporting-evidence-trigger:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.sr-supporting-evidence-trigger .sr-eyebrow {
+  margin: 0;
+  color: var(--sr-fg);
+  font-weight: 500;
+}
+
+.sr-chevron {
+  color: var(--sr-fg-muted);
+  transition: transform 200ms var(--sr-ease-out);
+  flex-shrink: 0;
+  opacity: 0.6;
+}
+
+.sr-supporting-evidence[open] .sr-chevron {
+  transform: rotate(180deg);
+}
+
+.sr-supporting-evidence-content {
+  padding: 0 var(--sr-space-4) var(--sr-space-4);
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.sr-act1-signals {
+  margin: 0;
+  padding: 0;
+  max-width: 84rem;
+}
+
+.sr-act1-signals > .sr-eyebrow {
+  display: none;
+}
+
+/* Signal bar segment hover micro-interactions — MCP-informed lift + glow.  */
+.sr-signal-segment {
+  position: relative;
+  transition:
+    transform 300ms ease-out,
+    box-shadow 300ms ease-out,
+    filter 300ms ease-out;
+}
+
+.sr-signal-segment:hover {
+  transform: translateY(-2px);
+  z-index: 2;
+  filter: brightness(1.15);
+}
+
+.sr-signal-segment[data-tone="alert"]:hover {
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--sr-tier-constrained) 30%, transparent);
+}
+.sr-signal-segment[data-tone="watch"]:hover {
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--sr-tier-constrained-moderate) 30%, transparent);
+}
+.sr-signal-segment[data-tone="steady"]:hover {
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--sr-tier-moderate) 30%, transparent);
+}
+.sr-signal-segment[data-tone="neutral"]:hover {
+  box-shadow: 0 4px 12px rgba(232, 230, 223, 0.08);
+}
+
+.sr-signal-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--sr-space-3) clamp(1.5rem, 3vw, 2.5rem);
+  margin: 0;
+  padding: 0;
+}
+
+@media (min-width: 720px) {
+  .sr-signal-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1200px) {
+  .sr-signal-grid {
+    grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+  }
+}
+
+/* Signal cells — 21st.dev-inspired card treatment with dark surface,       */
+/* subtle border, rounded corners, and hover glow. Each card carries        */
+/* its bar + decision text as a self-contained evidence unit.               */
+.sr-signal-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 0;
+  padding: var(--sr-space-3);
+  background: #12121a;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+  transition:
+    border-color 300ms var(--sr-ease-out),
+    box-shadow 300ms var(--sr-ease-out);
+}
+
+.sr-signal-cell:hover {
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+.sr-signal-decision {
+  margin: 0.5rem 0 0;
+  padding-top: 0.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  font-size: var(--sr-type-01);
+  line-height: 1.5;
+  color: var(--sr-fg-muted);
+  opacity: 0.7;
+}
+
+.sr-signal-cell dt {
+  margin: 0;
+  font-size: var(--sr-type-00);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--sr-fg-muted);
+  line-height: 1.4;
+}
+
+.sr-signal-cell dd {
+  margin: 0;
+  font-size: var(--sr-type-02);
+  color: var(--sr-fg);
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Horizontal stacked bar — 21st.dev-inspired proportional segments with    */
+/* rounded corners, taller height for readability, and smooth transitions.  */
+.sr-signal-bar {
+  display: flex;
+  height: 2.75rem;
+  border-radius: 8px;
+  overflow: hidden;
+  background: rgba(232, 230, 223, 0.03);
+  margin-top: 0.5rem;
+}
+
+.sr-signal-segment {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 4px;
+  transition: flex-basis var(--sr-motion-micro) var(--sr-ease-out);
+}
+
+.sr-signal-segment[data-tone="alert"] {
+  background: var(--sr-tone-alert-bg);
+  border-left: 1px solid var(--sr-tone-alert-edge);
+}
+.sr-signal-segment[data-tone="watch"] {
+  background: var(--sr-tone-watch-bg);
+  border-left: 1px solid var(--sr-tone-watch-edge);
+}
+.sr-signal-segment[data-tone="steady"] {
+  background: var(--sr-tone-steady-bg);
+  border-left: 1px solid var(--sr-tone-steady-edge);
+}
+.sr-signal-segment[data-tone="neutral"] {
+  background: var(--sr-tone-neutral-bg);
+  border-left: 1px solid var(--sr-border);
+}
+
+.sr-signal-segment:first-child {
+  border-left: none;
+}
+
+.sr-signal-segment-label {
+  font-size: var(--sr-type-01);
+  color: var(--sr-fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0 0.75rem;
+  letter-spacing: 0.02em;
+  font-weight: 600;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+.sr-coverage-caveat {
+  display: inline;
+  color: var(--sr-fg-muted);
+  letter-spacing: 0.04em;
+  text-transform: none;
+  font-size: inherit;
+  margin-inline-start: 0.25rem;
+  opacity: 0.85;
+}
+
+/* Per-tier narrative cards. Only materially-represented tiers are shown  */
+/* (zero-share tiers are silenced here because the landing section above  */
+/* already shows the full spectrum).                                      */
+.sr-tier-narratives {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--sr-space-3);
+  margin-top: 0;
+}
+
+@media (min-width: 720px) {
+  .sr-tier-narratives {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1200px) {
+  .sr-tier-narratives {
+    grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  }
+}
+
+/* Tier narrative cards — 21st.dev holistic premium treatment. Full card    */
+/* surface with glassmorphic background, subtle border, layered shadow,     */
+/* accent-coloured left edge, and hover lift + glow micro-interaction.      */
+.sr-tier-narrative {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: var(--sr-space-3);
+  background: rgba(18, 18, 26, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-left: 2px solid currentColor;
+  border-radius: 10px;
+  backdrop-filter: blur(8px);
+  box-shadow:
+    0 1px 0 rgba(0, 0, 0, 0.3),
+    0 4px 12px rgba(0, 0, 0, 0.25);
+  transition:
+    transform 300ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 300ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 300ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.sr-tier-narrative:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow:
+    0 2px 0 rgba(0, 0, 0, 0.3),
+    0 12px 28px rgba(0, 0, 0, 0.45);
+}
+
+.sr-tier-narrative[data-tier="urban"] { color: var(--sr-tier-urban); }
+.sr-tier-narrative[data-tier="moderate"] { color: var(--sr-tier-moderate); }
+.sr-tier-narrative[data-tier="constrained_moderate"] { color: var(--sr-tier-constrained-moderate); }
+.sr-tier-narrative[data-tier="constrained"] { color: var(--sr-tier-constrained); }
+.sr-tier-narrative[data-tier="unknown"] { color: var(--sr-tier-unknown); }
+
+/* Device narrative cards reuse the .sr-tier-narrative base but key their   */
+/* accent off the device-tier instead of the network tier. High = cool     */
+/* steady tone, mid = amber watch tone, low = alert tone.                   */
+.sr-tier-narrative[data-device-tier="high"] { color: var(--sr-tier-moderate); }
+.sr-tier-narrative[data-device-tier="mid"] { color: var(--sr-tier-constrained-moderate); }
+.sr-tier-narrative[data-device-tier="low"] { color: var(--sr-tier-constrained); }
+
+.sr-tier-narrative-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+}
+
+.sr-tier-narrative-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.sr-tier-narrative-label {
+  margin: 0;
+  color: var(--sr-fg-muted);
+}
+
+.sr-tier-narrative-stats {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+}
+
+.sr-tier-narrative-share {
+  font-size: clamp(2rem, 4vw, 2.75rem);
+  line-height: 1;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--sr-fg);
+}
+
+.sr-tier-narrative-sessions {
+  color: var(--sr-fg-muted);
+  letter-spacing: 0;
+}
+
+.sr-tier-narrative-body {
+  margin: 0;
+  font-size: var(--sr-type-02);
+  line-height: 1.55;
+  color: rgba(255, 255, 255, 0.5);
+  max-width: 36ch;
+  font-weight: 400;
+}
+
+/* Rail sections — glassmorphic card containers for the landing tables.     */
+.sr-rail-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sr-space-2);
+  padding: var(--sr-space-3);
+  background: rgba(18, 18, 26, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  backdrop-filter: blur(8px);
+  box-shadow:
+    0 1px 0 rgba(0, 0, 0, 0.3),
+    0 4px 14px rgba(0, 0, 0, 0.3);
+}
+
+/* Stacked rail sections get vertical spacing only outside of grid parents. */
+/* Inside .sr-landing-tables the grid gap owns the spacing.                */
+.sr-rail-section + .sr-rail-section {
+  margin-top: var(--sr-space-4);
+}
+
+.sr-landing-tables > .sr-rail-section + .sr-rail-section {
+  margin-top: 0;
+}
+
+.sr-rail-section > .sr-eyebrow {
+  font-size: 0.625rem;
+  color: var(--sr-fg-muted);
+}
+
+.sr-act-inner {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sr-space-2);
+  max-width: 56rem;
+}
+
+.sr-sample-stat {
+  margin: var(--sr-space-2) 0 0;
+  color: var(--sr-fg-muted);
+}
+
+.sr-act1-narrative {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding-top: var(--sr-space-4);
+  max-width: 56rem;
+}
+
+.sr-act1-narrative .sr-act-title {
+  margin: 0.25rem 0 0.5rem;
+}
+
+.sr-act1-footer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sr-space-2);
+  padding-top: var(--sr-space-3);
+  border-top: 1px solid var(--sr-border);
+  margin-top: var(--sr-space-4);
+}
+
+/* Network spread legend — rendered as a real 3-column table so tier name, */
+/* session count, and percentage line up vertically across rows. Device    */
+/* class still uses the older flex layout below.                           */
+.sr-tier-labels {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Column headings for the network/device spread tables. Premium eyebrow   */
+/* treatment — small, letter-spaced, muted, with a bottom border that     */
+/* visually separates the header from the data rows below.                 */
+/* Table column headers — MCP pattern: xs, medium weight, uppercase,       */
+/* generous padding, border-b for visual separation.                        */
+.sr-tier-col-head {
+  font-family: var(--sr-sans);
+  font-size: var(--sr-type-00);
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.5);
+  text-align: left;
+  padding: var(--sr-space-2) var(--sr-space-2) var(--sr-space-3);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.sr-tier-col-head-right {
+  text-align: right;
+}
+
+.sr-tier-label {
+  --share: 0;
+  position: relative;
+  font-size: 1rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--sr-border) 50%, transparent);
+}
+
+.sr-tier-label:last-child {
+  border-bottom: none;
+}
+
+.sr-tier-label[data-empty="true"] {
+  opacity: 0.4;
+}
+
+.sr-tier-label[data-tier="urban"] { color: var(--sr-tier-urban); }
+.sr-tier-label[data-tier="moderate"] { color: var(--sr-tier-moderate); }
+.sr-tier-label[data-tier="constrained_moderate"] { color: var(--sr-tier-constrained-moderate); }
+.sr-tier-label[data-tier="constrained"] { color: var(--sr-tier-constrained); }
+.sr-tier-label[data-tier="unknown"] { color: var(--sr-tier-unknown); }
+
+.sr-tier-label > th,
+.sr-tier-label > td {
+  padding: var(--sr-space-2) var(--sr-space-2);
+  vertical-align: middle;
+  text-align: left;
+  font-weight: 400;
+}
+
+.sr-tier-label:not([data-empty="true"]):hover > th,
+.sr-tier-label:not([data-empty="true"]):hover > td {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+/* All table cell text uses --sr-type-02 (0.9375rem) as the baseline so   */
+/* columns read at a uniform weight. The name column uses font-weight 500 */
+/* for emphasis; share column keeps the same size but bold weight so it    */
+/* anchors the right edge without outsizing everything else.               */
+.sr-tier-label-name {
+  font-size: var(--sr-type-mono-sm);
+  color: var(--sr-fg);
+  letter-spacing: 0;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding-right: var(--sr-space-2);
+  white-space: nowrap;
+}
+
+.sr-tier-label-criteria {
+  font-size: var(--sr-type-mono-sm);
+  color: var(--sr-fg);
+  letter-spacing: 0;
+  white-space: nowrap;
+  padding-right: var(--sr-space-2);
+  font-weight: 400;
+}
+
+.sr-tier-label-sessions {
+  font-size: var(--sr-type-mono-sm);
+  color: var(--sr-fg);
+  letter-spacing: 0;
+  white-space: nowrap;
+  padding-right: var(--sr-space-2);
+}
+
+.sr-tier-label-share {
+  font-size: var(--sr-type-mono-sm);
+  color: var(--sr-fg);
+  font-weight: 600;
+  text-align: right !important;
+  white-space: nowrap;
+}
+
+/* Tier dot → tall pill indicator (MCP pattern: w-1.5 h-8 rounded-full).   */
+.sr-tier-dot {
+  width: 0.25rem;
+  height: 1.75rem;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.sr-tier-label[data-tier="urban"] .sr-tier-dot { background: var(--sr-tier-urban); }
+.sr-tier-label[data-tier="moderate"] .sr-tier-dot { background: var(--sr-tier-moderate); }
+.sr-tier-label[data-tier="constrained_moderate"] .sr-tier-dot { background: var(--sr-tier-constrained-moderate); }
+.sr-tier-label[data-tier="constrained"] .sr-tier-dot { background: var(--sr-tier-constrained); }
+.sr-tier-label[data-tier="unknown"] .sr-tier-dot { background: var(--sr-tier-unknown); }
+
+/* Device-spread rows reuse the network-tier table chrome. Accent the dot  */
+/* + foreground with the device-class palette used across Act 1            */
+/* (high → steady / mid → watch / low → alert).                             */
+.sr-tier-label[data-device-tier="high"] { color: var(--sr-tier-moderate); }
+.sr-tier-label[data-device-tier="mid"] { color: var(--sr-tier-constrained-moderate); }
+.sr-tier-label[data-device-tier="low"] { color: var(--sr-tier-constrained); }
+.sr-tier-label[data-device-tier="high"] .sr-tier-dot { background: var(--sr-tier-moderate); }
+.sr-tier-label[data-device-tier="mid"] .sr-tier-dot { background: var(--sr-tier-constrained-moderate); }
+.sr-tier-label[data-device-tier="low"] .sr-tier-dot { background: var(--sr-tier-constrained); }
+
+/* -------- KPI metric card grid (MCP pattern) --------------------------- */
+/* Three metric cards in a horizontal row on the landing, each with an     */
+/* icon badge, big number, and muted label. Glassmorphic card surface       */
+/* with hover lift + glow, matching the MCP's premium metric card design.  */
+.sr-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--sr-space-3);
+  width: 100%;
+}
+
+@media (max-width: 768px) {
+  .sr-kpi-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.sr-kpi-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  padding: var(--sr-space-2) var(--sr-space-3);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  backdrop-filter: blur(12px);
+  transition:
+    transform 300ms cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 300ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 300ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 300ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.sr-kpi-card:hover {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.15);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+}
+
+.sr-kpi-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.25rem;
+}
+
+.sr-kpi-icon-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.375rem;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0.5rem;
+  color: var(--sr-fg-muted);
+}
+
+.sr-kpi-card[data-tone="alert"] .sr-kpi-icon-badge {
+  background: color-mix(in srgb, var(--sr-tier-constrained) 15%, transparent);
+  border-color: color-mix(in srgb, var(--sr-tier-constrained) 25%, transparent);
+  color: var(--sr-tier-constrained);
+}
+
+.sr-kpi-card[data-tone="watch"] .sr-kpi-icon-badge {
+  background: color-mix(in srgb, var(--sr-tier-constrained-moderate) 15%, transparent);
+  border-color: color-mix(in srgb, var(--sr-tier-constrained-moderate) 25%, transparent);
+  color: var(--sr-tier-constrained-moderate);
+}
+
+.sr-kpi-card[data-tone="steady"] .sr-kpi-icon-badge {
+  background: color-mix(in srgb, var(--sr-tier-moderate) 15%, transparent);
+  border-color: color-mix(in srgb, var(--sr-tier-moderate) 25%, transparent);
+  color: var(--sr-tier-moderate);
+}
+
+.sr-kpi-value {
+  font-size: clamp(1.5rem, 3.5vw, 2rem);
+  line-height: 1;
+  font-weight: 700;
+  color: var(--sr-fg);
+  letter-spacing: -0.02em;
+}
+
+.sr-kpi-card[data-tone="alert"] .sr-kpi-value {
+  color: var(--sr-tier-constrained);
+}
+
+.sr-kpi-card[data-tone="watch"] .sr-kpi-value {
+  color: var(--sr-tier-constrained-moderate);
+}
+
+.sr-kpi-label {
+  font-size: var(--sr-type-02);
+  color: rgba(255, 255, 255, 0.5);
+  line-height: 1.45;
+  font-weight: 400;
+}
+
+/* -------- Legacy takeaway (non-landing acts) --------------------------- */
+.sr-takeaway {
+  display: flex;
+  align-items: baseline;
+  gap: clamp(1rem, 2vw, 1.75rem);
+  margin: var(--sr-space-3) 0 var(--sr-space-2);
+  padding: var(--sr-space-3);
+  background: rgba(18, 18, 26, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  max-width: 56rem;
+}
+
+/* Landing-scoped takeaway: no borders, center-aligned label, tighter     */
+/* label width, generous top margin. The landing is the clean exec       */
+/* summary — every piece of chrome has to justify its existence.         */
+.sr-landing .sr-takeaway {
+  align-items: center;
+  gap: clamp(1rem, 2.4vw, 2rem);
+  margin: var(--sr-space-5) 0 0;
+  padding: 0;
+  border: 0;
+}
+
+.sr-landing .sr-takeaway-label {
+  font-size: 1rem;
+  line-height: 1.5;
+  color: var(--sr-fg-muted);
+  max-width: 28ch;
+}
+
+.sr-takeaway-wide {
+  max-width: none;
+}
+
+.sr-takeaway-number {
+  font-size: clamp(3rem, 8vw, 5.25rem);
+  line-height: 1;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--sr-fg);
+}
+
+.sr-takeaway[data-tone="alert"] .sr-takeaway-number {
+  color: var(--sr-tier-constrained);
+  text-shadow: 0 0 14px color-mix(in srgb, var(--sr-tier-constrained) 18%, transparent);
+}
+
+.sr-takeaway[data-tone="watch"] .sr-takeaway-number {
+  color: var(--sr-tier-constrained-moderate);
+  text-shadow: 0 0 12px color-mix(in srgb, var(--sr-tier-constrained-moderate) 14%, transparent);
+}
+
+.sr-takeaway[data-tone="steady"] .sr-takeaway-number {
+  color: var(--sr-tier-moderate);
+}
+
+.sr-takeaway-label {
+  flex: 1;
+  font-size: 1.0625rem;
+  line-height: 1.45;
+  color: var(--sr-fg);
+  max-width: 36ch;
+}
+
+/* Landing takeaway stacks: the hero row (big number + label) sits above  */
+/* a meta list whose rows mirror the hero's typographic voice — bright    */
+/* number, muted descriptive label — so sessions + days read as siblings */
+/* of the 40% statement, not as small-print chrome.                       */
+.sr-landing .sr-takeaway {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--sr-space-4);
+}
+
+.sr-takeaway-hero {
+  display: flex;
+  align-items: center;
+  gap: clamp(1rem, 2.4vw, 2rem);
+}
+
+.sr-takeaway-meta {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sr-space-3);
+}
+
+.sr-takeaway-meta-item {
+  display: flex;
+  align-items: baseline;
+  gap: clamp(1rem, 2.4vw, 2rem);
+}
+
+.sr-takeaway-meta-number {
+  font-size: clamp(2rem, 4.8vw, 3.25rem);
+  line-height: 1;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  color: var(--sr-fg);
+  font-variant-numeric: tabular-nums;
+}
+
+.sr-takeaway-meta-label {
+  font-size: 1rem;
+  line-height: 1.5;
+  color: var(--sr-fg-muted);
+  max-width: 28ch;
+}
+
+/* Mood pill in its landing-copy context — sits directly below the       */
+/* takeaway block, sized up slightly from the old fixed-chrome version    */
+/* so it reads as a proper status chip without competing with the hero.   */
+.sr-landing-mood {
+  align-self: center;
+  margin: 0;
+  padding: 0.5rem 0.875rem;
+  gap: 0.5rem;
+  font-size: var(--sr-type-01);
+}
+
+.sr-landing-mood .sr-mood-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+}
+
+/* -------- Provenance line (Act 1 footer) ------------------------------- */
+.sr-provenance-line {
+  margin: var(--sr-space-3) 0 0;
+  color: var(--sr-fg-muted);
+  font-size: var(--sr-type-mono-sm);
+  letter-spacing: 0;
+}
+
+
+/* -------- Particle metaphor legend ------------------------------------- */
+/* Narrates what the canvas particles represent so viewers read them as   */
+/* evidence, not decoration. Appears inside each act that uses particles. */
+.sr-particle-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.625rem;
+  margin: var(--sr-space-2) 0 0;
+  padding: 0.625rem 0.875rem;
+  max-width: 60ch;
+  border: 1px solid var(--sr-border);
+  border-left: 2px solid var(--sr-accent);
+  border-radius: 0 10px 10px 0;
+  background: rgba(13, 13, 20, 0.85);
+  color: var(--sr-fg);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
+.sr-particle-legend-dot {
+  flex-shrink: 0;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+  background: var(--sr-accent);
+  box-shadow: 0 0 10px var(--sr-accent-soft);
+}
+
+/* -------- Chips and meta ----------------------------------------------- */
+.sr-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0;
+}
+
+.sr-chip {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--sr-border);
+  border-radius: 10px;
+  background: rgba(15, 15, 20, 0.5);
+  font-size: 0.8125rem;
+  color: var(--sr-fg);
+}
+
+.sr-chip-accent {
+  border-color: color-mix(in srgb, var(--sr-accent) 42%, var(--sr-border));
+  background: color-mix(in srgb, var(--sr-accent) 8%, rgba(15, 15, 20, 0.5));
+}
+
+.sr-chip-accent .sr-mono {
+  color: var(--sr-accent);
+  font-weight: 500;
+}
+
+.sr-chip-sm {
+  padding: 0.3125rem 0.625rem;
+  font-size: var(--sr-type-mono-sm);
+  color: var(--sr-fg-muted);
+}
+
+.sr-chip-threshold {
+  padding: 0.375rem 0.75rem;
+  font-size: var(--sr-type-mono-sm);
+  color: var(--sr-fg-muted);
+  flex-direction: row;
+  align-items: center;
+}
+
+/* -------- Act 2 — the race --------------------------------------------- */
+.sr-race {
+  display: grid;
+  grid-template-columns: 1fr minmax(12rem, 18rem) 1fr;
+  gap: var(--sr-space-3);
+  align-items: stretch;
+  margin-top: var(--sr-space-3);
+}
+
+/* Lane cards — same glassmorphic surface as the rest of the design        */
+/* system. Tone differentiates via a small glowing dot in the header,       */
+/* matching the persona card pattern from Act 1.                            */
+.sr-lane {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sr-space-2);
+  padding: var(--sr-space-3);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  backdrop-filter: blur(12px);
+  transition:
+    border-color 300ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 300ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.sr-lane:hover {
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+.sr-lane-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sr-space-2);
+  padding-bottom: var(--sr-space-2);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* -------- Act 2 layout rhythm ---------------------------------------- */
+/* Act 2 is the tallest act — header + meta + race + timeline all need to */
+/* fit above the persistent footer without clipping. We tighten the top   */
+/* block (header gap + title/lede sizes) and cap the race/device heights  */
+/* so the timeline at the bottom always has breathing room.               */
+/* -------- Act 2 — centered header, race owns the stage below ----------- */
+/* Header matches the landing/Act 1 centered pattern. The race itself      */
+/* fills the remaining viewport as a wide 3-column grid — that's Act 2's   */
+/* unique identity, not the cards-and-tables language of other slides.      */
+.sr-act-2 {
+  align-items: center;
+  gap: clamp(1rem, 2vh, 1.5rem);
+}
+
+.sr-act-2 .sr-act-header {
+  gap: 0.5rem;
+  text-align: center;
+  align-items: center;
+  max-width: 72rem;
+  width: 100%;
+}
+
+.sr-act-2 .sr-act-title {
+  margin: 0;
+  font-size: clamp(1.5rem, 3vw, 2rem);
+  max-width: none;
+  letter-spacing: -0.02em;
+  text-align: center;
+}
+
+.sr-act-2 .sr-act-lede {
+  font-size: var(--sr-type-02);
+  line-height: 1.5;
+  max-width: 56ch;
+  color: rgba(255, 255, 255, 0.5);
+  text-align: center;
+}
+
+.sr-act-2 .sr-race {
+  margin-top: 0;
+  flex: 1;
+  min-height: 0;
+  align-items: center;
+  max-width: 72rem;
+  width: 100%;
+}
+
+/* Both lanes share identical internal layout so headers align and timing    */
+/* numbers align regardless of device frame height. No max-height on the    */
+/* lane — the slide's 100vh + race flex:1 constrains the overall height.    */
+.sr-act-2 .sr-lane {
+  justify-content: flex-start;
+  align-items: center;
+  flex: 1;
+  min-height: 0;
+}
+
+.sr-act-2 .sr-lane .sr-lane-header {
+  width: 100%;
+}
+
+.sr-act-2 .sr-device {
+  flex: 1;
+  min-height: 0;
+  max-height: clamp(12rem, 30vh, 18rem);
+  margin: var(--sr-space-2) 0;
+}
+
+.sr-act-2 .sr-lane-time {
+  flex-shrink: 0;
+  padding-top: var(--sr-space-2);
+}
+
+/* Wait delta is the scene's hero number. Give it presence without       */
+/* stealing the stage from the two devices racing on either side.        */
+.sr-wait-value {
+  font-size: clamp(2.75rem, 6vw, 4.5rem);
+  line-height: 1;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--sr-tier-constrained);
+  text-shadow: 0 0 14px color-mix(in srgb, var(--sr-tier-constrained) 18%, transparent);
+}
+
+.sr-wait-caption {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--sr-fg-muted);
+  max-width: 22ch;
+}
+
+/* -------- Device silhouettes (Act 2) ----------------------------------- */
+/* Two pure-HTML/CSS phone mockups frame the race — a premium iPhone-style */
+/* device for the urban lane (dynamic island, thin titanium bezel, 5G, 4  */
+/* signal bars) and a budget Android-style device for the comparison lane */
+/* (thicker plastic bezel, camera punch-hole, 3G, 1 signal bar). Device   */
+/* chrome narrates the tier before the load animation even begins.        */
+.sr-device {
+  position: relative;
+  width: auto;
+  height: 100%;
+  aspect-ratio: 9 / 19.5;
+  max-width: 14rem;
+  max-height: clamp(20rem, 44vh, 28rem);
+  margin: 0 auto;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  --sr-device-bezel: 6px;
+  --sr-device-radius-outer: 34px;
+  --sr-device-radius-inner: 28px;
+  --sr-device-body-a: #2a2b2f;
+  --sr-device-body-b: #15161a;
+  --sr-device-highlight: rgba(232, 230, 223, 0.18);
+  --sr-device-screen-a: #050608;
+  --sr-device-screen-b: #0c0e14;
+  --sr-device-status: rgba(232, 230, 223, 0.92);
+}
+
+.sr-device[data-device="premium"] {
+  --sr-device-bezel: 4px;
+  --sr-device-radius-outer: 38px;
+  --sr-device-radius-inner: 32px;
+  --sr-device-body-a: #e4e5e8;
+  --sr-device-body-b: #6b6d72;
+  --sr-device-highlight: rgba(255, 255, 255, 0.65);
+  --sr-device-status: #ffffff;
+  aspect-ratio: 9 / 19.5;
+}
+
+.sr-device[data-device="budget"] {
+  --sr-device-bezel: 8px;
+  --sr-device-radius-outer: 22px;
+  --sr-device-radius-inner: 12px;
+  --sr-device-body-a: #1a1b1f;
+  --sr-device-body-b: #0b0c10;
+  --sr-device-highlight: rgba(232, 230, 223, 0.08);
+  --sr-device-status: rgba(232, 230, 223, 0.78);
+  aspect-ratio: 9 / 18.5;
+}
+
+.sr-device-frame {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: var(--sr-device-radius-outer);
+  padding: var(--sr-device-bezel);
+  background: linear-gradient(
+    145deg,
+    var(--sr-device-body-a) 0%,
+    var(--sr-device-body-b) 48%,
+    var(--sr-device-body-a) 100%
+  );
+  box-shadow:
+    0 1px 0 var(--sr-device-highlight) inset,
+    0 -1px 0 rgba(0, 0, 0, 0.5) inset,
+    0 18px 42px rgba(0, 0, 0, 0.55),
+    0 2px 0 rgba(0, 0, 0, 0.4);
+}
+
+.sr-device[data-device="premium"] .sr-device-frame {
+  background:
+    linear-gradient(145deg, #f2f3f5 0%, #9a9ca1 32%, #5d5f64 55%, #9a9ca1 78%, #f2f3f5 100%);
+}
+
+.sr-device[data-device="budget"] .sr-device-frame::after {
+  /* Matte plastic rim texture for the budget device */
+  content: "";
+  position: absolute;
+  inset: 2px;
+  border-radius: calc(var(--sr-device-radius-outer) - 2px);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 30%);
+  pointer-events: none;
+}
+
+.sr-device-screen {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: var(--sr-device-radius-inner);
+  background: linear-gradient(
+    180deg,
+    var(--sr-device-screen-a) 0%,
+    var(--sr-device-screen-b) 100%
+  );
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding: 0.625rem 0.625rem 1.125rem;
+  gap: 0.5rem;
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.6) inset,
+    0 1px 0 rgba(0, 0, 0, 0.8) inset;
+}
+
+/* Status bar — time, signal, network, battery */
+.sr-device-statusbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 1.125rem;
+  padding: 0 0.375rem;
+  color: var(--sr-device-status);
+  font-size: 0.625rem;
+  letter-spacing: 0.02em;
+  z-index: 2;
+}
+
+.sr-device[data-device="budget"] .sr-device-statusbar {
+  padding: 0 0.5rem;
+  font-size: 0.5625rem;
+}
+
+.sr-device-time {
+  font-weight: 600;
+  color: var(--sr-device-status);
+  font-size: 0.6875rem;
+}
+
+.sr-device[data-device="budget"] .sr-device-time {
+  font-weight: 500;
+  font-size: 0.625rem;
+}
+
+.sr-device-status-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.sr-device-signal {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 1px;
+  height: 0.625rem;
+}
+
+.sr-device-signal-bar {
+  width: 2px;
+  border-radius: 0.5px;
+  background: var(--sr-device-status);
+  opacity: 0.35;
+}
+
+.sr-device-signal-bar[data-active="true"] {
+  opacity: 1;
+}
+
+.sr-device-signal-bar:nth-child(1) { height: 30%; }
+.sr-device-signal-bar:nth-child(2) { height: 55%; }
+.sr-device-signal-bar:nth-child(3) { height: 78%; }
+.sr-device-signal-bar:nth-child(4) { height: 100%; }
+
+.sr-device-network {
+  font-size: 0.5625rem;
+  font-weight: 500;
+  color: var(--sr-device-status);
+  letter-spacing: 0.03em;
+}
+
+.sr-device[data-device="premium"] .sr-device-network {
+  color: #ffffff;
+}
+
+.sr-device[data-device="budget"] .sr-device-network {
+  color: color-mix(in srgb, var(--sr-tier-constrained) 72%, var(--sr-device-status));
+}
+
+.sr-device-battery {
+  position: relative;
+  width: 1.25rem;
+  height: 0.5625rem;
+  border: 1px solid var(--sr-device-status);
+  border-radius: 2px;
+  padding: 1px;
+  opacity: 0.85;
+}
+
+.sr-device-battery::after {
+  content: "";
+  position: absolute;
+  right: -3px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1.5px;
+  height: 3px;
+  background: var(--sr-device-status);
+  border-radius: 0 1px 1px 0;
+}
+
+.sr-device-battery-fill {
+  display: block;
+  height: 100%;
+  border-radius: 1px;
+  background: var(--sr-device-status);
+}
+
+.sr-device[data-device="budget"] .sr-device-battery-fill {
+  background: color-mix(in srgb, var(--sr-tier-constrained-moderate) 60%, var(--sr-device-status));
+}
+
+/* Dynamic Island (premium) */
+.sr-device-island {
+  position: absolute;
+  top: 0.375rem;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 32%;
+  height: 1.125rem;
+  background: #000;
+  border-radius: 999px;
+  z-index: 3;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.8);
+}
+
+/* Punch-hole camera (budget) */
+.sr-device-punchhole {
+  position: absolute;
+  top: 0.5rem;
+  left: 1rem;
+  width: 0.4375rem;
+  height: 0.4375rem;
+  background: #000;
+  border: 1px solid rgba(232, 230, 223, 0.1);
+  border-radius: 999px;
+  z-index: 3;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.9), inset 0 0 2px rgba(255, 255, 255, 0.08);
+}
+
+/* Content stack — keeps the original skeleton concept but tighter */
+.sr-device-content {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4375rem;
+  padding: 0.125rem 0.125rem 0;
+}
+
+.sr-frame-line {
+  border-radius: 2px;
+  border: 1px solid rgba(232, 230, 223, 0.08);
+  background: rgba(232, 230, 223, 0.025);
+}
+
+.sr-frame-hero {
+  height: 0.5rem;
+  width: 60%;
+}
+
+.sr-frame-body {
+  flex: 1;
+  min-height: 1.5rem;
+  width: 100%;
+}
+
+.sr-frame-short {
+  flex: 0 0 1rem;
+  width: 45%;
+}
+
+.sr-frame-footer {
+  height: 0.75rem;
+  width: 100%;
+  margin-top: auto;
+}
+
+/* Home indicator bar */
+.sr-device-home {
+  position: absolute;
+  left: 50%;
+  bottom: 0.3125rem;
+  transform: translateX(-50%);
+  width: 32%;
+  height: 3px;
+  background: var(--sr-device-status);
+  border-radius: 999px;
+  opacity: 0.55;
+  z-index: 2;
+}
+
+.sr-device[data-device="budget"] .sr-device-home {
+  width: 20%;
+  height: 2px;
+  opacity: 0.28;
+}
+
+/* Tier-coloured progress fill rising from the bottom of the screen */
+/* Device screen fill — animates from scaleY(0) → scaleY(1) during the     */
+/* race. Urban fills with a steady teal glow; comparison fills with the     */
+/* accent (alert red). Higher opacity makes the fill clearly visible so     */
+/* readers can SEE the timing difference between the two devices.           */
+.sr-frame-progress {
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 100%;
+  transform-origin: bottom center;
+  transform: scaleY(0);
+  opacity: 0.65;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    color-mix(in srgb, var(--sr-tier-urban) 25%, transparent) 40%,
+    color-mix(in srgb, var(--sr-tier-urban) 60%, transparent) 100%
+  );
+  transition: transform var(--sr-motion-complex) linear;
+  z-index: 0;
+  pointer-events: none;
+  border-radius: 0 0 var(--sr-device-radius-inner) var(--sr-device-radius-inner);
+}
+
+.sr-lane[data-tone="comparison"] .sr-frame-progress {
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    color-mix(in srgb, var(--sr-accent) 25%, transparent) 40%,
+    color-mix(in srgb, var(--sr-accent) 60%, transparent) 100%
+  );
+}
+
+.sr-root[data-motion="reduced"] .sr-frame-progress {
+  transform: scaleY(1);
+}
+
+/* Soft ambient glare over the screen surface for premium device only */
+.sr-device-glare {
+  position: absolute;
+  inset: var(--sr-device-bezel);
+  border-radius: var(--sr-device-radius-inner);
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.06) 0%,
+    transparent 28%,
+    transparent 72%,
+    rgba(255, 255, 255, 0.04) 100%
+  );
+  pointer-events: none;
+  z-index: 4;
+}
+
+.sr-device[data-device="budget"] .sr-device-glare {
+  background: none;
+}
+
+.sr-lane-time {
+  font-size: clamp(1.25rem, 2vw, 1.75rem);
+  color: var(--sr-fg);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  text-align: center;
+  word-break: keep-all;
+}
+
+.sr-wait {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  gap: var(--sr-space-2);
+  padding: var(--sr-space-3);
+  background: transparent;
+  border: none;
+  border-radius: 0;
+}
+
+.sr-wait strong {
+  color: var(--sr-accent);
+  text-shadow: 0 0 10px var(--sr-accent-soft);
+}
+
+.sr-race-fallback {
+  padding: var(--sr-space-4);
+  border: 1px solid var(--sr-border);
+  border-radius: 16px;
+  background: rgba(13, 13, 20, 0.6);
+}
+
+.sr-fallback-title {
+  margin: 0.5rem 0 0.75rem;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--sr-fg);
+  max-width: 48ch;
+}
+
+/* -------- Act 3 layout rhythm ---------------------------------------- */
+/* Generous vertical gaps between header → hero → meta → stages →        */
+/* footnote so each section has room to breathe. Proximity inside the    */
+/* stage cards (intro tight, measure tight) is what communicates         */
+/* grouping; whitespace between sections is what separates groups.       */
+/* Act 3 tightens the global slide rhythm: header → hero → funnel, with a */
+/* compact lede and capped max-widths so everything breathes above the    */
+/* persistent footer without clipping.                                    */
+.sr-act-3 {
+  align-items: center;
+  gap: clamp(1rem, 2vh, 1.5rem);
+}
+
+.sr-act-3 .sr-act-header {
+  gap: 0.5rem;
+  margin-bottom: 0;
+  text-align: center;
+  align-items: center;
+  max-width: 72rem;
+  width: 100%;
+}
+
+.sr-act-3 .sr-act-title {
+  margin: 0;
+  font-size: clamp(1.5rem, 3vw, 2rem);
+  line-height: 1.15;
+  max-width: none;
+  letter-spacing: -0.02em;
+  text-align: center;
+}
+
+.sr-act-3 .sr-act-lede {
+  font-size: var(--sr-type-02);
+  line-height: 1.5;
+  max-width: 56ch;
+  color: rgba(255, 255, 255, 0.5);
+  text-align: center;
+}
+
+.sr-act-3 .sr-takeaway {
+  margin: 0;
+}
+
+.sr-act-3 .sr-reduced-note {
+  margin-top: var(--sr-space-2);
+}
+
+.sr-reduced-note {
+  margin: var(--sr-space-2) 0 0;
+  padding: var(--sr-space-2);
+  border-left: 2px solid var(--sr-accent);
+  background: rgba(13, 13, 20, 0.5);
+  border-radius: 0 8px 8px 0;
+}
+
+.sr-legacy {
+  padding: var(--sr-space-4);
+  border: 1px solid var(--sr-border);
+  border-radius: 16px;
+  background: rgba(13, 13, 20, 0.6);
+  max-width: 52rem;
+}
+
+/* -------- Act 4 — the horizon ------------------------------------------ */
+/* Three narrative zones stacked vertically: findings (what you now know),  */
+/* supporting evidence (collapsible), horizon (where Stroma fits). Each     */
+/* zone has its own visual language so the page reads as a closing           */
+/* argument, not a dashboard of equal-weight cards.                         */
+
+.sr-bullets {
+  margin: var(--sr-space-2) 0 var(--sr-space-3);
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.sr-bullets li {
+  position: relative;
+  padding-left: 1.25rem;
+  font-size: 0.9375rem;
+  line-height: 1.55;
+  color: var(--sr-fg);
+}
+
+.sr-bullets li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.5rem;
+  width: 0.375rem;
+  height: 0.375rem;
+  border-radius: 999px;
+  background: var(--sr-accent);
+}
+
+.sr-dist-bar {
+  display: flex;
+  height: 0.5rem;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(5, 5, 10, 0.6);
+  border: 1px solid var(--sr-border);
+}
+
+.sr-dist-segment {
+  display: block;
+  height: 100%;
+}
+
+.sr-dist-segment[data-tier="urban"] { background: var(--sr-tier-urban); }
+.sr-dist-segment[data-tier="moderate"] { background: var(--sr-tier-moderate); }
+.sr-dist-segment[data-tier="constrained_moderate"] { background: var(--sr-tier-constrained-moderate); }
+.sr-dist-segment[data-tier="constrained"] { background: var(--sr-tier-constrained); }
+.sr-dist-segment[data-tier="unknown"] { background: var(--sr-tier-unknown); }
+
+.sr-offers {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: var(--sr-space-2);
+  margin: var(--sr-space-3) 0;
+}
+
+/* Offer cards — premium glassmorphic CTA cards with shadow depth.         */
+.sr-offer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: var(--sr-space-4);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 14px;
+  background: rgba(18, 18, 26, 0.72);
+  backdrop-filter: blur(8px);
+  color: var(--sr-fg);
+  text-decoration: none;
+  cursor: pointer;
+  box-shadow:
+    0 1px 0 rgba(0, 0, 0, 0.3),
+    0 4px 14px rgba(0, 0, 0, 0.3);
+  transition:
+    transform 300ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 300ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 300ms cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 300ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.sr-offer:hover,
+.sr-offer:focus-visible {
+  transform: translateY(-3px);
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(21, 21, 28, 0.85);
+  box-shadow:
+    0 2px 0 rgba(0, 0, 0, 0.3),
+    0 18px 40px rgba(0, 0, 0, 0.5),
+    0 0 0 1px color-mix(in srgb, var(--sr-accent) 18%, transparent);
+}
+
+.sr-offer:focus-visible {
+  outline: 2px solid var(--sr-accent);
+  outline-offset: 3px;
+}
+
+.sr-offer-title {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--sr-fg);
+}
+
+.sr-offer-body {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.55;
+  color: var(--sr-fg-muted);
+}
+
+.sr-offer-cta {
+  margin-top: auto;
+  padding-top: 0.5rem;
+  font-family: var(--sr-mono);
+  font-size: var(--sr-type-mono-sm);
+  letter-spacing: 0.02em;
+  color: var(--sr-accent);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  border-top: 1px solid rgba(232, 230, 223, 0.08);
+}
+
+/* -------- Responsive --------------------------------------------------- */
+
+@media (max-width: 768px) {
+  .sr-act {
+    padding: clamp(5rem, 12vh, 7rem) 1.25rem 4rem;
+    gap: var(--sr-space-3);
+  }
+
+  .sr-race {
+    grid-template-columns: 1fr;
+    gap: var(--sr-space-2);
+  }
+
+  .sr-wait {
+    order: 3;
+  }
+
+  .sr-evidence-chips {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .sr-evidence-chips {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* -------- Focus rings (AAA accessibility) ------------------------------ */
+.sr-root :focus-visible {
+  outline: 2px solid var(--sr-accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* -------- QA visual-snapshot isolation --------------------------------- */
+/* When qa=1&scene=actN is set, show only the requested act and force it  */
+/* into its final visible state so visual regression snapshots stay       */
+/* deterministic. The landing section stays hidden in all scene=actN      */
+/* modes because it's captured separately when scene=landing is set.      */
+.app-shell.qa-mode .sr-canvas,
+.app-shell.qa-mode .sr-progress,
+.app-shell.qa-mode .sr-deck-pagination,
+.app-shell.qa-mode .sr-deck-arrow,
+.app-shell.qa-mode .sr-deck-hint,
+.app-shell.qa-mode .sr-landing-footer {
+  display: none !important;
+}
+
+/* QA mode reverts the deck container to static flow so visual snapshots  */
+/* capture the requested scene at its natural size, not behind the       */
+/* overflow-hidden viewport or translated off-screen by the deck.        */
+.app-shell.qa-mode .sr-deck {
+  position: static !important;
+  width: auto !important;
+  height: auto !important;
+  overflow: visible !important;
+}
+
+.app-shell.qa-mode .sr-slide {
+  position: static !important;
+  inset: auto !important;
+  width: auto !important;
+  height: auto !important;
+  min-height: auto !important;
+  transform: none !important;
+  transition: none !important;
+}
+
+.app-shell.qa-mode.scene-act1 .sr-landing,
+.app-shell.qa-mode.scene-act2 .sr-landing,
+.app-shell.qa-mode.scene-act3 .sr-landing,
+.app-shell.qa-mode.scene-act4 .sr-landing {
+  display: none !important;
+}
+
+.app-shell.qa-mode.scene-act1 .sr-act:not([data-act="1"]),
+.app-shell.qa-mode.scene-act2 .sr-act:not([data-act="2"]),
+.app-shell.qa-mode.scene-act3 .sr-act:not([data-act="3"]),
+.app-shell.qa-mode.scene-act4 .sr-act:not([data-act="4"]) {
+  display: none !important;
+}
+
+.app-shell.qa-mode .sr-act,
+.app-shell.qa-mode .sr-landing {
+  opacity: 1 !important;
+  transform: none !important;
+  min-height: auto;
+}
+
+.app-shell.qa-mode .sr-frame-progress {
+  transform: scaleY(1) !important;
+}
+
+/* =======================================================================
+ * Iteration 4 — Premium polish layer
+ *
+ * Patterns borrowed from ContentSquare, FullStory, Quantum Metric, and
+ * LogRocket, reshaped to honour the Truth Boundary and our single-snapshot
+ * aggregate. New atoms:
+ *   - .sr-icon         — Lucide SVG base with currentColor stroke
+ *   - .sr-severity-gauge — radial health-score dial (LogRocket)
+ *   - .sr-delta-chip   — metric delta chip (ContentSquare)
+ *   - .sr-audience-strip — 50-dot audience segmentation (ContentSquare)
+ *   - .sr-timeline-compare — horizontal race timeline (LogRocket RUM)
+ *   - .sr-funnel-waterfall — horizontal stage cascade with connectors (FullStory)
+ *   - .sr-rail-eyebrow — icon-prefixed rail section label
+ *   - .sr-offer upgrades — bigger CTA with icon + tier-accent top rail
+ * ===================================================================== */
+
+/* -------- Lucide icon base ------------------------------------------- */
+/* The renderIcon helper injects the `sr-icon` class onto the <svg> root  */
+/* itself, so these rules style the SVG directly. CSS width/height win    */
+/* over the SVG's intrinsic width="24" height="24" geometry attrs.        */
+.sr-icon {
+  display: inline-block;
+  width: var(--sr-icon-size-md);
+  height: var(--sr-icon-size-md);
+  flex-shrink: 0;
+  vertical-align: -0.125em;
+  color: currentColor;
+  stroke-width: 1.75;
+}
+
+.sr-icon-sm { width: var(--sr-icon-size-sm); height: var(--sr-icon-size-sm); }
+.sr-icon-md { width: var(--sr-icon-size-md); height: var(--sr-icon-size-md); }
+.sr-icon-lg { width: var(--sr-icon-size-lg); height: var(--sr-icon-size-lg); }
+.sr-icon-xl { width: var(--sr-icon-size-xl); height: var(--sr-icon-size-xl); }
+
+/* Rail eyebrow — MCP pattern: icon in a rounded box + title, with a       */
+/* bottom border separator that anchors the table below.                    */
+.sr-rail-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.625rem;
+  margin-bottom: 0;
+  padding-bottom: var(--sr-space-2);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: var(--sr-type-01);
+  font-weight: 600;
+  color: var(--sr-fg);
+  letter-spacing: 0.12em;
+}
+
+.sr-rail-eyebrow .sr-icon {
+  padding: 0.375rem;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0.5rem;
+}
+
+/* -------- Radial severity gauge (LogRocket pattern) ------------------ */
+.sr-severity-gauge {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  flex-shrink: 0;
+}
+
+.sr-severity-gauge svg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.sr-severity-gauge-track {
+  fill: none;
+  stroke: var(--sr-border-strong);
+  stroke-width: 3;
+  opacity: 0.5;
+}
+
+.sr-severity-gauge-fill {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 3;
+  stroke-linecap: round;
+  transition: stroke-dashoffset var(--sr-motion-complex) var(--sr-ease-out);
+}
+
+.sr-severity-gauge[data-tone="steady"] {
+  color: var(--sr-tone-steady-fg);
+}
+.sr-severity-gauge[data-tone="steady"] .sr-severity-gauge-fill {
+  stroke-dasharray: 33 100;
+}
+
+.sr-severity-gauge[data-tone="watch"] {
+  color: var(--sr-tone-watch-fg);
+}
+.sr-severity-gauge[data-tone="watch"] .sr-severity-gauge-fill {
+  stroke-dasharray: 66 100;
+}
+
+.sr-severity-gauge[data-tone="alert"] {
+  color: var(--sr-tone-alert-fg);
+}
+.sr-severity-gauge[data-tone="alert"] .sr-severity-gauge-fill {
+  stroke-dasharray: 100 100;
+}
+
+
+/* -------- Delta chip (ContentSquare pattern) ------------------------- */
+.sr-delta-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.25rem 0.625rem;
+  border-radius: 999px;
+  font-size: var(--sr-type-00);
+  letter-spacing: 0.02em;
+  line-height: 1.2;
+  background: var(--sr-tone-alert-bg);
+  color: var(--sr-tone-alert-fg);
+  border: 1px solid var(--sr-tone-alert-edge);
+}
+
+.sr-delta-chip[data-tone="watch"] {
+  background: var(--sr-tone-watch-bg);
+  color: var(--sr-tone-watch-fg);
+  border-color: var(--sr-tone-watch-edge);
+}
+.sr-delta-chip[data-tone="steady"] {
+  background: var(--sr-tone-steady-bg);
+  color: var(--sr-tone-steady-fg);
+  border-color: var(--sr-tone-steady-edge);
+}
+
+.sr-delta-chip-sep { opacity: 0.55; }
+.sr-delta-chip-abs { font-weight: 500; }
+.sr-delta-chip-ratio { color: inherit; opacity: 0.92; }
+
+/* -------- Act 2 wait aside upgrades ---------------------------------- */
+.sr-wait {
+  gap: 0.5rem;
+}
+
+.sr-wait .sr-severity-gauge {
+  margin-bottom: 0.25rem;
+}
+
+.sr-wait-eyebrow {
+  margin-top: 0.25rem;
+}
+
+.sr-lane-sample {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.375rem;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: var(--sr-type-mono-sm);
+  letter-spacing: 0;
+}
+
+.sr-lane-sample-sep { opacity: 0.45; }
+
+/* -------- Act 2 horizontal timeline comparison (LogRocket pattern) --- */
+.sr-timeline-compare {
+  margin-top: var(--sr-space-2);
+  padding: var(--sr-space-3);
+  background: rgba(18, 18, 26, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  backdrop-filter: blur(8px);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  flex-shrink: 0;
+  max-width: 72rem;
+  width: 100%;
+}
+
+.sr-timeline-title {
+  color: var(--sr-fg-muted);
+}
+
+.sr-timeline-tracks {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.sr-timeline-row {
+  display: grid;
+  grid-template-columns: 6rem 1fr auto;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.sr-timeline-label {
+  color: var(--sr-fg-muted);
+}
+
+.sr-timeline-bar {
+  position: relative;
+  height: 0.5rem;
+  background: rgba(232, 230, 223, 0.05);
+  border-radius: 999px;
+  overflow: visible;
+}
+
+.sr-timeline-fill {
+  display: block;
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0%;
+  border-radius: 999px;
+  background: var(--sr-tier-urban);
+}
+
+.sr-timeline-row[data-tone="urban"] .sr-timeline-fill { background: var(--sr-tier-urban); }
+.sr-timeline-row[data-tone="comparison"] .sr-timeline-fill { background: var(--sr-accent); }
+
+.sr-timeline-marker {
+  position: absolute;
+  top: 50%;
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: 999px;
+  background: var(--sr-fg);
+  box-shadow: 0 0 0 2px var(--sr-bg);
+  transform: translate(-50%, -50%);
+}
+
+.sr-timeline-row[data-tone="urban"] .sr-timeline-marker { background: var(--sr-tier-urban); }
+.sr-timeline-row[data-tone="comparison"] .sr-timeline-marker { background: var(--sr-accent); }
+
+.sr-timeline-value {
+  color: var(--sr-fg);
+  letter-spacing: 0;
+  text-align: right;
+  min-width: 3rem;
+}
+
+/* -------- Act 1 audience dot strip (ContentSquare pattern) ----------- */
+.sr-audience-strip {
+  display: flex;
+  align-items: stretch;
+  gap: 0.25rem;
+  height: 1.25rem;
+  max-width: 42rem;
+  margin: 0;
+}
+
+.sr-audience-dot {
+  display: block;
+  flex: 1 1 0;
+  min-width: 0;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--sr-tier-urban);
+  opacity: 0.88;
+}
+
+.sr-audience-dot[data-tier="urban"] { background: var(--sr-tier-urban); }
+.sr-audience-dot[data-tier="moderate"] { background: var(--sr-tier-moderate); }
+.sr-audience-dot[data-tier="constrained_moderate"] { background: var(--sr-tier-constrained-moderate); }
+.sr-audience-dot[data-tier="constrained"] { background: var(--sr-tier-constrained); }
+.sr-audience-dot[data-tier="unknown"] { background: var(--sr-tier-unknown); }
+
+.sr-audience-dot[data-device-tier="high"] { background: var(--sr-tier-moderate); }
+.sr-audience-dot[data-device-tier="mid"] { background: var(--sr-tier-constrained-moderate); }
+.sr-audience-dot[data-device-tier="low"] { background: var(--sr-tier-constrained); }
+
+/* -------- Act 3 hero restructure ------------------------------------- */
+/* The hero stat is the slide's centerpiece — it should dominate without   */
+/* competing with the funnel cards below. No card chrome; the number       */
+/* itself carries the weight via scale + accent glow, mirroring how        */
+/* Act 2's wait-delta floats in open space.                                */
+.sr-act3-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.75rem;
+  margin: 0;
+  padding: var(--sr-space-4) var(--sr-space-4) var(--sr-space-3);
+  background: transparent;
+}
+
+.sr-act3-hero .sr-severity-gauge {
+  width: 2.25rem;
+  height: 2.25rem;
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+.sr-act3-hero-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.sr-act3-hero .sr-takeaway-number {
+  font-size: clamp(3.5rem, 8vw, 5.5rem);
+  line-height: 1;
+  color: var(--sr-accent);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  text-shadow: 0 0 20px var(--sr-accent-soft);
+}
+
+.sr-act3-hero-caption {
+  margin: 0;
+  color: var(--sr-fg-muted);
+  font-size: var(--sr-type-02);
+  line-height: 1.5;
+  max-width: 36ch;
+}
+
+/* -------- Shared viz-caption eyebrow --------------------------------- */
+/* Quiet ambient clarifier above the funnel waterfall.                   */
+/* Metaphor-boundary copy — correctly muted per dark-mode discipline.    */
+.sr-viz-caption {
+  margin: 0 0 var(--sr-space-2);
+  font-size: var(--sr-type-00);
+  color: var(--sr-fg-muted);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  line-height: 1.5;
+}
+
+.sr-funnel-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  max-width: 72rem;
+  width: 100%;
+  padding-top: var(--sr-space-3);
+  border-top: 1px solid var(--sr-border);
+}
+
+/* -------- Act 3 horizontal funnel waterfall (FullStory pattern) ------ */
+.sr-funnel-waterfall {
+  display: flex;
+  align-items: stretch;
+  gap: clamp(0.75rem, 2vw, 1.5rem);
+  margin-top: var(--sr-space-3);
+  max-width: 72rem;
+  width: 100%;
+}
+
+@media (max-width: 1023px) {
+  .sr-funnel-waterfall {
+    flex-direction: column;
+    gap: var(--sr-space-3);
+  }
+}
+
+/* Funnel nodes — glassmorphic cards with tone-graded accent border.       */
+.sr-funnel-node {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+  padding: var(--sr-space-3);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-left: 2px solid var(--sr-tone-neutral-edge);
+  border-radius: 10px;
+  background: rgba(18, 18, 26, 0.72);
+  backdrop-filter: blur(8px);
+  box-shadow: var(--sr-shadow-sm);
+  min-height: 8.5rem;
+  transition:
+    transform var(--sr-motion-complex) var(--sr-ease-out),
+    box-shadow var(--sr-motion-complex) var(--sr-ease-out);
+}
+
+.sr-funnel-node:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--sr-shadow-md);
+}
+
+.sr-funnel-node[data-tone="alert"] { border-left-color: var(--sr-tone-alert-edge); }
+.sr-funnel-node[data-tone="watch"] { border-left-color: var(--sr-tone-watch-edge); }
+.sr-funnel-node[data-tone="steady"] { border-left-color: var(--sr-tone-steady-edge); }
+
+.sr-funnel-node-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+}
+
+.sr-funnel-node-icon {
+  display: inline-flex;
+  width: var(--sr-icon-size-md);
+  height: var(--sr-icon-size-md);
+  color: var(--sr-fg-muted);
+}
+
+.sr-funnel-node[data-tone="alert"] .sr-funnel-node-icon { color: var(--sr-tone-alert-fg); }
+.sr-funnel-node[data-tone="watch"] .sr-funnel-node-icon { color: var(--sr-tone-watch-fg); }
+.sr-funnel-node[data-tone="steady"] .sr-funnel-node-icon { color: var(--sr-tone-steady-fg); }
+
+.sr-funnel-node-label {
+  margin: 0;
+  color: var(--sr-fg);
+  font-size: 0.75rem;
+  letter-spacing: 0.16em;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.sr-funnel-node-metric {
+  font-size: clamp(2rem, 4vw, 3rem);
+  line-height: 1;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--sr-fg);
+}
+
+.sr-funnel-node[data-tone="alert"] .sr-funnel-node-metric { color: var(--sr-tone-alert-fg); }
+.sr-funnel-node[data-tone="watch"] .sr-funnel-node-metric { color: var(--sr-tone-watch-fg); }
+.sr-funnel-node[data-tone="steady"] .sr-funnel-node-metric { color: var(--sr-tone-steady-fg); }
+
+.sr-funnel-node-threshold {
+  margin: 0;
+  color: var(--sr-fg-muted);
+  letter-spacing: 0;
+}
+
+.sr-funnel-node-inactive {
+  border-left-style: dashed;
+  border-left-color: var(--sr-border);
+}
+
+.sr-funnel-node-placeholder {
+  margin: 0;
+  font-size: clamp(1.75rem, 3vw, 2.25rem);
+  line-height: 1;
+  color: var(--sr-fg-muted);
+  font-weight: 400;
+}
+
+.sr-funnel-node-caption {
+  margin: 0;
+  color: var(--sr-fg-muted);
+  font-size: var(--sr-type-01);
+  line-height: 1.45;
+  font-style: italic;
+  opacity: 0.82;
+}
+
+/* Connector — pure arrow icon between funnel nodes. The arrow's tone     */
+/* colour encodes direction (worse / better / unchanged); the two node    */
+/* percentages on either side tell the reader the exact numbers.          */
+.sr-funnel-connector {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem 0.5rem;
+  color: var(--sr-fg-muted);
+  align-self: center;
+}
+
+@media (max-width: 1023px) {
+  .sr-funnel-connector {
+    transform: rotate(90deg);
+    padding: 0.5rem;
+  }
+}
+
+.sr-funnel-connector[data-tone="alert"] { color: var(--sr-tone-alert-fg); }
+.sr-funnel-connector[data-tone="watch"] { color: var(--sr-tone-watch-fg); }
+.sr-funnel-connector[data-tone="steady"] { color: var(--sr-tone-steady-fg); }
+.sr-funnel-connector[data-tone="neutral"] { color: var(--sr-fg-muted); }
+
+.sr-funnel-connector-inactive {
+  opacity: 0.4;
+}
+
+/* -------- Elevation sweep on fixed chrome ---------------------------- */
+.sr-mood-pill {
+  box-shadow: var(--sr-shadow-sm);
+}
+
+.sr-deck-pagination {
+  box-shadow: var(--sr-shadow-md);
+}
+
+.sr-deck-arrow {
+  box-shadow: var(--sr-shadow-sm);
+}
+.sr-deck-arrow:hover,
+.sr-deck-arrow:focus-visible {
+  box-shadow: var(--sr-shadow-md);
+}
+
+/* -------- Act 4 restructure ------------------------------------------ */
+/* Centered header above a two-column body: findings (left) + horizon      */
+/* (right). Uses horizontal space so everything fits within 100vh.          */
+/* Left column = the report's closing evidence, open editorial prose.       */
+/* Right column = where Stroma fits, separated by a vertical border so     */
+/* the shift in purpose is clear without shouting.                         */
+
+.sr-act-4 {
+  align-items: center;
+  gap: clamp(1rem, 2vh, 1.5rem);
+}
+
+.sr-act-4 .sr-act-header {
+  text-align: center;
+  align-items: center;
+  max-width: 72rem;
+  width: 100%;
+}
+
+.sr-act-4 .sr-act-title {
+  font-size: clamp(1.5rem, 3vw, 2rem);
+  letter-spacing: -0.02em;
+  text-align: center;
+}
+
+.sr-act-4 .sr-act-lede {
+  font-size: var(--sr-type-02);
+  line-height: 1.5;
+  max-width: 56ch;
+  color: rgba(255, 255, 255, 0.5);
+  text-align: center;
+}
+
+/* --- Two-column body --------------------------------------------------- */
+.sr-act4-body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: clamp(2rem, 4vw, 3.5rem);
+  max-width: 72rem;
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+  align-items: start;
+}
+
+@media (max-width: 1023px) {
+  .sr-act4-body {
+    grid-template-columns: 1fr;
+    gap: var(--sr-space-4);
+  }
+}
+
+/* --- Left column: Findings --------------------------------------------- */
+.sr-act4-findings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sr-space-2);
+}
+
+.sr-act4-findings-eyebrow {
+  margin: 0 0 0.25rem;
+}
+
+.sr-act4-findings-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.sr-act4-findings-list li {
+  position: relative;
+  padding-left: 1.125rem;
+  font-size: var(--sr-type-02);
+  line-height: 1.55;
+  color: var(--sr-fg);
+}
+
+.sr-act4-findings-list li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.5rem;
+  width: 0.3125rem;
+  height: 0.3125rem;
+  border-radius: 999px;
+  background: var(--sr-accent);
+}
+
+
+/* --- Right column: Horizon --------------------------------------------- */
+/* This is where Stroma introduces itself. The mood accent gives way to    */
+/* the brand violet — matching stroma.design's CTA language: solid pill    */
+/* buttons, violet glow on hover, confident but not loud.                  */
+.sr-act4-horizon {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sr-space-3);
+  padding-left: clamp(1.5rem, 3vw, 2.5rem);
+  border-left: 1px solid color-mix(in srgb, var(--sr-brand) 20%, var(--sr-border));
+}
+
+@media (max-width: 1023px) {
+  .sr-act4-horizon {
+    padding-left: 0;
+    border-left: 0;
+    padding-top: var(--sr-space-3);
+    border-top: 1px solid color-mix(in srgb, var(--sr-brand) 20%, var(--sr-border));
+  }
+}
+
+.sr-act4-horizon > .sr-eyebrow {
+  margin: 0;
+  color: var(--sr-brand);
+}
+
+.sr-act4-horizon-body {
+  margin: 0;
+  font-size: var(--sr-type-02);
+  line-height: 1.55;
+  color: var(--sr-fg-muted);
+}
+
+.sr-act-4 .sr-offers {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sr-space-2);
+}
+
+.sr-act-4 .sr-offer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: var(--sr-space-3);
+  border: 1px solid color-mix(in srgb, var(--sr-brand) 12%, var(--sr-border));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--sr-brand) 4%, var(--sr-bg-panel));
+  color: var(--sr-fg);
+  text-decoration: none;
+  cursor: pointer;
+  box-shadow: var(--sr-shadow-sm);
+  transition:
+    transform var(--sr-motion-complex) var(--sr-ease-out),
+    box-shadow var(--sr-motion-complex) var(--sr-ease-out),
+    border-color var(--sr-motion-complex) var(--sr-ease-out);
+}
+
+.sr-act-4 .sr-offer:hover,
+.sr-act-4 .sr-offer:focus-visible {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--sr-brand) 35%, var(--sr-border));
+  box-shadow:
+    var(--sr-shadow-md),
+    0 8px 24px var(--sr-brand-glow);
+}
+
+.sr-act-4 .sr-offer:focus-visible {
+  outline: 2px solid var(--sr-brand);
+  outline-offset: 3px;
+}
+
+.sr-act-4 .sr-offer-title {
+  margin: 0;
+  font-size: var(--sr-type-03);
+  font-weight: 600;
+  color: var(--sr-fg);
+}
+
+.sr-act-4 .sr-offer-body {
+  margin: 0;
+  font-size: var(--sr-type-01);
+  line-height: 1.5;
+  color: var(--sr-fg-muted);
+}
+
+/* Solid violet pill CTA — matches stroma.design button language.          */
+.sr-act-4 .sr-offer-cta {
+  margin-top: 0.5rem;
+  display: inline-flex;
+  align-self: flex-start;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 999px;
+  background: var(--sr-brand);
+  color: #fff;
+  font-family: var(--sr-sans);
+  font-size: var(--sr-type-01);
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  transition:
+    background var(--sr-motion-micro) var(--sr-ease-out),
+    box-shadow var(--sr-motion-micro) var(--sr-ease-out);
+}
+
+.sr-act-4 .sr-offer:hover .sr-offer-cta {
+  background: color-mix(in srgb, var(--sr-brand) 85%, #fff);
+  box-shadow: 0 4px 16px var(--sr-brand-glow);
+}
+
+.sr-offer-cta-icon {
+  color: inherit;
+  transition: transform var(--sr-motion-micro) var(--sr-ease-out);
+}
+
+.sr-act-4 .sr-offer:hover .sr-offer-cta-icon,
+.sr-act-4 .sr-offer:focus-visible .sr-offer-cta-icon {
+  transform: translateX(4px);
+}

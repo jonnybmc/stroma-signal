@@ -57,6 +57,10 @@ That coverage honesty is a feature, not a caveat. It means the output says "here
 
 The final output is a shareable report URL. Not a dashboard login. Not a vendor portal. A link that encodes your real user distribution, the performance gap between your best and worst tier, and the metrics that back it up. You can paste it in Slack, present it in a boardroom, or attach it to a product brief. It carries its own evidence.
 
+That report matters because the report is the wedge. It is the part that turns raw instrumentation into a visible internal decision. Signal is not just "data into BigQuery." It is a measured path from browser event to report artifact.
+
+The Tier Report is not a diagnostic, attribution, or commercial modelling artifact. It is the measured proof layer: who your users are, how far apart their experiences are, and where performance crosses into poor territory using explicit thresholds. The deeper "why" and "what to fix first" layers stay outside the free artifact on purpose.
+
 ## How It Works
 
 ```bash
@@ -76,6 +80,8 @@ Data flows on the first page load. No build step. No vendor account. No cookies 
 For GA4 integration, add the dataLayer sink. For a preview report during development, add the preview collector. For full warehouse persistence, point the beacon at your own endpoint and use the provided SQL templates to query BigQuery.
 
 The architecture is modular by design. The base package is the collection edge. The GA4 helper handles compact flattening. The report module handles aggregation and URL encoding. Import only what you need.
+
+For the presentation-layer source of truth behind the hosted report artifact, see the [Tier Report Design Spec](./tier-report-design-spec.md).
 
 ## Why Not Just Use What You Already Have
 

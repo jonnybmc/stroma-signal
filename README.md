@@ -64,6 +64,8 @@ Your team still configures the warehouse refresh once:
 
 Signal does not create BigQuery scheduled queries, persistence tables, or dashboards for you in v0.1.
 
+The Tier Report is not a diagnostic, attribution, or commercial modelling artifact. It is the measured proof layer that makes audience shape, experience gap, and poor-performance progression visible enough to act on.
+
 ## Companion Tooling In This Repo
 
 This monorepo also includes companion tooling that supports QA, demos, and contributor workflows:
@@ -162,7 +164,7 @@ Next doc: [warehouse schema](./docs/warehouse-schema.md)
 
 - GTM / GA4 path: validate rows with [ga4-bigquery-validation.sql](./docs/ga4-bigquery-validation.sql), then generate the hosted report with [ga4-bigquery-url-builder.sql](./docs/ga4-bigquery-url-builder.sql).
 - Own endpoint and full-control paths: validate rows with [normalized-bigquery-validation.sql](./docs/normalized-bigquery-validation.sql), then generate the hosted report with [normalized-bigquery-url-builder.sql](./docs/normalized-bigquery-url-builder.sql).
-- [`/build`](http://signal.stroma.design/build) stays the optional QA and fallback path, not the primary launch automation flow.
+- [`/build`](https://signal.stroma.design/build) stays the optional QA and fallback path, not the primary launch automation flow.
 
 If you want the plain-English production operating model for the BigQuery step, use [production report automation](./docs/production-report-automation.md).
 
@@ -178,8 +180,11 @@ Signal is framework-agnostic. These recipes cover where to initialise, SSR guard
 ## Deeper Docs
 
 - [why Signal exists](./docs/why-signal.md)
+- [tier report design spec](./docs/tier-report-design-spec.md)
 - [choose your setup](./docs/client-integrations.md)
 - [public API freeze (v0.1)](./docs/public-api-v0.1.md)
+- [signal technical reference](./docs/signal-technical-reference.md)
+- [aggregation spec](./docs/aggregation-spec.md)
 - [marketer quickstart](./docs/marketer-quickstart.md)
 - [production report automation](./docs/production-report-automation.md)
 - [GTM recipe](./docs/gtm-recipe.md)

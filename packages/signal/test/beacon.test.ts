@@ -51,8 +51,25 @@ describe('beacon sink', () => {
     vi.stubGlobal('fetch', fetch);
 
     createBeaconSink({ endpoint: 'https://collector.example/ingest', onError }).handle(chromeColdNavFixture);
-    await Promise.resolve();
+    await vi.waitFor(() => expect(onError).toHaveBeenCalledTimes(1));
 
     expect(onError).toHaveBeenCalledWith(fetchError, chromeColdNavFixture);
+  });
+
+  it('reports non-OK HTTP responses through the error callback', async () => {
+    const sendBeacon = vi.fn(() => false);
+    const fetch = vi.fn(() => Promise.resolve(new Response(null, { status: 500 })));
+    const onError = vi.fn();
+
+    vi.stubGlobal('navigator', { sendBeacon } as Navigator);
+    vi.stubGlobal('fetch', fetch);
+
+    createBeaconSink({ endpoint: 'https://collector.example/ingest', onError }).handle(chromeColdNavFixture);
+    await vi.waitFor(() => expect(onError).toHaveBeenCalledTimes(1));
+
+    expect(onError).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'Beacon endpoint responded 500' }),
+      chromeColdNavFixture
+    );
   });
 });

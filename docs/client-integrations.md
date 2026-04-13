@@ -10,6 +10,8 @@ You do not need the hosted report shell, the builder route, or the local spike l
 
 If you are not implementing code and only need the launch recipe for a shareable report URL, start with [marketer-quickstart.md](./marketer-quickstart.md) and [production-report-automation.md](./production-report-automation.md).
 
+The hosted Tier Report is a first-class companion artifact, but it is not a diagnostic, attribution, or commercial modelling artifact.
+
 ## Choose Your Setup
 
 ### I already have GTM / GA4
@@ -156,7 +158,7 @@ Verification detail:
 - GTM / GA4 path: run [ga4-bigquery-validation.sql](./ga4-bigquery-validation.sql), then [ga4-bigquery-url-builder.sql](./ga4-bigquery-url-builder.sql).
 - Own endpoint path: flatten rows into the [warehouse schema](./warehouse-schema.md), then run [normalized-bigquery-validation.sql](./normalized-bigquery-validation.sql), then [normalized-bigquery-url-builder.sql](./normalized-bigquery-url-builder.sql).
 - Full-control path: hand off the canonical event into your own pipeline, keep canonical field names, then use [normalized-bigquery-validation.sql](./normalized-bigquery-validation.sql) and [normalized-bigquery-url-builder.sql](./normalized-bigquery-url-builder.sql).
-- [`/build`](http://signal.stroma.design/build) is the QA and fallback path, not the primary launch automation path.
+- [`/build`](https://signal.stroma.design/build) is the QA and fallback path, not the primary launch automation path.
 
 Validation queries prove the raw rows are landing. The provided URL-builder queries then filter out `navigation_type = restore` and `navigation_type = prerender` by default before computing coverage and percentiles.
 

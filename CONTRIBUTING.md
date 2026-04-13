@@ -48,6 +48,9 @@ These docs are a coordinated public onboarding surface and should stay aligned w
 - `packages/signal/README.md`
 - `README.md`
 - `docs/why-signal.md`
+- `docs/tier-report-design-spec.md`
+- `docs/signal-technical-reference.md`
+- `docs/aggregation-spec.md`
 - `docs/marketer-quickstart.md`
 - `docs/production-report-automation.md`
 - `docs/bigquery-saved-query-setup.md`

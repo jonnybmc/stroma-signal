@@ -343,6 +343,45 @@ describe('signal runtime integration', () => {
     );
   });
 
+  it('creates a fresh runtime when init is called after destroy', () => {
+    setupGlobals();
+    const sink1 = createSink();
+    const controller1 = init({ sinks: [sink1], packageVersion: 'test' });
+    const eventId1 = controller1.getEventId();
+
+    destroy();
+
+    const sink2 = createSink();
+    const controller2 = init({ sinks: [sink2], packageVersion: 'test' });
+
+    // New controller has a different event ID
+    expect(controller2.getEventId()).not.toBe(eventId1);
+    expect(controller2.getState()).toBe('observing');
+
+    // New controller emits to the new sink, not the old one
+    controller2.flushNow();
+    expect(sink2.handle).toHaveBeenCalledTimes(1);
+    expect(sink1.handle).toHaveBeenCalledTimes(0);
+  });
+
+  it('ignores flushNow during booting when vital observer is not yet ready', () => {
+    // Set up a prerendered page so init stays in booting
+    setupGlobals();
+    const mockDoc = globalThis.document as unknown as MockEventTarget & {
+      visibilityState: string;
+      prerendering: boolean;
+    };
+    mockDoc.prerendering = true;
+
+    const sink = createSink();
+    const controller = init({ sinks: [sink], packageVersion: 'test' });
+
+    // Still booting — flushNow should be a no-op
+    controller.flushNow();
+    expect(sink.handle).not.toHaveBeenCalled();
+    expect(controller.getState()).toBe('booting');
+  });
+
   it('exposes sampled-out sessions explicitly to consumers', () => {
     setupGlobals();
 

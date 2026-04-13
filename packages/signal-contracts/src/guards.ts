@@ -4,6 +4,8 @@ import type {
   SignalDeviceDistribution,
   SignalDeviceTier,
   SignalEventV1,
+  SignalExperienceFunnel,
+  SignalExperienceStage,
   SignalInteractionType,
   SignalLcpAttribution,
   SignalLcpElementType,
@@ -75,6 +77,7 @@ const VALID_RACE_FALLBACK_REASONS = new Set<SignalRaceFallbackReason>([
   'fcp_unavailable',
   'insufficient_comparable_data'
 ]);
+const VALID_EXPERIENCE_STAGES = new Set<SignalExperienceStage>(['fcp', 'lcp', 'inp']);
 const VALID_NAVIGATION_TYPES = new Set<SignalNavigationType>([
   'navigate',
   'reload',
@@ -127,6 +130,33 @@ function isTierMetricSummary(value: unknown): value is SignalTierMetricSummary {
     isNumber(value.lcp_coverage) &&
     isNumber(value.fcp_coverage) &&
     isNumber(value.ttfb_coverage)
+  );
+}
+
+function isExperienceTierStageSummary(value: unknown): boolean {
+  if (!isRecord(value)) return false;
+  return isNumber(value.coverage) && isNumber(value.poor_share);
+}
+
+function isExperienceStageSummary(value: unknown): boolean {
+  if (!isRecord(value) || !isNumber(value.poor_threshold_ms) || !isRecord(value.tiers)) return false;
+  return (
+    isExperienceTierStageSummary(value.tiers.urban) &&
+    isExperienceTierStageSummary(value.tiers.moderate) &&
+    isExperienceTierStageSummary(value.tiers.constrained_moderate) &&
+    isExperienceTierStageSummary(value.tiers.constrained)
+  );
+}
+
+function isExperienceFunnel(value: unknown): value is SignalExperienceFunnel {
+  if (!isRecord(value) || !Array.isArray(value.active_stages)) return false;
+  if (value.active_stages.some((stage) => !hasEnumValue(VALID_EXPERIENCE_STAGES, stage))) return false;
+  if (!isNumber(value.measured_session_coverage) || !isNumber(value.poor_session_share)) return false;
+  if (!isRecord(value.stages)) return false;
+  return (
+    isExperienceStageSummary(value.stages.fcp) &&
+    isExperienceStageSummary(value.stages.lcp) &&
+    isExperienceStageSummary(value.stages.inp)
   );
 }
 
@@ -236,8 +266,212 @@ export function explainSignalAggregateIssues(value: unknown): string[] {
     issues.push('Expected "top_page_path" to be a string or null.');
   }
 
+  if (!(value.experience_funnel == null || isExperienceFunnel(value.experience_funnel))) {
+    issues.push(
+      'Expected "experience_funnel" to include active stages, measured coverage, poor session share, and per-stage tier summaries when present.'
+    );
+  }
+
+  if (value.device_hardware != null) {
+    const dh = value.device_hardware;
+    if (!isRecord(dh) || !isRecord(dh.cores_hist) || !isRecord(dh.memory_gb_hist) || !isNumber(dh.memory_coverage)) {
+      issues.push(
+        'Expected "device_hardware" to include cores_hist, memory_gb_hist, and memory_coverage when present.'
+      );
+    }
+  }
+
+  if (value.network_signals != null) {
+    const ns = value.network_signals;
+    if (
+      !isRecord(ns) ||
+      !isRecord(ns.effective_type_hist) ||
+      !isNumber(ns.effective_type_coverage) ||
+      !isNumber(ns.save_data_share)
+    ) {
+      issues.push(
+        'Expected "network_signals" to include effective_type_hist, effective_type_coverage, and save_data_share when present.'
+      );
+    }
+  }
+
+  if (value.environment != null) {
+    const env = value.environment;
+    if (!isRecord(env) || !isRecord(env.browser_hist)) {
+      issues.push('Expected "environment" to include browser_hist when present.');
+    }
+  }
+
   if (!Array.isArray(value.warnings) || value.warnings.some((warning) => !isString(warning))) {
     issues.push('Expected "warnings" to be an array of strings.');
+  }
+
+  // Semantic range validation — percentages must be 0–100, counts non-negative
+  if (isNumber(value.sample_size) && value.sample_size < 0) {
+    issues.push('Expected "sample_size" to be non-negative.');
+  }
+  if (isNumber(value.classified_sample_size) && value.classified_sample_size < 0) {
+    issues.push('Expected "classified_sample_size" to be non-negative.');
+  }
+  if (isNumber(value.period_days) && value.period_days < 0) {
+    issues.push('Expected "period_days" to be non-negative.');
+  }
+  if (isNumber(value.generated_at) && value.generated_at < 0) {
+    issues.push('Expected "generated_at" to be non-negative.');
+  }
+  if (isTierDistribution(value.network_distribution)) {
+    const nd = value.network_distribution;
+    const ndEntries: Array<[string, unknown]> = [
+      ['urban', nd.urban],
+      ['moderate', nd.moderate],
+      ['constrained_moderate', nd.constrained_moderate],
+      ['constrained', nd.constrained],
+      ['unknown', nd.unknown]
+    ];
+    for (const [key, v] of ndEntries) {
+      if (isNumber(v) && (v < 0 || v > 100)) {
+        issues.push(`Expected "network_distribution.${key}" to be between 0 and 100.`);
+      }
+    }
+  }
+  if (isDeviceDistribution(value.device_distribution)) {
+    const dd = value.device_distribution;
+    const ddEntries: Array<[string, unknown]> = [
+      ['low', dd.low],
+      ['mid', dd.mid],
+      ['high', dd.high]
+    ];
+    for (const [key, v] of ddEntries) {
+      if (isNumber(v) && (v < 0 || v > 100)) {
+        issues.push(`Expected "device_distribution.${key}" to be between 0 and 100.`);
+      }
+    }
+  }
+  if (isCoverage(value.coverage) && isRecord(value.coverage)) {
+    const cov = value.coverage;
+    const covEntries: Array<[string, unknown]> = [
+      ['network_coverage', cov.network_coverage],
+      ['unclassified_network_share', cov.unclassified_network_share],
+      ['connection_reuse_share', cov.connection_reuse_share],
+      ['lcp_coverage', cov.lcp_coverage],
+      ['selected_metric_urban_coverage', cov.selected_metric_urban_coverage],
+      ['selected_metric_comparison_coverage', cov.selected_metric_comparison_coverage]
+    ];
+    for (const [key, v] of covEntries) {
+      if (isNumber(v) && (v < 0 || v > 100)) {
+        issues.push(`Expected "coverage.${key}" to be between 0 and 100.`);
+      }
+    }
+  }
+  // Validate nested tier metric coverages
+  if (isRecord(value.vitals)) {
+    for (const tierKey of ['urban', 'comparison'] as const) {
+      const tier = value.vitals[tierKey];
+      if (isTierMetricSummary(tier)) {
+        for (const covKey of ['lcp_coverage', 'fcp_coverage', 'ttfb_coverage'] as const) {
+          if (tier[covKey] < 0 || tier[covKey] > 100) {
+            issues.push(`Expected "vitals.${tierKey}.${covKey}" to be between 0 and 100.`);
+          }
+        }
+      }
+    }
+  }
+  // Validate experience funnel stage coverage and poor_share
+  if (value.experience_funnel != null && isExperienceFunnel(value.experience_funnel)) {
+    const ef = value.experience_funnel;
+    if (ef.measured_session_coverage < 0 || ef.measured_session_coverage > 100) {
+      issues.push('Expected "experience_funnel.measured_session_coverage" to be between 0 and 100.');
+    }
+    if (ef.poor_session_share < 0 || ef.poor_session_share > 100) {
+      issues.push('Expected "experience_funnel.poor_session_share" to be between 0 and 100.');
+    }
+    for (const stageKey of ['fcp', 'lcp', 'inp'] as const) {
+      const stage = ef.stages[stageKey];
+      for (const tierKey of ['urban', 'moderate', 'constrained_moderate', 'constrained'] as const) {
+        const tier = stage.tiers[tierKey];
+        if (tier.coverage < 0 || tier.coverage > 100) {
+          issues.push(
+            `Expected "experience_funnel.stages.${stageKey}.tiers.${tierKey}.coverage" to be between 0 and 100.`
+          );
+        }
+        if (tier.poor_share < 0 || tier.poor_share > 100) {
+          issues.push(
+            `Expected "experience_funnel.stages.${stageKey}.tiers.${tierKey}.poor_share" to be between 0 and 100.`
+          );
+        }
+      }
+    }
+  }
+  // Validate optional device_hardware percentages
+  if (value.device_hardware != null && isRecord(value.device_hardware)) {
+    const dh = value.device_hardware;
+    if (isNumber(dh.memory_coverage) && (dh.memory_coverage < 0 || dh.memory_coverage > 100)) {
+      issues.push('Expected "device_hardware.memory_coverage" to be between 0 and 100.');
+    }
+    if (isRecord(dh.cores_hist)) {
+      for (const [k, v] of Object.entries(dh.cores_hist)) {
+        if (isNumber(v) && (v < 0 || v > 100)) {
+          issues.push(`Expected "device_hardware.cores_hist.${k}" to be between 0 and 100.`);
+        }
+      }
+    }
+    if (isRecord(dh.memory_gb_hist)) {
+      for (const [k, v] of Object.entries(dh.memory_gb_hist)) {
+        if (isNumber(v) && (v < 0 || v > 100)) {
+          issues.push(`Expected "device_hardware.memory_gb_hist.${k}" to be between 0 and 100.`);
+        }
+      }
+    }
+  }
+  // Validate optional network_signals percentages
+  if (value.network_signals != null && isRecord(value.network_signals)) {
+    const ns = value.network_signals;
+    if (isNumber(ns.effective_type_coverage) && (ns.effective_type_coverage < 0 || ns.effective_type_coverage > 100)) {
+      issues.push('Expected "network_signals.effective_type_coverage" to be between 0 and 100.');
+    }
+    if (isNumber(ns.save_data_share) && (ns.save_data_share < 0 || ns.save_data_share > 100)) {
+      issues.push('Expected "network_signals.save_data_share" to be between 0 and 100.');
+    }
+    if (isRecord(ns.effective_type_hist)) {
+      for (const [k, v] of Object.entries(ns.effective_type_hist)) {
+        if (isNumber(v) && (v < 0 || v > 100)) {
+          issues.push(`Expected "network_signals.effective_type_hist.${k}" to be between 0 and 100.`);
+        }
+      }
+    }
+  }
+  // Validate optional environment percentages
+  if (value.environment != null && isRecord(value.environment)) {
+    const env = value.environment;
+    if (isRecord(env.browser_hist)) {
+      for (const [k, v] of Object.entries(env.browser_hist)) {
+        if (isNumber(v) && (v < 0 || v > 100)) {
+          issues.push(`Expected "environment.browser_hist.${k}" to be between 0 and 100.`);
+        }
+      }
+    }
+  }
+
+  // Cross-field coherence — catches structurally valid but semantically impossible aggregates.
+  // Independent rounding means sums may be 99 or 101 — allow ±2 tolerance.
+  if (isTierDistribution(value.network_distribution)) {
+    const nd = value.network_distribution;
+    const ndSum = nd.urban + nd.moderate + nd.constrained_moderate + nd.constrained + nd.unknown;
+    if (ndSum > 0 && Math.abs(ndSum - 100) > 2) {
+      issues.push(`Expected network_distribution to sum to ~100 (got ${ndSum}).`);
+    }
+  }
+  if (isDeviceDistribution(value.device_distribution)) {
+    const dd = value.device_distribution;
+    const ddSum = dd.low + dd.mid + dd.high;
+    if (ddSum > 0 && Math.abs(ddSum - 100) > 2) {
+      issues.push(`Expected device_distribution to sum to ~100 (got ${ddSum}).`);
+    }
+  }
+  if (isNumber(value.sample_size) && isNumber(value.classified_sample_size)) {
+    if (value.classified_sample_size > value.sample_size) {
+      issues.push('Expected "classified_sample_size" to not exceed "sample_size".');
+    }
   }
 
   return issues;

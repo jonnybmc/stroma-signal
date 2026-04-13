@@ -33,8 +33,13 @@ for (const [entry, target] of Object.entries(packageJson.exports ?? {})) {
 [
   'LICENSE',
   'README.md',
+  'docs/why-signal.md',
+  'docs/tier-report-design-spec.md',
   'docs/public-api-v0.1.md',
+  'docs/signal-technical-reference.md',
+  'docs/aggregation-spec.md',
   'docs/marketer-quickstart.md',
+  'docs/production-report-automation.md',
   'docs/client-integrations.md',
   'docs/collector-contract.md',
   'docs/warehouse-schema.md',

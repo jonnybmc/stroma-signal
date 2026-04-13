@@ -1,0 +1,210 @@
+:root {
+  color-scheme: dark;
+  --report-font-sans: "Avenir Next", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --report-font-mono: "JetBrains Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+
+  --report-bg: #080a11;
+  --report-bg-elevated: rgba(15, 18, 29, 0.92);
+  --report-surface: rgba(14, 18, 30, 0.72);
+  --report-surface-strong: rgba(18, 22, 36, 0.88);
+  --report-line: rgba(244, 238, 224, 0.12);
+  --report-line-strong: rgba(244, 238, 224, 0.22);
+
+  --report-ink: #f4eee0;
+  --report-ink-soft: rgba(244, 238, 224, 0.76);
+  --report-muted: rgba(244, 238, 224, 0.58);
+  --report-muted-quiet: rgba(244, 238, 224, 0.38);
+
+  --report-blue: #378add;
+  --report-teal: #5dcaa5;
+  --report-amber: #d59831;
+  --report-red: #c3473e;
+  --report-gray: #8c887d;
+  --report-violet: #5d2dff;
+
+  --report-shadow: 0 32px 96px rgba(0, 0, 0, 0.34);
+  --report-blur: blur(20px);
+
+  --report-space-1: 0.375rem;
+  --report-space-2: 0.75rem;
+  --report-space-3: 1rem;
+  --report-space-4: 1.5rem;
+  --report-space-5: 2rem;
+  --report-space-6: 3rem;
+
+  --report-radius-card: 24px;
+  --report-radius-shell: 32px;
+
+  /* ---------------------------------------------------------------------
+   * Immersive report tokens (sr-*). Additive layer for the canvas-driven
+   * four-act experience. Legacy --report-* tokens above remain in use by
+   * shared.css and the builder and must not be removed.
+   * ------------------------------------------------------------------- */
+
+  /* Surface */
+  --sr-bg: #0a0a0f;
+  --sr-bg-panel: #0d0d14;
+  --sr-bg-card: #15151c;
+  --sr-border: #2c2c2a;
+  --sr-border-strong: rgba(244, 238, 224, 0.18);
+
+  /* Foreground */
+  --sr-fg: #e8e6df;
+  --sr-fg-muted: #9c9a92;
+
+  /* Tier palette (product-owned, fixed) */
+  --sr-tier-urban: #378add;
+  --sr-tier-moderate: #5dcaa5;
+  --sr-tier-constrained-moderate: #ef9f27;
+  --sr-tier-constrained: #e24b4a;
+  --sr-tier-unknown: #888780;
+
+  /* Mood accent alias — resolves per [data-mood] below. Default: sober. */
+  --sr-accent: var(--sr-tier-constrained-moderate);
+  --sr-accent-soft: color-mix(in srgb, var(--sr-accent) 18%, transparent);
+
+  /* Stroma brand — used in Act 4 horizon where the product introduces     */
+  /* itself. Distinct from mood accent so the brand identity is consistent  */
+  /* regardless of report mood.                                            */
+  --sr-brand: #5d2dff;
+  --sr-brand-soft: color-mix(in srgb, var(--sr-brand) 18%, transparent);
+  --sr-brand-glow: color-mix(in srgb, var(--sr-brand) 28%, transparent);
+
+  /* Typography — system fonts only to honour the 150KB static budget in
+   * scripts/check-budgets.mjs. Modern OSes ship premium sans and mono
+   * faces by default; Inter + JetBrains Mono can be added later by
+   * bumping the budget and dropping woff2 into public/fonts/.
+   */
+  --sr-sans:
+    "Inter Variable", "Inter", system-ui, -apple-system, "Segoe UI Variable",
+    "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --sr-mono:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "JetBrains Mono", "Liberation Mono", monospace;
+
+  /* Type scale */
+  --sr-type-hero: clamp(2.75rem, 6vw, 4.5rem);
+  --sr-type-act: clamp(1.875rem, 3.5vw, 2.5rem);
+  --sr-type-lede: 1.125rem;
+  --sr-type-body: 1rem;
+  --sr-type-eyebrow: 0.6875rem;
+  --sr-type-mono-lg: 1.5rem;
+  --sr-type-mono-md: 0.875rem;
+  --sr-type-mono-sm: 0.75rem;
+
+  /* Spacing (8pt base) */
+  --sr-space-1: 0.5rem;
+  --sr-space-2: 1rem;
+  --sr-space-3: 1.5rem;
+  --sr-space-4: 2rem;
+  --sr-space-5: 3rem;
+  --sr-space-6: 4rem;
+  --sr-space-7: 6rem;
+
+  /* Motion */
+  --sr-motion-micro: 180ms;
+  --sr-motion-reveal: 260ms;
+  --sr-motion-stagger: 40ms;
+  --sr-motion-complex: 320ms;
+  --sr-motion-counter: 1200ms;
+  --sr-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --sr-ease-in: cubic-bezier(0.64, 0, 0.78, 0);
+
+  /* Z layers */
+  --sr-z-canvas: 10;
+  --sr-z-content: 20;
+  --sr-z-chrome: 40;
+
+  /* ---------------------------------------------------------------------
+   * Iteration 4 additions: modular type scale, elevation system, icon
+   * sizing, and severity tone overlays. These replace ad-hoc values that
+   * were scattered through report-immersive.css and give every premium
+   * atom (gauge, delta chip, funnel node, cohort cell) a single source
+   * of truth for sizing, shadow depth, and status color.
+   * ------------------------------------------------------------------- */
+
+  /* Type scale — 1.25x modular with hand-tuned base steps so the old */
+  /* ad-hoc sizes (0.625, 0.875, 0.9375, 1.0625) map onto a coherent   */
+  /* ramp. Fluid clamp-based hero / act / mono scales stay unchanged.  */
+  --sr-type-scale-ratio: 1.25;
+  --sr-type-00: 0.6875rem; /* eyebrow, micro meta */
+  --sr-type-01: 0.8125rem; /* caption, small mono */
+  --sr-type-02: 0.9375rem; /* supporting body, card body */
+  --sr-type-03: 1rem;       /* body */
+  --sr-type-04: 1.125rem;  /* lede */
+  --sr-type-05: 1.4375rem; /* small title, inline metric */
+  --sr-type-06: 1.875rem;  /* act title floor */
+  --sr-type-07: 2.75rem;   /* hero floor */
+
+  /* Elevation — layered shadows for floating chrome and card hover. */
+  /* First shadow is a 1–2px ledge for subtle definition; second is   */
+  /* the long soft drop for lift. Accent variant tints the lift with  */
+  /* the current mood accent so CTA hovers telegraph urgency.         */
+  --sr-shadow-sm:
+    0 1px 0 rgba(0, 0, 0, 0.3),
+    0 1px 3px rgba(0, 0, 0, 0.35);
+  --sr-shadow-md:
+    0 2px 0 rgba(0, 0, 0, 0.3),
+    0 8px 18px rgba(0, 0, 0, 0.45);
+  --sr-shadow-lg:
+    0 2px 0 rgba(0, 0, 0, 0.3),
+    0 18px 40px rgba(0, 0, 0, 0.55);
+  --sr-shadow-accent:
+    0 12px 28px color-mix(in srgb, var(--sr-accent) 22%, transparent);
+
+  /* Icon sizes — mirror the type scale so icons align to baselines. */
+  --sr-icon-size-sm: 0.875rem;
+  --sr-icon-size-md: 1rem;
+  --sr-icon-size-lg: 1.25rem;
+  --sr-icon-size-xl: 1.5rem;
+
+  /* Severity tone overlays — tinted surfaces for badges, chips, and */
+  /* cohort cells. Each resolves to a low-alpha tint of the          */
+  /* corresponding tier colour. Kept as aliases so atoms can read    */
+  /* `--sr-tone-alert-bg` instead of repeating the color-mix().       */
+  --sr-tone-alert-fg: var(--sr-tier-constrained);
+  --sr-tone-alert-bg: color-mix(in srgb, var(--sr-tier-constrained) 18%, transparent);
+  --sr-tone-alert-edge: color-mix(in srgb, var(--sr-tier-constrained) 42%, var(--sr-border));
+  --sr-tone-watch-fg: var(--sr-tier-constrained-moderate);
+  --sr-tone-watch-bg: color-mix(in srgb, var(--sr-tier-constrained-moderate) 18%, transparent);
+  --sr-tone-watch-edge: color-mix(in srgb, var(--sr-tier-constrained-moderate) 42%, var(--sr-border));
+  --sr-tone-steady-fg: var(--sr-tier-moderate);
+  --sr-tone-steady-bg: color-mix(in srgb, var(--sr-tier-moderate) 16%, transparent);
+  --sr-tone-steady-edge: color-mix(in srgb, var(--sr-tier-moderate) 36%, var(--sr-border));
+  --sr-tone-neutral-fg: var(--sr-fg-muted);
+  --sr-tone-neutral-bg: rgba(232, 230, 223, 0.06);
+  --sr-tone-neutral-edge: var(--sr-border);
+}
+
+/* Mood accent alias resolves to the tier color that narrates each mood. */
+.sr-root[data-mood="urgent"] {
+  --sr-accent: var(--sr-tier-constrained);
+  --sr-accent-soft: color-mix(in srgb, var(--sr-tier-constrained) 22%, transparent);
+}
+.sr-root[data-mood="sober"] {
+  --sr-accent: var(--sr-tier-constrained-moderate);
+  --sr-accent-soft: color-mix(in srgb, var(--sr-tier-constrained-moderate) 18%, transparent);
+}
+.sr-root[data-mood="affirming"] {
+  --sr-accent: var(--sr-tier-moderate);
+  --sr-accent-soft: color-mix(in srgb, var(--sr-tier-moderate) 18%, transparent);
+}
+
+/* Reduced motion collapses durations end-to-end. */
+.sr-root[data-motion="reduced"] {
+  --sr-motion-micro: 0ms;
+  --sr-motion-reveal: 0ms;
+  --sr-motion-stagger: 0ms;
+  --sr-motion-complex: 0ms;
+  --sr-motion-counter: 0ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sr-root {
+    --sr-motion-micro: 0ms;
+    --sr-motion-reveal: 0ms;
+    --sr-motion-stagger: 0ms;
+    --sr-motion-complex: 0ms;
+    --sr-motion-counter: 0ms;
+  }
+}

@@ -87,6 +87,10 @@ The data-layer payload is intentionally a compact GA4-safe subset, not the full 
 - Hosted report route: `https://signal.stroma.design/r`
 - Hosted builder route: `https://signal.stroma.design/build`
 
+The hosted Tier Report is a first-class companion surface, but it is not a diagnostic, attribution, or commercial modelling artifact.
+
+The canonical production `/r` artifact shipped by the provided warehouse SQL templates uses the last 7 complete calendar days and excludes the current in-progress day.
+
 ## Diagnostics cut line for v0.1
 
 The following additive diagnostics ship in v0.1:
@@ -181,10 +185,23 @@ The GTM / GA4 path does not emit these warehouse-only fields in v0.1:
 - `interaction_target`
 - `interaction_time_ms`
 
+## Additive Report Contract
+
+`SignalEventV1` remains unchanged in this phase.
+
+The additive report-layer change lives in `SignalAggregateV1`, which now includes an optional `experience_funnel` block under `rv=1` for the hosted Tier Report. This block powers the measured Act 3 funnel and keeps older `rv=1` links compatible when the funnel fields are absent.
+
+The Tier Report uses this additive report contract to show:
+
+- who your users are
+- how far apart their experiences are
+- where performance crosses into poor territory using explicit thresholds
+
 ## Related documentation
 
 - [Signal Technical Reference](./signal-technical-reference.md) — full field definitions, browser support matrices, classification logic, and aggregation rules
 - [Aggregation Spec](./aggregation-spec.md) — comparison tier selection, race metric fallback cascade, and coverage honesty rules
+- [Tier Report Design Spec](./tier-report-design-spec.md) — canonical product and presentation boundary for the hosted report
 - [Why Signal Exists](./why-signal.md) — positioning and product context
 
 ## Explicitly not part of v0.1
@@ -195,4 +212,4 @@ The GTM / GA4 path does not emit these warehouse-only fields in v0.1:
 - direct `gtag` loading in the public package
 - session persistence
 - SPA soft-navigation support
-- report-schema expansion for diagnostics
+- browser-event expansion for additional diagnostics beyond the current optional attribution fields
