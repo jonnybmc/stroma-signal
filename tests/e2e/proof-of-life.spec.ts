@@ -262,6 +262,20 @@ test('builder rejects out-of-range hosted report urls instead of previewing corr
   await expect(page.locator('#builder-summary')).toContainText('Paste a valid report URL');
 });
 
+test('builder rejects contradictory hosted report urls instead of previewing plausible data', async ({ page }) => {
+  const contradictoryUrl =
+    'https://signal.stroma.design/r?mode=preview&d=test.local&nt=25,25,25,25,0&dt=34,33,33&lu=0&lt=0&fu=0&ft=0&tu=0&tt=0&ulc=0&ufc=0&utc=0&clc=0&cfc=0&ctc=0&s=100&p=7&nc=0&nu=100&nr=0&lc=0&ct=none&rm=none&ga=1776072000000';
+
+  await page.goto('http://localhost:4174/build/');
+  await page.locator('#mode-report-url').click();
+  await page.locator('#report-url-input').fill(contradictoryUrl);
+  await page.getByRole('button', { name: 'Validate report URL' }).click();
+
+  await expect(page.locator('#builder-error')).toContainText('Could not decode that report URL');
+  await expect(page.locator('#builder-error')).toContainText('classified network_distribution share');
+  await expect(page.locator('#builder-summary')).toContainText('Paste a valid report URL');
+});
+
 test('report route renders hostile domain text safely', async ({ page }) => {
   const hostileDomain = encodeURIComponent('<img src=x onerror=alert(1)>');
   await page.goto(
@@ -286,6 +300,15 @@ test('report route fails closed for out-of-range numeric coverage', async ({ pag
 
   await expect(page.locator('.headline')).toContainText('Invalid report URL');
   await expect(page.locator('.error')).toContainText('coverage.network_coverage');
+});
+
+test('report route fails closed for contradictory but in-range coverage states', async ({ page }) => {
+  await page.goto(
+    'http://localhost:4174/r?mode=preview&d=test.local&nt=25,25,25,25,0&dt=34,33,33&lu=0&lt=0&fu=0&ft=0&tu=0&tt=0&ulc=0&ufc=0&utc=0&clc=0&cfc=0&ctc=0&s=100&p=7&nc=0&nu=100&nr=0&lc=0&ct=none&rm=none&ga=1776072000000'
+  );
+
+  await expect(page.locator('.headline')).toContainText('Invalid report URL');
+  await expect(page.locator('.error')).toContainText('classified network_distribution share');
 });
 
 test('fresh reports keep the generation date visible even when other warnings exist', async ({ page }) => {

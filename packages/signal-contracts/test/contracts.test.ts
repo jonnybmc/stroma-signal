@@ -489,6 +489,64 @@ describe('signal contracts', () => {
     expect(issues.some((i) => i.includes('exceed'))).toBe(true);
   });
 
+  it('rejects incoherent coverage sums in aggregate guard validation', () => {
+    const invalid = {
+      ...previewAggregateFixture,
+      coverage: {
+        ...previewAggregateFixture.coverage,
+        network_coverage: 100,
+        unclassified_network_share: 80
+      }
+    };
+    const issues = explainSignalAggregateIssues(invalid);
+    expect(issues.some((i) => i.includes('network_coverage + coverage.unclassified_network_share'))).toBe(true);
+  });
+
+  it('rejects classified-share mismatch between network_distribution and coverage', () => {
+    const invalid = {
+      ...previewAggregateFixture,
+      network_distribution: { urban: 25, moderate: 25, constrained_moderate: 25, constrained: 25, unknown: 0 },
+      coverage: {
+        ...previewAggregateFixture.coverage,
+        network_coverage: 0,
+        unclassified_network_share: 100
+      },
+      classified_sample_size: 0
+    };
+    const issues = explainSignalAggregateIssues(invalid);
+    expect(issues.some((i) => i.includes('classified network_distribution share'))).toBe(true);
+  });
+
+  it('rejects unclassified-share mismatch between network_distribution and coverage', () => {
+    const invalid = {
+      ...previewAggregateFixture,
+      network_distribution: { urban: 0, moderate: 0, constrained_moderate: 0, constrained: 0, unknown: 0 },
+      coverage: {
+        ...previewAggregateFixture.coverage,
+        network_coverage: 0,
+        unclassified_network_share: 100
+      },
+      classified_sample_size: 0
+    };
+    const issues = explainSignalAggregateIssues(invalid);
+    expect(issues.some((i) => i.includes('network_distribution.unknown'))).toBe(true);
+  });
+
+  it('rejects classified_sample_size mismatching sample_size × network_coverage', () => {
+    const invalid = {
+      ...previewAggregateFixture,
+      sample_size: 100,
+      coverage: {
+        ...previewAggregateFixture.coverage,
+        network_coverage: 75,
+        unclassified_network_share: 25
+      },
+      classified_sample_size: 10
+    };
+    const issues = explainSignalAggregateIssues(invalid);
+    expect(issues.some((i) => i.includes('sample_size × coverage.network_coverage'))).toBe(true);
+  });
+
   it('rejects incoherent report URLs via the decoder', () => {
     // nt=0,0,0,0,0 with nc=100 means 100% coverage but 0% in every tier — incoherent
     // The decoder runs explainSignalAggregateIssues post-decode, but this specific case
@@ -498,6 +556,30 @@ describe('signal contracts', () => {
         'https://signal.stroma.design/r?mode=preview&d=test.local&nt=0,0,0,0,0&dt=10,10,10&lu=0&lt=0&fu=0&ft=0&tu=0&tt=0&ulc=0&ufc=0&utc=0&clc=0&cfc=0&ctc=0&s=50&p=7&nc=100&nu=0&nr=0&lc=0&ct=none&rm=none&ga=1712572800000'
       )
     ).toThrow('device_distribution');
+  });
+
+  it('rejects report urls whose coverage sum is internally contradictory', () => {
+    expect(() =>
+      decodeSignalReportUrl(
+        'https://signal.stroma.design/r?mode=preview&d=test.local&nt=25,25,25,25,0&dt=34,33,33&lu=0&lt=0&fu=0&ft=0&tu=0&tt=0&ulc=0&ufc=0&utc=0&clc=0&cfc=0&ctc=0&s=100&p=7&nc=100&nu=80&nr=0&lc=0&ct=none&rm=none&ga=1712572800000'
+      )
+    ).toThrow('network_coverage + coverage.unclassified_network_share');
+  });
+
+  it('rejects report urls whose classified share contradicts network_distribution', () => {
+    expect(() =>
+      decodeSignalReportUrl(
+        'https://signal.stroma.design/r?mode=preview&d=test.local&nt=25,25,25,25,0&dt=34,33,33&lu=0&lt=0&fu=0&ft=0&tu=0&tt=0&ulc=0&ufc=0&utc=0&clc=0&cfc=0&ctc=0&s=100&p=7&nc=0&nu=100&nr=0&lc=0&ct=none&rm=none&ga=1712572800000'
+      )
+    ).toThrow('classified network_distribution share');
+  });
+
+  it('rejects report urls whose unknown share contradicts coverage', () => {
+    expect(() =>
+      decodeSignalReportUrl(
+        'https://signal.stroma.design/r?mode=preview&d=test.local&nt=0,0,0,0,0&dt=34,33,33&lu=0&lt=0&fu=0&ft=0&tu=0&tt=0&ulc=0&ufc=0&utc=0&clc=0&cfc=0&ctc=0&s=100&p=7&nc=0&nu=100&nr=0&lc=0&ct=none&rm=none&ga=1712572800000'
+      )
+    ).toThrow('network_distribution.unknown');
   });
 
   it('preserves device-hardware / network-signals / environment blocks through the codec', () => {
