@@ -1,6 +1,7 @@
 import type {
   SignalAggregateV1,
   SignalComparisonTier,
+  SignalCoverage,
   SignalDeviceDistribution,
   SignalDeviceTier,
   SignalEventV1,
@@ -105,7 +106,7 @@ function isDeviceDistribution(value: unknown): value is SignalDeviceDistribution
   return isNumber(value.low) && isNumber(value.mid) && isNumber(value.high);
 }
 
-function isCoverage(value: unknown): boolean {
+function isCoverage(value: unknown): value is SignalCoverage {
   if (!isRecord(value)) return false;
   return (
     isNumber(value.network_coverage) &&
@@ -347,7 +348,7 @@ export function explainSignalAggregateIssues(value: unknown): string[] {
       }
     }
   }
-  if (isCoverage(value.coverage) && isRecord(value.coverage)) {
+  if (isCoverage(value.coverage)) {
     const cov = value.coverage;
     const covEntries: Array<[string, unknown]> = [
       ['network_coverage', cov.network_coverage],
@@ -471,6 +472,39 @@ export function explainSignalAggregateIssues(value: unknown): string[] {
   if (isNumber(value.sample_size) && isNumber(value.classified_sample_size)) {
     if (value.classified_sample_size > value.sample_size) {
       issues.push('Expected "classified_sample_size" to not exceed "sample_size".');
+    }
+  }
+  if (isNumber(value.sample_size) && value.sample_size > 0 && isCoverage(value.coverage)) {
+    const coverage = value.coverage;
+    const coverageSum = coverage.network_coverage + coverage.unclassified_network_share;
+    if (Math.abs(coverageSum - 100) > 2) {
+      issues.push(
+        `Expected coverage.network_coverage + coverage.unclassified_network_share to sum to ~100 (got ${coverageSum}).`
+      );
+    }
+  }
+  if (isTierDistribution(value.network_distribution) && isCoverage(value.coverage)) {
+    const nd = value.network_distribution;
+    const coverage = value.coverage;
+    const classifiedShare = nd.urban + nd.moderate + nd.constrained_moderate + nd.constrained;
+    if (Math.abs(classifiedShare - coverage.network_coverage) > 2) {
+      issues.push(
+        `Expected classified network_distribution share to align with coverage.network_coverage (got ${classifiedShare} vs ${coverage.network_coverage}).`
+      );
+    }
+    if (Math.abs(nd.unknown - coverage.unclassified_network_share) > 2) {
+      issues.push(
+        `Expected network_distribution.unknown to align with coverage.unclassified_network_share (got ${nd.unknown} vs ${coverage.unclassified_network_share}).`
+      );
+    }
+  }
+  if (isNumber(value.sample_size) && isNumber(value.classified_sample_size) && isCoverage(value.coverage)) {
+    const coverage = value.coverage;
+    const expectedClassifiedSampleSize = Math.round((value.sample_size * coverage.network_coverage) / 100);
+    if (Math.abs(value.classified_sample_size - expectedClassifiedSampleSize) > 1) {
+      issues.push(
+        `Expected "classified_sample_size" to align with sample_size × coverage.network_coverage (got ${value.classified_sample_size} vs ${expectedClassifiedSampleSize}).`
+      );
     }
   }
 
