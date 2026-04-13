@@ -17,6 +17,8 @@ function buildQaUrl(aggregate: Parameters<typeof encodeSignalReportUrl>[0], scen
 
 test.describe('report visual regression', () => {
   test.skip(({ browserName }) => browserName !== 'chromium', 'Visual snapshots run in Chromium only.');
+  // Visual baselines are intentionally local-only and tracked per platform
+  // so contributors can refresh Darwin and Linux snapshots independently.
 
   test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 1024 });
