@@ -6,6 +6,8 @@ This is the fastest launch path for a GTM/GA4-led team.
 
 If you are looking for the production operating model after rows land in BigQuery, pair this with [production-report-automation.md](./production-report-automation.md).
 
+The hosted Tier Report is the shareable proof artifact at the end of this flow. It is not a diagnostic, attribution, or commercial modelling artifact.
+
 ## Outcome
 
 By the end of this flow you should have:
@@ -110,11 +112,11 @@ Important:
 
 Open the generated `signal_report_url`.
 
-That hosted `/r?...` URL is the launch artifact. It is the shareable internal sales/discovery asset.
+That hosted `/r?...` URL is the launch artifact. It is the measured proof layer your team can share internally after enough real traffic has accumulated.
 
 ## 7. If SQL Is Blocked
 
-Use [http://signal.stroma.design/build](http://signal.stroma.design/build) or the local `/build` route to:
+Use [https://signal.stroma.design/build](https://signal.stroma.design/build) or the local `/build` route to:
 
 - paste a `SignalAggregateV1` object and generate a URL
 - or paste a final hosted report URL and validate the decoded summary

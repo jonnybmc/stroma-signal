@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  affirmingAggregateFixture,
   aggregateSignalEvents,
   chooseRaceMetric,
   chromeColdNavFixture,
   decodeSignalReportUrl,
+  deriveSignalAggregateWarnings,
   encodeSignalReportUrl,
   explainSignalAggregateIssues,
   explainSignalEventIssues,
@@ -12,15 +14,21 @@ import {
   fcpFallbackAggregateFixture,
   flattenSignalEventForGa4,
   highUnclassifiedShareAggregateFixture,
+  lowInpCoverageAggregateFixture,
   mixedLifecycleAggregateFixture,
   prerenderLifecycleFixture,
   previewAggregateFixture,
   restoreLifecycleFixture,
+  SIGNAL_AGGREGATION_SPEC_V1,
   SIGNAL_GA4_EVENT_NAME,
   SIGNAL_GA4_FIELD_MAP_V1,
+  SIGNAL_MIN_LCP_COVERAGE,
+  SIGNAL_MIN_RACE_OBSERVATIONS,
+  SIGNAL_PREVIEW_MINIMUM_SAMPLE,
   safariFallbackFixture,
   safariHeavyAggregateFixture,
   signalReportScenarioFixtures,
+  singleStageFunnelFixture,
   strongLcpCoverageAggregateFixture,
   toSignalWarehouseRow,
   ttfbFallbackAggregateFixture
@@ -44,11 +52,14 @@ describe('signal contracts', () => {
     expect(decoded.vitals.comparison.lcp_coverage).toBe(previewAggregateFixture.vitals.comparison.lcp_coverage);
     expect(decoded.vitals.comparison.fcp_coverage).toBe(previewAggregateFixture.vitals.comparison.fcp_coverage);
     expect(decoded.vitals.comparison.ttfb_coverage).toBe(previewAggregateFixture.vitals.comparison.ttfb_coverage);
+    expect(decoded.experience_funnel).toEqual(previewAggregateFixture.experience_funnel);
   });
 
   it('rejects invalid enum values in report urls', () => {
     expect(() =>
-      decodeSignalReportUrl('https://signal.stroma.design/r?nt=20,20,20,20,20&dt=34,33,33&ct=%3Cscript%3E&rm=none')
+      decodeSignalReportUrl(
+        'https://signal.stroma.design/r?nt=20,20,20,20,20&dt=34,33,33&s=100&p=7&nc=100&ct=%3Cscript%3E&rm=none'
+      )
     ).toThrow('Invalid encoded enum value for "ct"');
   });
 
@@ -76,6 +87,75 @@ describe('signal contracts', () => {
       race_metric: 'fcp',
       race_fallback_reason: 'lcp_coverage_below_threshold'
     });
+  });
+
+  it('selects lcp as primary when both tiers have strong lcp coverage', () => {
+    expect(
+      chooseRaceMetric({
+        urban: {
+          lcp_observations: 40,
+          fcp_observations: 40,
+          ttfb_observations: 40,
+          lcp_coverage: 80,
+          fcp_coverage: 100,
+          ttfb_coverage: 100
+        },
+        comparison: {
+          lcp_observations: 30,
+          fcp_observations: 30,
+          ttfb_observations: 30,
+          lcp_coverage: 75,
+          fcp_coverage: 100,
+          ttfb_coverage: 100
+        }
+      })
+    ).toEqual({ race_metric: 'lcp', race_fallback_reason: null });
+  });
+
+  it('falls back to ttfb when both lcp and fcp observations are insufficient', () => {
+    expect(
+      chooseRaceMetric({
+        urban: {
+          lcp_observations: 5,
+          fcp_observations: 10,
+          ttfb_observations: 30,
+          lcp_coverage: 20,
+          fcp_coverage: 40,
+          ttfb_coverage: 100
+        },
+        comparison: {
+          lcp_observations: 3,
+          fcp_observations: 8,
+          ttfb_observations: 28,
+          lcp_coverage: 15,
+          fcp_coverage: 32,
+          ttfb_coverage: 100
+        }
+      })
+    ).toEqual({ race_metric: 'ttfb', race_fallback_reason: 'fcp_unavailable' });
+  });
+
+  it('returns none when no metric meets observation thresholds', () => {
+    expect(
+      chooseRaceMetric({
+        urban: {
+          lcp_observations: 5,
+          fcp_observations: 5,
+          ttfb_observations: 5,
+          lcp_coverage: 20,
+          fcp_coverage: 20,
+          ttfb_coverage: 20
+        },
+        comparison: {
+          lcp_observations: 3,
+          fcp_observations: 3,
+          ttfb_observations: 3,
+          lcp_coverage: 15,
+          fcp_coverage: 15,
+          ttfb_coverage: 15
+        }
+      })
+    ).toEqual({ race_metric: 'none', race_fallback_reason: 'insufficient_comparable_data' });
   });
 
   it('flattens canonical events for ga4 without renaming the event', () => {
@@ -172,6 +252,80 @@ describe('signal contracts', () => {
     expect(aggregate.top_page_path).toBe('/pricing');
   });
 
+  it('computes a measured three-stage experience funnel when coverage is strong', () => {
+    const funnel = strongLcpCoverageAggregateFixture.experience_funnel;
+
+    expect(funnel).toBeDefined();
+    expect(funnel?.active_stages).toEqual(['fcp', 'lcp', 'inp']);
+    expect(funnel?.stages.fcp.poor_threshold_ms).toBe(3000);
+    expect(funnel?.stages.lcp.poor_threshold_ms).toBe(4000);
+    expect(funnel?.stages.inp.poor_threshold_ms).toBe(500);
+    expect(funnel?.measured_session_coverage).toBe(100);
+  });
+
+  it('drops INP from the measured funnel when INP coverage is too weak', () => {
+    const funnel = lowInpCoverageAggregateFixture.experience_funnel;
+
+    expect(funnel).toBeDefined();
+    expect(funnel?.active_stages).toEqual(['fcp', 'lcp']);
+    expect(funnel?.stages.inp.tiers.urban.coverage).toBeLessThan(50);
+    expect(funnel?.stages.inp.tiers.moderate.coverage).toBeLessThan(50);
+  });
+
+  it('classifies poor-session share from measured threshold crossings only', () => {
+    const makePoorEvent = (event_id: string, ts: number, net_tier: 'urban' | 'moderate', poor: boolean) => ({
+      ...chromeColdNavFixture,
+      event_id,
+      ts,
+      net_tier,
+      vitals: {
+        ...chromeColdNavFixture.vitals,
+        fcp_ms: poor ? 3_400 : 1_100,
+        lcp_ms: poor ? 4_500 : 2_400,
+        inp_ms: poor ? 640 : 180
+      }
+    });
+
+    const aggregate = aggregateSignalEvents(
+      [
+        ...Array.from({ length: 30 }, (_, index) =>
+          makePoorEvent(`urban_${index}`, chromeColdNavFixture.ts + index, 'urban', index < 15)
+        ),
+        ...Array.from({ length: 30 }, (_, index) =>
+          makePoorEvent(`moderate_${index}`, chromeColdNavFixture.ts + 100 + index, 'moderate', index < 15)
+        )
+      ],
+      'production',
+      chromeColdNavFixture.ts + 1_000
+    );
+
+    expect(aggregate.experience_funnel?.active_stages).toEqual(['fcp', 'lcp', 'inp']);
+    expect(aggregate.experience_funnel?.measured_session_coverage).toBe(100);
+    expect(aggregate.experience_funnel?.poor_session_share).toBe(50);
+  });
+
+  it('produces no NaN in the codec output when the aggregate has zero sample size', () => {
+    const emptyAggregate = aggregateSignalEvents([], 'preview', Date.now());
+    expect(emptyAggregate.sample_size).toBe(0);
+
+    const encoded = encodeSignalReportUrl(emptyAggregate);
+    expect(encoded.url).not.toContain('NaN');
+    expect(encoded.url).not.toContain('Infinity');
+
+    const decoded = decodeSignalReportUrl(encoded.url);
+    expect(decoded.sample_size).toBe(0);
+    expect(decoded.network_distribution.urban).toBe(0);
+    expect(decoded.device_distribution.low).toBe(0);
+  });
+
+  it('handles 100% unclassified traffic without NaN or malformed percentages', () => {
+    const encoded = encodeSignalReportUrl(highUnclassifiedShareAggregateFixture);
+    expect(encoded.url).not.toContain('NaN');
+    const decoded = decodeSignalReportUrl(encoded.url);
+    expect(decoded.coverage.unclassified_network_share).toBeGreaterThan(50);
+    expect(decoded.network_distribution.unknown).toBeGreaterThan(50);
+  });
+
   it('excludes restore and prerender events from default report aggregates', () => {
     const aggregate = aggregateSignalEvents(
       [chromeColdNavFixture, restoreLifecycleFixture, prerenderLifecycleFixture],
@@ -189,28 +343,345 @@ describe('signal contracts', () => {
     expect(aggregate.domain).toBe('example.co.za');
   });
 
+  it('decodes older rv=1 report urls without the additive experience funnel block', () => {
+    const decoded = decodeSignalReportUrl(
+      'https://signal.stroma.design/r?mode=preview&d=example.co.za&nt=25,25,25,25,0&dt=34,33,33&lu=2100&lt=4200&fu=1100&ft=1900&tu=220&tt=380&ulc=100&ufc=100&utc=100&clc=100&cfc=100&ctc=100&s=100&p=7&nc=100&nu=0&nr=0&lc=100&ct=moderate&rm=lcp'
+    );
+
+    expect(decoded.domain).toBe('example.co.za');
+    expect(decoded.experience_funnel).toBeUndefined();
+  });
+
   it('ships scenario fixtures that cover the intended report fallbacks and edge cases', () => {
     expect(signalReportScenarioFixtures.map((fixture) => fixture.id)).toEqual([
       'preview',
       'mixed-lifecycle',
       'strong-lcp',
+      'affirming-balance',
       'fcp-fallback',
       'ttfb-fallback',
       'insufficient-race',
+      'low-inp-coverage',
       'high-unclassified',
-      'safari-heavy'
+      'safari-heavy',
+      'full-depth',
+      'sober-mood',
+      'single-stage-funnel'
     ]);
     expect(mixedLifecycleAggregateFixture.sample_size).toBe(1);
     expect(strongLcpCoverageAggregateFixture.race_metric).toBe('lcp');
+    expect(affirmingAggregateFixture.experience_funnel?.poor_session_share).toBeLessThanOrEqual(12);
     expect(fcpFallbackAggregateFixture.race_metric).toBe('fcp');
     expect(ttfbFallbackAggregateFixture.race_metric).toBe('ttfb');
+    expect(lowInpCoverageAggregateFixture.experience_funnel?.active_stages).toEqual(['fcp', 'lcp']);
     expect(highUnclassifiedShareAggregateFixture.coverage.unclassified_network_share).toBeGreaterThan(50);
     expect(safariHeavyAggregateFixture.coverage.lcp_coverage).toBeLessThan(25);
+  });
+
+  it('computes correct p75 metrics for single-event aggregates', () => {
+    // Single event with known LCP → p75 should equal that value
+    const singleEvent = { ...chromeColdNavFixture, net_tier: 'urban' as const };
+    const agg = aggregateSignalEvents([singleEvent], 'preview');
+    expect(agg.vitals.urban.lcp_ms).toBe(Math.round(singleEvent.vitals.lcp_ms ?? 0));
+    expect(agg.vitals.urban.fcp_ms).toBe(Math.round(singleEvent.vitals.fcp_ms ?? 0));
+    expect(agg.vitals.urban.ttfb_ms).toBe(Math.round(singleEvent.vitals.ttfb_ms ?? 0));
+  });
+
+  it('returns null metrics for empty tier accumulator', () => {
+    // No comparison events → comparison tier vitals should be null
+    const urbanOnly = { ...chromeColdNavFixture, net_tier: 'urban' as const };
+    const agg = aggregateSignalEvents([urbanOnly], 'preview');
+    expect(agg.vitals.comparison.lcp_ms).toBeNull();
+    expect(agg.vitals.comparison.fcp_ms).toBeNull();
+    expect(agg.vitals.comparison.ttfb_ms).toBeNull();
+  });
+
+  it('resolves single-stage funnel when only FCP has sufficient coverage', () => {
+    expect(singleStageFunnelFixture.experience_funnel?.active_stages).toEqual(['fcp']);
+  });
+
+  it('resolves full three-stage funnel with strong coverage', () => {
+    expect(strongLcpCoverageAggregateFixture.experience_funnel?.active_stages).toEqual(['fcp', 'lcp', 'inp']);
+  });
+
+  it('resolves two-stage funnel when INP is below coverage threshold', () => {
+    expect(lowInpCoverageAggregateFixture.experience_funnel?.active_stages).toEqual(['fcp', 'lcp']);
+  });
+
+  it('derives correct warnings for different aggregate states', () => {
+    // Preview + small sample + no race → 2 warnings
+    expect(deriveSignalAggregateWarnings({ mode: 'preview', sample_size: 5, race_metric: 'none' })).toHaveLength(2);
+    // Production + large sample + LCP race → 0 warnings
+    expect(deriveSignalAggregateWarnings({ mode: 'production', sample_size: 200, race_metric: 'lcp' })).toHaveLength(0);
+    // Preview + adequate sample + no race → 1 warning (race only)
+    expect(deriveSignalAggregateWarnings({ mode: 'preview', sample_size: 200, race_metric: 'none' })).toHaveLength(1);
+    // Production + small sample + LCP race → 0 warnings (preview check only applies to preview mode)
+    expect(deriveSignalAggregateWarnings({ mode: 'production', sample_size: 5, race_metric: 'lcp' })).toHaveLength(0);
+  });
+
+  it('keeps the aggregation spec object in sync with types.ts constants', () => {
+    expect(SIGNAL_AGGREGATION_SPEC_V1.previewMinimumSample).toBe(SIGNAL_PREVIEW_MINIMUM_SAMPLE);
+    expect(SIGNAL_AGGREGATION_SPEC_V1.minRaceObservations).toBe(SIGNAL_MIN_RACE_OBSERVATIONS);
+    expect(SIGNAL_AGGREGATION_SPEC_V1.minLcpCoverage).toBe(SIGNAL_MIN_LCP_COVERAGE);
+    expect(SIGNAL_AGGREGATION_SPEC_V1.funnelPoorThresholds.fcp).toBe(3000);
+    expect(SIGNAL_AGGREGATION_SPEC_V1.funnelPoorThresholds.lcp).toBe(4000);
+    expect(SIGNAL_AGGREGATION_SPEC_V1.funnelPoorThresholds.inp).toBe(500);
   });
 
   it('explains invalid aggregate input with actionable contract issues', () => {
     expect(explainSignalAggregateIssues({ foo: 'bar' })).toContain('Expected "v" to be 1.');
     expect(explainSignalAggregateIssues(previewAggregateFixture)).toEqual([]);
+  });
+
+  it('rejects out-of-range percentages in aggregate guard validation', () => {
+    const invalid = {
+      ...previewAggregateFixture,
+      network_distribution: { ...previewAggregateFixture.network_distribution, urban: 150 }
+    };
+    const issues = explainSignalAggregateIssues(invalid);
+    expect(issues.some((issue) => issue.includes('network_distribution.urban'))).toBe(true);
+    expect(issues.some((issue) => issue.includes('between 0 and 100'))).toBe(true);
+  });
+
+  it('rejects negative sample_size in aggregate guard validation', () => {
+    const invalid = { ...previewAggregateFixture, sample_size: -5 };
+    const issues = explainSignalAggregateIssues(invalid);
+    expect(issues.some((issue) => issue.includes('sample_size'))).toBe(true);
+    expect(issues.some((issue) => issue.includes('non-negative'))).toBe(true);
+  });
+
+  it('rejects network distribution that does not sum to ~100', () => {
+    const invalid = {
+      ...previewAggregateFixture,
+      network_distribution: { urban: 0, moderate: 0, constrained_moderate: 0, constrained: 0, unknown: 0 }
+    };
+    // All zeros is acceptable (empty data) — sum is 0, no coherence error
+    expect(explainSignalAggregateIssues(invalid).some((i) => i.includes('sum to ~100'))).toBe(false);
+
+    const invalid2 = {
+      ...previewAggregateFixture,
+      network_distribution: { urban: 50, moderate: 50, constrained_moderate: 50, constrained: 0, unknown: 0 }
+    };
+    // 150% total — should fail
+    const issues2 = explainSignalAggregateIssues(invalid2);
+    expect(issues2.some((i) => i.includes('network_distribution'))).toBe(true);
+    expect(issues2.some((i) => i.includes('sum to ~100'))).toBe(true);
+  });
+
+  it('rejects device distribution that does not sum to ~100', () => {
+    const invalid = {
+      ...previewAggregateFixture,
+      device_distribution: { low: 10, mid: 10, high: 10 }
+    };
+    const issues = explainSignalAggregateIssues(invalid);
+    expect(issues.some((i) => i.includes('device_distribution'))).toBe(true);
+    expect(issues.some((i) => i.includes('sum to ~100'))).toBe(true);
+  });
+
+  it('rejects classified_sample_size exceeding sample_size', () => {
+    const invalid = {
+      ...previewAggregateFixture,
+      sample_size: 10,
+      classified_sample_size: 20
+    };
+    const issues = explainSignalAggregateIssues(invalid);
+    expect(issues.some((i) => i.includes('classified_sample_size'))).toBe(true);
+    expect(issues.some((i) => i.includes('exceed'))).toBe(true);
+  });
+
+  it('rejects incoherent report URLs via the decoder', () => {
+    // nt=0,0,0,0,0 with nc=100 means 100% coverage but 0% in every tier — incoherent
+    // The decoder runs explainSignalAggregateIssues post-decode, but this specific case
+    // has nt summing to 0 which we allow (empty data). However, dt=10,10,10 sums to 30 — should fail.
+    expect(() =>
+      decodeSignalReportUrl(
+        'https://signal.stroma.design/r?mode=preview&d=test.local&nt=0,0,0,0,0&dt=10,10,10&lu=0&lt=0&fu=0&ft=0&tu=0&tt=0&ulc=0&ufc=0&utc=0&clc=0&cfc=0&ctc=0&s=50&p=7&nc=100&nu=0&nr=0&lc=0&ct=none&rm=none&ga=1712572800000'
+      )
+    ).toThrow('device_distribution');
+  });
+
+  it('preserves device-hardware / network-signals / environment blocks through the codec', () => {
+    const encoded = encodeSignalReportUrl(strongLcpCoverageAggregateFixture);
+    const decoded = decodeSignalReportUrl(encoded.url);
+
+    expect(decoded.device_hardware).toEqual(strongLcpCoverageAggregateFixture.device_hardware);
+    expect(decoded.network_signals).toEqual(strongLcpCoverageAggregateFixture.network_signals);
+    expect(decoded.environment).toEqual(strongLcpCoverageAggregateFixture.environment);
+  });
+
+  it('marks the memory histogram as unknown when Safari / Firefox sessions dominate', () => {
+    const hardware = safariHeavyAggregateFixture.device_hardware;
+    expect(hardware).toBeDefined();
+    // Safari series pushes device_memory_gb to null; those sessions land
+    // in the unknown bucket and drop memory_coverage below 100.
+    expect(hardware?.memory_gb_hist.unknown).toBeGreaterThan(0);
+    expect(hardware?.memory_coverage).toBeLessThan(100);
+  });
+
+  it('drops effective_type / downlink / rtt to unknown + null on Safari-heavy samples', () => {
+    const signals = safariHeavyAggregateFixture.network_signals;
+    expect(signals).toBeDefined();
+    expect(signals?.effective_type_hist.unknown).toBeGreaterThan(0);
+    expect(signals?.effective_type_coverage).toBeLessThan(100);
+  });
+
+  it('tracks browser distribution in the environment block', () => {
+    const env = safariHeavyAggregateFixture.environment;
+    expect(env).toBeDefined();
+    expect(env?.browser_hist.safari).toBeGreaterThan(0);
+    // Safari-heavy fixture keeps a small Chromium support series so the
+    // Chrome bucket stays non-zero.
+    expect(env?.browser_hist.chrome).toBeGreaterThan(0);
+  });
+
+  it('keeps rv=1 urls decoding cleanly when the new blocks are absent', () => {
+    const decoded = decodeSignalReportUrl(
+      'https://signal.stroma.design/r?mode=preview&d=example.co.za&nt=25,25,25,25,0&dt=34,33,33&lu=2100&lt=4200&fu=1100&ft=1900&tu=220&tt=380&ulc=100&ufc=100&utc=100&clc=100&cfc=100&ctc=100&s=100&p=7&nc=100&nu=0&nr=0&lc=100&ct=moderate&rm=lcp'
+    );
+
+    expect(decoded.device_hardware).toBeUndefined();
+    expect(decoded.network_signals).toBeUndefined();
+    expect(decoded.environment).toBeUndefined();
+  });
+
+  it('preserves generated_at through the codec round-trip', () => {
+    const encoded = encodeSignalReportUrl(strongLcpCoverageAggregateFixture);
+    const decoded = decodeSignalReportUrl(encoded.url);
+
+    expect(decoded.generated_at).toBe(strongLcpCoverageAggregateFixture.generated_at);
+  });
+
+  it('falls back to Date.now() for generated_at when decoding legacy urls without ga param', () => {
+    const before = Date.now();
+    const decoded = decodeSignalReportUrl(
+      'https://signal.stroma.design/r?mode=preview&d=test.local&nt=50,30,15,5,0&dt=34,33,33&lu=2000&lt=5000&fu=900&ft=2800&tu=200&tt=450&ulc=80&ufc=90&utc=95&clc=75&cfc=85&ctc=90&s=50&p=7&nc=100&nu=0&nr=10&lc=80&ct=constrained&rm=lcp'
+    );
+    const after = Date.now();
+
+    expect(decoded.generated_at).toBeGreaterThanOrEqual(before);
+    expect(decoded.generated_at).toBeLessThanOrEqual(after);
+  });
+
+  it('decodes urls with empty nsl and nsr params without crashing', () => {
+    // Simulates the normalized SQL builder output when downlink/rtt quartiles
+    // are unavailable (< 20 observations). The SQL now omits the params
+    // entirely, but old URLs may have &nsl=&nsr= with empty values.
+    const url =
+      'https://signal.stroma.design/r?mode=production&d=test.local&nt=50,30,15,5,0&dt=34,33,33&lu=2000&lt=5000&fu=900&ft=2800&tu=200&tt=450&ulc=80&ufc=90&utc=95&clc=75&cfc=85&ctc=90&s=50&p=7&nc=100&nu=0&nr=10&lc=80&ct=constrained&rm=lcp&nse=0,0,30,60,10&nsv=90&nsd=5&nsl=&nsr=';
+    const decoded = decodeSignalReportUrl(url);
+
+    expect(decoded.network_signals).toBeDefined();
+    expect(decoded.network_signals?.downlink_mbps).toBeNull();
+    expect(decoded.network_signals?.rtt_ms).toBeNull();
+  });
+
+  it('throws on malformed required numeric params instead of silently defaulting to zero', () => {
+    // s=abc is a required param — must throw, not silently produce a zeroed report
+    expect(() =>
+      decodeSignalReportUrl(
+        'https://signal.stroma.design/r?mode=preview&d=test.local&nt=50,30,15,5,0&dt=34,33,33&lu=abc&lt=5000&fu=900&ft=2800&tu=200&tt=450&ulc=80&ufc=90&utc=95&clc=75&cfc=85&ctc=90&s=abc&p=7&nc=100&nu=0&nr=10&lc=80&ct=constrained&rm=lcp'
+      )
+    ).toThrow('Invalid numeric value for required parameter "s"');
+  });
+
+  it('throws on malformed optional numeric params instead of coercing them to zero', () => {
+    expect(() =>
+      decodeSignalReportUrl(
+        'https://signal.stroma.design/r?mode=preview&d=test.local&nt=50,30,15,5,0&dt=34,33,33&lu=abc&lt=5000&fu=900&ft=2800&tu=200&tt=450&ulc=80&ufc=90&utc=95&clc=75&cfc=85&ctc=90&s=50&p=7&nc=100&nu=0&nr=10&lc=80&ct=constrained&rm=lcp'
+      )
+    ).toThrow('Invalid numeric value for parameter "lu"');
+  });
+
+  it('throws when a present ga param is malformed', () => {
+    expect(() =>
+      decodeSignalReportUrl(
+        'https://signal.stroma.design/r?mode=preview&d=test.local&nt=50,30,15,5,0&dt=34,33,33&lu=2000&lt=5000&fu=900&ft=2800&tu=200&tt=450&ulc=80&ufc=90&utc=95&clc=75&cfc=85&ctc=90&s=50&p=7&nc=100&nu=0&nr=10&lc=80&ct=constrained&rm=lcp&ga=not-a-timestamp'
+      )
+    ).toThrow('Invalid numeric value for required parameter "ga"');
+  });
+
+  it('rejects out-of-range top-level coverage in report urls', () => {
+    expect(() =>
+      decodeSignalReportUrl(
+        'https://signal.stroma.design/r?mode=preview&d=test.local&nt=50,30,15,5,0&dt=34,33,33&lu=2000&lt=5000&fu=900&ft=2800&tu=200&tt=450&ulc=80&ufc=90&utc=95&clc=75&cfc=85&ctc=90&s=50&p=7&nc=140&nu=0&nr=10&lc=80&ct=constrained&rm=lcp&ga=1712572800000'
+      )
+    ).toThrow('coverage.network_coverage');
+  });
+
+  it('rejects out-of-range vitals coverage in report urls', () => {
+    expect(() =>
+      decodeSignalReportUrl(
+        'https://signal.stroma.design/r?mode=preview&d=test.local&nt=50,30,15,5,0&dt=34,33,33&lu=2000&lt=5000&fu=900&ft=2800&tu=200&tt=450&ulc=180&ufc=90&utc=95&clc=75&cfc=85&ctc=90&s=50&p=7&nc=100&nu=0&nr=10&lc=80&ct=constrained&rm=lcp&ga=1712572800000'
+      )
+    ).toThrow('vitals.urban.lcp_coverage');
+  });
+
+  it('rejects out-of-range experience funnel tier coverage and poor share in report urls', () => {
+    expect(() =>
+      decodeSignalReportUrl(
+        'https://signal.stroma.design/r?mode=preview&d=test.local&nt=50,30,15,5,0&dt=34,33,33&lu=2000&lt=5000&fu=900&ft=2800&tu=200&tt=450&ulc=80&ufc=90&utc=95&clc=75&cfc=85&ctc=90&s=50&p=7&nc=100&nu=0&nr=10&lc=80&ct=constrained&rm=lcp&ga=1712572800000&es=fcp,lcp&ec=80&ep=20&fpt=3000&lpt=4000&ipt=500&fcs=120,80,70,60&fps=10,20,30,40&lcs=90,80,70,60&lps=10,20,30,140&ics=0,0,0,0&ips=0,0,0,0'
+      )
+    ).toThrow('experience_funnel.stages.fcp.tiers.urban.coverage');
+  });
+
+  it('rejects out-of-range optional device hardware percentages in report urls', () => {
+    expect(() =>
+      decodeSignalReportUrl(
+        'https://signal.stroma.design/r?mode=preview&d=test.local&nt=50,30,15,5,0&dt=34,33,33&lu=2000&lt=5000&fu=900&ft=2800&tu=200&tt=450&ulc=80&ufc=90&utc=95&clc=75&cfc=85&ctc=90&s=50&p=7&nc=100&nu=0&nr=10&lc=80&ct=constrained&rm=lcp&ga=1712572800000&dhc=101,0,0,0,0,0&dhm=0,0,0,0,0,100&dhv=80'
+      )
+    ).toThrow('device_hardware.cores_hist.1');
+  });
+
+  it('rejects out-of-range optional network signal percentages in report urls', () => {
+    expect(() =>
+      decodeSignalReportUrl(
+        'https://signal.stroma.design/r?mode=preview&d=test.local&nt=50,30,15,5,0&dt=34,33,33&lu=2000&lt=5000&fu=900&ft=2800&tu=200&tt=450&ulc=80&ufc=90&utc=95&clc=75&cfc=85&ctc=90&s=50&p=7&nc=100&nu=0&nr=10&lc=80&ct=constrained&rm=lcp&ga=1712572800000&nse=0,0,0,101,0&nsv=80&nsd=5'
+      )
+    ).toThrow('network_signals.effective_type_hist.4g');
+  });
+
+  it('rejects out-of-range optional environment percentages in report urls', () => {
+    expect(() =>
+      decodeSignalReportUrl(
+        'https://signal.stroma.design/r?mode=preview&d=test.local&nt=50,30,15,5,0&dt=34,33,33&lu=2000&lt=5000&fu=900&ft=2800&tu=200&tt=450&ulc=80&ufc=90&utc=95&clc=75&cfc=85&ctc=90&s=50&p=7&nc=100&nu=0&nr=10&lc=80&ct=constrained&rm=lcp&ga=1712572800000&eb=0,0,0,0,101'
+      )
+    ).toThrow('environment.browser_hist.other');
+  });
+
+  it('throws on semantic inconsistency: race_metric without comparison tier', () => {
+    expect(() =>
+      decodeSignalReportUrl(
+        'https://signal.stroma.design/r?mode=preview&d=test.local&nt=50,30,15,5,0&dt=34,33,33&lu=2000&lt=5000&fu=900&ft=2800&tu=200&tt=450&ulc=80&ufc=90&utc=95&clc=75&cfc=85&ctc=90&s=50&p=7&nc=100&nu=0&nr=10&lc=80&ct=none&rm=lcp'
+      )
+    ).toThrow('comparison tier is "none"');
+  });
+
+  it('throws on semantic inconsistency: primary LCP race with fallback reason', () => {
+    expect(() =>
+      decodeSignalReportUrl(
+        'https://signal.stroma.design/r?mode=preview&d=test.local&nt=50,30,15,5,0&dt=34,33,33&lu=2000&lt=5000&fu=900&ft=2800&tu=200&tt=450&ulc=80&ufc=90&utc=95&clc=75&cfc=85&ctc=90&s=50&p=7&nc=100&nu=0&nr=10&lc=80&ct=constrained&rm=lcp&rr=lcp_coverage_below_threshold'
+      )
+    ).toThrow('should not have a fallback reason');
+  });
+
+  it('adds missing-freshness warning for legacy URLs without ga param', () => {
+    const decoded = decodeSignalReportUrl(
+      'https://signal.stroma.design/r?mode=preview&d=test.local&nt=50,30,15,5,0&dt=34,33,33&lu=2000&lt=5000&fu=900&ft=2800&tu=200&tt=450&ulc=80&ufc=90&utc=95&clc=75&cfc=85&ctc=90&s=50&p=7&nc=100&nu=0&nr=10&lc=80&ct=constrained&rm=lcp'
+    );
+
+    expect(decoded.warnings.length).toBeGreaterThan(0);
+    expect(decoded.warnings.some((warning) => warning.includes('freshness'))).toBe(true);
+  });
+
+  it('keeps legacy rv=1 urls without additive blocks backward compatible', () => {
+    const decoded = decodeSignalReportUrl(
+      'https://signal.stroma.design/r?mode=preview&d=test.local&nt=50,30,15,5,0&dt=34,33,33&lu=2000&lt=5000&fu=900&ft=2800&tu=200&tt=450&ulc=80&ufc=90&utc=95&clc=75&cfc=85&ctc=90&s=50&p=7&nc=100&nu=0&nr=10&lc=80&ct=constrained&rm=lcp'
+    );
+
+    expect(decoded.experience_funnel).toBeUndefined();
+    expect(decoded.device_hardware).toBeUndefined();
+    expect(decoded.network_signals).toBeUndefined();
+    expect(decoded.environment).toBeUndefined();
   });
 
   it('rejects invalid diagnostic enums in canonical events and warehouse rows', () => {

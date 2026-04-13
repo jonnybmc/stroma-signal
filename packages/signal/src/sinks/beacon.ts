@@ -37,6 +37,11 @@ export function createBeaconSink(options: BeaconSinkOptions): SignalSink {
             body: payload,
             keepalive: true
           })
+          .then((response) => {
+            if (!response.ok) {
+              options.onError?.(new Error(`Beacon endpoint responded ${response.status}`), event);
+            }
+          })
           .catch((error) => {
             options.onError?.(error, event);
           });

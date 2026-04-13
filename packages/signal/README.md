@@ -27,6 +27,8 @@ The minimum adoption path is usually:
 
 This package does not ship the repo's local spike lab, hosted report shell, or builder UI as required consumer setup.
 
+The hosted Tier Report remains a first-class companion artifact, but it is not a diagnostic, attribution, or commercial modelling artifact. It is the measured proof layer that sits on top of the package and warehouse flow.
+
 ## Quick Start
 
 ### Send canonical events to your own endpoint
@@ -80,6 +82,7 @@ Those are companion repo assets, not required package setup.
 
 - Repo README: https://github.com/jonathanbooysen/stroma-signal#readme
 - Why Signal exists: https://github.com/jonathanbooysen/stroma-signal/blob/main/docs/why-signal.md
+- Tier Report design spec: https://github.com/jonathanbooysen/stroma-signal/blob/main/docs/tier-report-design-spec.md
 - Setup guide: https://github.com/jonathanbooysen/stroma-signal/blob/main/docs/client-integrations.md
 - GTM / GA4 launch path: https://github.com/jonathanbooysen/stroma-signal/blob/main/docs/marketer-quickstart.md
 - Public API contract: https://github.com/jonathanbooysen/stroma-signal/blob/main/docs/public-api-v0.1.md

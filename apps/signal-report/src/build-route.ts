@@ -7,75 +7,13 @@ import {
 } from '@stroma-labs/signal-contracts';
 
 import './shared.css';
-import { escapeHtml, renderIssueList, renderLinkedMessage } from './render-utils';
+import { renderAggregateSummary } from './builder-summary';
+import { renderIssueList, renderLinkedMessage } from './render-utils';
 
 type BuilderMode = 'aggregate' | 'report_url';
 
 const app = document.querySelector<HTMLDivElement>('#app');
 if (!app) throw new Error('Missing app root');
-
-function humanize(value: string): string {
-  return value.replaceAll('_', ' ');
-}
-
-function renderSummary(aggregate: SignalAggregateV1): string {
-  const warningMarkup =
-    aggregate.warnings.length === 0
-      ? '<p class="summary-empty">No warnings in this aggregate.</p>'
-      : `<ul class="summary-list">${aggregate.warnings.map((warning) => `<li>${escapeHtml(warning)}</li>`).join('')}</ul>`;
-
-  return `
-    <div class="summary-grid">
-      <article class="summary-card">
-        <p class="label">Domain</p>
-        <p class="summary-value">${escapeHtml(aggregate.domain)}</p>
-      </article>
-      <article class="summary-card">
-        <p class="label">Mode</p>
-        <p class="summary-value">${escapeHtml(aggregate.mode)}</p>
-      </article>
-      <article class="summary-card">
-        <p class="label">Sample</p>
-        <p class="summary-value">${aggregate.sample_size}</p>
-      </article>
-      <article class="summary-card">
-        <p class="label">Comparison tier</p>
-        <p class="summary-value">${escapeHtml(humanize(aggregate.comparison_tier))}</p>
-      </article>
-      <article class="summary-card">
-        <p class="label">Race metric</p>
-        <p class="summary-value">${escapeHtml(aggregate.race_metric === 'none' ? 'no race' : aggregate.race_metric.toUpperCase())}</p>
-      </article>
-      <article class="summary-card">
-        <p class="label">Fallback</p>
-        <p class="summary-value">${escapeHtml(aggregate.race_fallback_reason ? humanize(aggregate.race_fallback_reason) : 'none')}</p>
-      </article>
-    </div>
-    <div class="summary-section">
-      <p class="label">Coverage honesty</p>
-      <ul class="summary-list">
-        <li>Network coverage: ${aggregate.coverage.network_coverage}%</li>
-        <li>Unclassified share: ${aggregate.coverage.unclassified_network_share}%</li>
-        <li>Connection reuse share: ${aggregate.coverage.connection_reuse_share}%</li>
-        <li>LCP coverage: ${aggregate.coverage.lcp_coverage}%</li>
-        <li>Selected urban coverage: ${aggregate.coverage.selected_metric_urban_coverage ?? 'n/a'}${aggregate.coverage.selected_metric_urban_coverage == null ? '' : '%'}</li>
-        <li>Selected comparison coverage: ${aggregate.coverage.selected_metric_comparison_coverage ?? 'n/a'}${aggregate.coverage.selected_metric_comparison_coverage == null ? '' : '%'}</li>
-      </ul>
-    </div>
-    <div class="summary-section">
-      <p class="label">Round-trip vitals</p>
-      <ul class="summary-list">
-        <li>Urban: LCP ${aggregate.vitals.urban.lcp_ms ?? 'n/a'} / FCP ${aggregate.vitals.urban.fcp_ms ?? 'n/a'} / TTFB ${aggregate.vitals.urban.ttfb_ms ?? 'n/a'}</li>
-        <li>${escapeHtml(humanize(aggregate.comparison_tier))}: LCP ${aggregate.vitals.comparison.lcp_ms ?? 'n/a'} / FCP ${aggregate.vitals.comparison.fcp_ms ?? 'n/a'} / TTFB ${aggregate.vitals.comparison.ttfb_ms ?? 'n/a'}</li>
-        <li>Top page path: ${escapeHtml(aggregate.top_page_path ?? 'n/a')}</li>
-      </ul>
-    </div>
-    <div class="summary-section">
-      <p class="label">Warnings</p>
-      ${warningMarkup}
-    </div>
-  `;
-}
 
 function renderErrors(target: HTMLElement, issues: string[]): void {
   renderIssueList(target, issues);
@@ -268,15 +206,14 @@ function loadFixture(id: string): void {
   copyButton.disabled = true;
   success.textContent = '';
   renderErrors(error, []);
-  summary.innerHTML = renderSummary(fixture.aggregate);
+  summary.innerHTML = renderAggregateSummary(fixture.aggregate);
 }
 
-loadFixture(signalReportScenarioFixtures[0]?.id ?? 'preview');
+loadFixture('full-depth');
 setMode('aggregate');
 
 fixtureSelect.addEventListener('change', () => {
-  const fixture = signalReportScenarioFixtures.find((entry) => entry.id === fixtureSelect.value);
-  fixtureDescription.textContent = fixture?.description ?? '';
+  loadFixture(fixtureSelect.value);
 });
 
 for (const button of modeButtons) {
@@ -320,7 +257,7 @@ generateButton.addEventListener('click', () => {
   reportUrlInput.value = encoded.url;
   copyButton.disabled = false;
   renderLinkedMessage(success, 'Generated URL', encoded.url);
-  summary.innerHTML = renderSummary(decoded);
+  summary.innerHTML = renderAggregateSummary(decoded);
 });
 
 validateButton.addEventListener('click', () => {
@@ -338,7 +275,7 @@ validateButton.addEventListener('click', () => {
   latestUrl = url;
   copyButton.disabled = false;
   renderLinkedMessage(success, 'Validated URL', url);
-  summary.innerHTML = renderSummary(aggregate);
+  summary.innerHTML = renderAggregateSummary(aggregate);
 });
 
 copyButton.addEventListener('click', async () => {

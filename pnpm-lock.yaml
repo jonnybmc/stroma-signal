@@ -56,6 +56,9 @@ importers:
       '@stroma-labs/signal-contracts':
         specifier: workspace:*
         version: link:../../packages/signal-contracts
+      lucide-static:
+        specifier: ^0.460.0
+        version: 0.460.0
 
   apps/signal-spike-lab:
     dependencies:
@@ -709,6 +712,9 @@ packages:
 
   loupe@3.2.1:
     resolution: {integrity: sha512-CdzqowRJCeLU72bHvWqwRBBlLcMEtIvGrlvef74kMnV2AolS9Y8xUv1I0U/MNAWMhBlKIoyuEgoJ0t/bbwHbLQ==}
+
+  lucide-static@0.460.0:
+    resolution: {integrity: sha512-X6pIdg7jVxv7YQ/uR241hwhNiztcAfmj181TbcX7HCxxk/3mGaRtAc6b2ftUvQBufbJE6ehgyzO2uVsa604tWg==}
 
   magic-string@0.30.21:
     resolution: {integrity: sha512-vd2F4YUyEXKGcLHoq+TEyCjxueSeHnFxyyjNp80yg0XV4vUhnDer/lvvlqM/arB5bXQN5K2/3oinyCRyx8T2CQ==}
@@ -1459,6 +1465,8 @@ snapshots:
       wrap-ansi: 9.0.2
 
   loupe@3.2.1: {}
+
+  lucide-static@0.460.0: {}
 
   magic-string@0.30.21:
     dependencies:

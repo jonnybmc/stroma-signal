@@ -2,15 +2,25 @@ import type {
   SignalAggregateV1,
   SignalComparisonTier,
   SignalDeviceDistribution,
+  SignalDeviceHardware,
+  SignalEnvironment,
   SignalEventV1,
+  SignalExperienceFunnel,
+  SignalExperienceStage,
+  SignalExperienceStageSummary,
   SignalMetricSelectionInput,
   SignalMetricSelectionResult,
+  SignalNetworkSignals,
   SignalNetworkTier,
+  SignalQuartiles,
   SignalTierDistribution,
   SignalTierMetricSummary
 } from './types.js';
 import {
   SIGNAL_EVENT_VERSION,
+  SIGNAL_FUNNEL_FCP_POOR_THRESHOLD,
+  SIGNAL_FUNNEL_INP_POOR_THRESHOLD,
+  SIGNAL_FUNNEL_LCP_POOR_THRESHOLD,
   SIGNAL_MIN_LCP_COVERAGE,
   SIGNAL_MIN_RACE_OBSERVATIONS,
   SIGNAL_PREVIEW_MINIMUM_SAMPLE,
@@ -18,6 +28,7 @@ import {
 } from './types.js';
 
 const CLASSIFIED_TIERS: SignalNetworkTier[] = ['urban', 'moderate', 'constrained_moderate', 'constrained'];
+const EXPERIENCE_STAGES: SignalExperienceStage[] = ['fcp', 'lcp', 'inp'];
 
 const ZERO_TIER_DISTRIBUTION: SignalTierDistribution = {
   urban: 0,
@@ -31,6 +42,12 @@ const ZERO_DEVICE_DISTRIBUTION: SignalDeviceDistribution = {
   low: 0,
   mid: 0,
   high: 0
+};
+
+const POOR_STAGE_THRESHOLDS: Record<SignalExperienceStage, number> = {
+  fcp: SIGNAL_FUNNEL_FCP_POOR_THRESHOLD,
+  lcp: SIGNAL_FUNNEL_LCP_POOR_THRESHOLD,
+  inp: SIGNAL_FUNNEL_INP_POOR_THRESHOLD
 };
 
 function isLoadShapedEvent(event: SignalEventV1): boolean {
@@ -50,11 +67,124 @@ function p75(values: number[]): number | null {
   return Math.round(sorted[index] ?? fallback ?? 0);
 }
 
+// Quartile threshold — below this sample count we don't trust the percentile
+// math, so the report surfaces `null` and the reader sees an honest "not
+// enough data" caveat instead of a noisy made-up number.
+const QUARTILE_MIN_SAMPLE = 20;
+
+function quartiles(values: number[]): SignalQuartiles | null {
+  if (values.length < QUARTILE_MIN_SAMPLE) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  const pick = (percentile: number): number => {
+    const index = Math.max(0, Math.ceil(sorted.length * percentile) - 1);
+    return sorted[index] ?? 0;
+  };
+  return {
+    p25: Math.round(pick(0.25) * 10) / 10,
+    p50: Math.round(pick(0.5) * 10) / 10,
+    p75: Math.round(pick(0.75) * 10) / 10
+  };
+}
+
+function coresBucket(cores: number): keyof SignalDeviceHardware['cores_hist'] {
+  if (cores <= 1) return '1';
+  if (cores <= 2) return '2';
+  if (cores <= 4) return '4';
+  if (cores <= 6) return '6';
+  if (cores <= 8) return '8';
+  return '12_plus';
+}
+
+function memoryBucket(memoryGb: number | null): keyof SignalDeviceHardware['memory_gb_hist'] {
+  if (memoryGb == null) return 'unknown';
+  if (memoryGb <= 0.5) return '0_5';
+  if (memoryGb <= 1) return '1';
+  if (memoryGb <= 2) return '2';
+  if (memoryGb <= 4) return '4';
+  return '8_plus';
+}
+
+function effectiveTypeBucket(value: string | null): keyof SignalNetworkSignals['effective_type_hist'] {
+  switch (value) {
+    case 'slow-2g':
+      return 'slow_2g';
+    case '2g':
+      return '2g';
+    case '3g':
+      return '3g';
+    case '4g':
+      return '4g';
+    default:
+      return 'unknown';
+  }
+}
+
+function browserBucket(value: string): keyof SignalEnvironment['browser_hist'] {
+  const normalized = value.toLowerCase();
+  if (normalized.includes('edge')) return 'edge';
+  if (normalized.includes('chrome')) return 'chrome';
+  if (normalized.includes('firefox')) return 'firefox';
+  if (normalized.includes('safari')) return 'safari';
+  return 'other';
+}
+
+const ZERO_CORES_HIST: SignalDeviceHardware['cores_hist'] = {
+  '1': 0,
+  '2': 0,
+  '4': 0,
+  '6': 0,
+  '8': 0,
+  '12_plus': 0
+};
+
+const ZERO_MEMORY_HIST: SignalDeviceHardware['memory_gb_hist'] = {
+  '0_5': 0,
+  '1': 0,
+  '2': 0,
+  '4': 0,
+  '8_plus': 0,
+  unknown: 0
+};
+
+const ZERO_EFFECTIVE_TYPE_HIST: SignalNetworkSignals['effective_type_hist'] = {
+  slow_2g: 0,
+  '2g': 0,
+  '3g': 0,
+  '4g': 0,
+  unknown: 0
+};
+
+const ZERO_BROWSER_HIST: SignalEnvironment['browser_hist'] = {
+  chrome: 0,
+  safari: 0,
+  firefox: 0,
+  edge: 0,
+  other: 0
+};
+
+function distributePercent<K extends string>(counters: Record<K, number>, total: number): Record<K, number> {
+  const out = {} as Record<K, number>;
+  for (const key of Object.keys(counters) as K[]) {
+    out[key] = asPercent(counters[key], total);
+  }
+  return out;
+}
+
 interface TierAccumulator {
   observations: number;
   lcp: number[];
   fcp: number[];
   ttfb: number[];
+}
+
+interface StageAccumulator {
+  measured: number;
+  poor: number;
+}
+
+interface FunnelTierAccumulator {
+  observations: number;
+  stages: Record<SignalExperienceStage, StageAccumulator>;
 }
 
 function createTierAccumulator(): TierAccumulator {
@@ -63,6 +193,24 @@ function createTierAccumulator(): TierAccumulator {
     lcp: [],
     fcp: [],
     ttfb: []
+  };
+}
+
+function createStageAccumulator(): StageAccumulator {
+  return {
+    measured: 0,
+    poor: 0
+  };
+}
+
+function createFunnelTierAccumulator(): FunnelTierAccumulator {
+  return {
+    observations: 0,
+    stages: {
+      fcp: createStageAccumulator(),
+      lcp: createStageAccumulator(),
+      inp: createStageAccumulator()
+    }
   };
 }
 
@@ -97,6 +245,36 @@ function createEmptyTierSummary(): SignalTierMetricSummary {
   };
 }
 
+function createEmptyExperienceStageSummary(stage: SignalExperienceStage): SignalExperienceStageSummary {
+  return {
+    poor_threshold_ms: POOR_STAGE_THRESHOLDS[stage],
+    tiers: {
+      urban: { coverage: 0, poor_share: 0 },
+      moderate: { coverage: 0, poor_share: 0 },
+      constrained_moderate: { coverage: 0, poor_share: 0 },
+      constrained: { coverage: 0, poor_share: 0 }
+    }
+  };
+}
+
+function summarizeExperienceStage(
+  accumulators: Record<SignalNetworkTier, FunnelTierAccumulator>,
+  stage: SignalExperienceStage
+): SignalExperienceStageSummary {
+  const summary = createEmptyExperienceStageSummary(stage);
+
+  for (const tier of CLASSIFIED_TIERS) {
+    const accumulator = accumulators[tier];
+    const stageAccumulator = accumulator.stages[stage];
+    summary.tiers[tier] = {
+      coverage: asPercent(stageAccumulator.measured, accumulator.observations),
+      poor_share: asPercent(stageAccumulator.poor, stageAccumulator.measured)
+    };
+  }
+
+  return summary;
+}
+
 function pickComparisonTier(distribution: SignalTierDistribution): SignalComparisonTier {
   const counts = CLASSIFIED_TIERS.filter((tier) => tier !== 'urban')
     .map((tier) => ({
@@ -107,6 +285,85 @@ function pickComparisonTier(distribution: SignalTierDistribution): SignalCompari
 
   const best = counts[0];
   return best && best.count > 0 ? best.tier : 'none';
+}
+
+function metricValueForStage(event: SignalEventV1, stage: SignalExperienceStage): number | null {
+  switch (stage) {
+    case 'fcp':
+      return event.vitals.fcp_ms;
+    case 'lcp':
+      return event.vitals.lcp_ms;
+    case 'inp':
+      return event.vitals.inp_ms;
+  }
+}
+
+function stageIsPoor(stage: SignalExperienceStage, value: number): boolean {
+  return value > POOR_STAGE_THRESHOLDS[stage];
+}
+
+function resolveActiveStages(
+  classifiedSampleSize: number,
+  stageMeasuredCounts: Record<SignalExperienceStage, number>
+): SignalExperienceStage[] {
+  if (classifiedSampleSize <= 0) return [];
+
+  const activeStages: SignalExperienceStage[] = ['fcp'];
+
+  if (
+    stageMeasuredCounts.lcp >= SIGNAL_MIN_RACE_OBSERVATIONS &&
+    asPercent(stageMeasuredCounts.lcp, classifiedSampleSize) >= SIGNAL_MIN_LCP_COVERAGE
+  ) {
+    activeStages.push('lcp');
+  }
+
+  if (
+    stageMeasuredCounts.inp >= SIGNAL_MIN_RACE_OBSERVATIONS &&
+    asPercent(stageMeasuredCounts.inp, classifiedSampleSize) >= SIGNAL_MIN_LCP_COVERAGE
+  ) {
+    activeStages.push('inp');
+  }
+
+  return activeStages;
+}
+
+function buildExperienceFunnel(
+  classifiedEvents: SignalEventV1[],
+  accumulators: Record<SignalNetworkTier, FunnelTierAccumulator>,
+  stageMeasuredCounts: Record<SignalExperienceStage, number>
+): SignalExperienceFunnel {
+  const activeStages = resolveActiveStages(classifiedEvents.length, stageMeasuredCounts);
+
+  let measuredSessionCount = 0;
+  let poorSessionCount = 0;
+
+  if (activeStages.length > 0) {
+    for (const event of classifiedEvents) {
+      const stageValues = activeStages.map((stage) => metricValueForStage(event, stage));
+      if (stageValues.some((value) => value == null)) continue;
+
+      measuredSessionCount += 1;
+      if (
+        activeStages.some((stage, index) => {
+          const value = stageValues[index];
+          return value != null && stageIsPoor(stage, value);
+        })
+      ) {
+        poorSessionCount += 1;
+      }
+    }
+  }
+
+  return {
+    active_stages: activeStages,
+    measured_session_coverage: asPercent(measuredSessionCount, classifiedEvents.length),
+    poor_session_share: asPercent(poorSessionCount, measuredSessionCount),
+    stages: {
+      fcp: summarizeExperienceStage(accumulators, 'fcp'),
+      lcp: summarizeExperienceStage(accumulators, 'lcp'),
+      inp: summarizeExperienceStage(accumulators, 'inp')
+    }
+  };
 }
 
 export function chooseRaceMetric(input: SignalMetricSelectionInput): SignalMetricSelectionResult {
@@ -139,6 +396,19 @@ export function chooseRaceMetric(input: SignalMetricSelectionInput): SignalMetri
   };
 }
 
+export function deriveSignalAggregateWarnings(
+  input: Pick<SignalAggregateV1, 'mode' | 'sample_size' | 'race_metric'>
+): string[] {
+  const warnings: string[] = [];
+  if (input.mode === 'preview' && input.sample_size < SIGNAL_PREVIEW_MINIMUM_SAMPLE) {
+    warnings.push('Sample size below the recommended preview threshold.');
+  }
+  if (input.race_metric === 'none') {
+    warnings.push('Act 2 cannot render a comparable race with the current data.');
+  }
+  return warnings;
+}
+
 function computeTopPagePathFromCounts(counts: Map<string, number>): string | null {
   let topPath: string | null = null;
   let topCount = 0;
@@ -168,12 +438,36 @@ export function aggregateSignalEvents(
   const topPathCounts = new Map<string, number>();
   let connectionReuseCount = 0;
   let lcpCount = 0;
+
+  // Iteration 6 — actionable signal counters. Every field here answers a
+  // specific product-team decision (see SignalDeviceHardware / etc. docs).
+  const coresCounters = { ...ZERO_CORES_HIST };
+  const memoryCounters = { ...ZERO_MEMORY_HIST };
+  let memoryAvailableCount = 0;
+  const effectiveTypeCounters = { ...ZERO_EFFECTIVE_TYPE_HIST };
+  let effectiveTypeAvailableCount = 0;
+  let saveDataCount = 0;
+  const downlinkSamples: number[] = [];
+  const rttSamples: number[] = [];
+  const browserCounters = { ...ZERO_BROWSER_HIST };
   const tierAccumulators: Record<SignalNetworkTier, TierAccumulator> = {
     urban: createTierAccumulator(),
     moderate: createTierAccumulator(),
     constrained_moderate: createTierAccumulator(),
     constrained: createTierAccumulator()
   };
+  const funnelAccumulators: Record<SignalNetworkTier, FunnelTierAccumulator> = {
+    urban: createFunnelTierAccumulator(),
+    moderate: createFunnelTierAccumulator(),
+    constrained_moderate: createFunnelTierAccumulator(),
+    constrained: createFunnelTierAccumulator()
+  };
+  const stageMeasuredCounts: Record<SignalExperienceStage, number> = {
+    fcp: 0,
+    lcp: 0,
+    inp: 0
+  };
+  const classifiedEvents: SignalEventV1[] = [];
 
   for (const event of reportEvents) {
     if (!hasTimestamp) {
@@ -193,13 +487,45 @@ export function aggregateSignalEvents(
       networkDistribution.unknown += 1;
     } else {
       networkDistribution[event.net_tier] += 1;
-      const accumulator = tierAccumulators[event.net_tier];
-      accumulator.observations += 1;
-      if (event.vitals.lcp_ms != null) accumulator.lcp.push(event.vitals.lcp_ms);
-      if (event.vitals.fcp_ms != null) accumulator.fcp.push(event.vitals.fcp_ms);
-      if (event.vitals.ttfb_ms != null) accumulator.ttfb.push(event.vitals.ttfb_ms);
+      classifiedEvents.push(event);
+
+      const tierAccumulator = tierAccumulators[event.net_tier];
+      tierAccumulator.observations += 1;
+      if (event.vitals.lcp_ms != null) tierAccumulator.lcp.push(event.vitals.lcp_ms);
+      if (event.vitals.fcp_ms != null) tierAccumulator.fcp.push(event.vitals.fcp_ms);
+      if (event.vitals.ttfb_ms != null) tierAccumulator.ttfb.push(event.vitals.ttfb_ms);
+
+      const funnelAccumulator = funnelAccumulators[event.net_tier];
+      funnelAccumulator.observations += 1;
+      for (const stage of EXPERIENCE_STAGES) {
+        const stageValue = metricValueForStage(event, stage);
+        if (stageValue == null) continue;
+
+        stageMeasuredCounts[stage] += 1;
+        funnelAccumulator.stages[stage].measured += 1;
+        if (stageIsPoor(stage, stageValue)) {
+          funnelAccumulator.stages[stage].poor += 1;
+        }
+      }
     }
+
     deviceDistribution[event.device_tier] += 1;
+
+    // Iteration 6 — preserve every actionable signal the SDK already
+    // captures so the report can render it as evidence. Coverage counters
+    // stay first-class so the report can surface honest caveats where the
+    // browser didn't expose the underlying API (Safari/Firefox).
+    coresCounters[coresBucket(event.device_cores)] += 1;
+    memoryCounters[memoryBucket(event.device_memory_gb)] += 1;
+    if (event.device_memory_gb != null) memoryAvailableCount += 1;
+
+    effectiveTypeCounters[effectiveTypeBucket(event.context.effective_type)] += 1;
+    if (event.context.effective_type != null) effectiveTypeAvailableCount += 1;
+    if (event.context.save_data === true) saveDataCount += 1;
+    if (event.context.downlink_mbps != null) downlinkSamples.push(event.context.downlink_mbps);
+    if (event.context.rtt_ms != null) rttSamples.push(event.context.rtt_ms);
+
+    browserCounters[browserBucket(event.meta.browser)] += 1;
   }
 
   const classifiedSampleSize = total - networkDistribution.unknown;
@@ -236,13 +562,29 @@ export function aggregateSignalEvents(
             : comparison.ttfb_coverage
   };
 
-  const warnings: string[] = [];
-  if (mode === 'preview' && total < SIGNAL_PREVIEW_MINIMUM_SAMPLE) {
-    warnings.push('Sample size below the recommended preview threshold.');
-  }
-  if (metricChoice.race_metric === 'none') {
-    warnings.push('Act 2 cannot render a comparable race with the current data.');
-  }
+  const warnings = deriveSignalAggregateWarnings({
+    mode,
+    sample_size: total,
+    race_metric: metricChoice.race_metric
+  });
+
+  const deviceHardware: SignalDeviceHardware = {
+    cores_hist: distributePercent(coresCounters, total) as SignalDeviceHardware['cores_hist'],
+    memory_gb_hist: distributePercent(memoryCounters, total) as SignalDeviceHardware['memory_gb_hist'],
+    memory_coverage: asPercent(memoryAvailableCount, total)
+  };
+
+  const networkSignals: SignalNetworkSignals = {
+    effective_type_hist: distributePercent(effectiveTypeCounters, total) as SignalNetworkSignals['effective_type_hist'],
+    effective_type_coverage: asPercent(effectiveTypeAvailableCount, total),
+    save_data_share: asPercent(saveDataCount, total),
+    downlink_mbps: quartiles(downlinkSamples),
+    rtt_ms: quartiles(rttSamples)
+  };
+
+  const environment: SignalEnvironment = {
+    browser_hist: distributePercent(browserCounters, total) as SignalEnvironment['browser_hist']
+  };
 
   return {
     v: SIGNAL_EVENT_VERSION,
@@ -273,6 +615,10 @@ export function aggregateSignalEvents(
       urban,
       comparison
     },
+    experience_funnel: buildExperienceFunnel(classifiedEvents, funnelAccumulators, stageMeasuredCounts),
+    device_hardware: deviceHardware,
+    network_signals: networkSignals,
+    environment,
     top_page_path: computeTopPagePathFromCounts(topPathCounts),
     warnings
   };

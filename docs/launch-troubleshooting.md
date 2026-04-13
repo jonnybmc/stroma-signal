@@ -65,6 +65,7 @@ Check:
 
 - the validation query returns rows
 - the time window in the URL-builder query includes the exported events
+- the canonical production window still means the last 7 complete days, excluding today
 - the project, dataset, and property placeholders were replaced correctly
 - the event parameters still match the canonical field names
 - the available rows are not only `navigation_type = restore` or `navigation_type = prerender`
@@ -77,6 +78,7 @@ Check:
 
 - the scheduled query is still enabled and succeeding
 - the scheduled query is using the intended time window
+- the intended production window is still the last 7 complete calendar days, excluding the current day
 - source rows are still landing in the underlying BigQuery table
 - the derived current-URL table is still being updated
 - the latest `signal_report_url` row has a recent `updated_at` value
@@ -106,8 +108,13 @@ Check:
 - network coverage
 - selected metric coverage
 - high unclassified share
+- known freshness date vs legacy freshness warning
+- active Act 3 stages and measured funnel coverage
 
 The decoded summary in `/build` should match the intended aggregate semantics before the report is shared.
+
+If the link predates the additive measured funnel block, the report should fall back to a reduced legacy Act 3 state instead of inventing data.
+If the link carries impossible percentages or invalid nested coverage blocks, `/build` and `/r` should now reject it instead of rendering a plausible-looking report.
 
 ## Non-GA4 Clients
 

@@ -6,6 +6,8 @@ Use this when Signal is already landing rows in BigQuery and your team wants an 
 
 This is an operating recommendation for v0.1. Signal gives you the event payloads and the canonical SQL templates. Your team configures the warehouse refresh once.
 
+The hosted Tier Report is not a diagnostic, attribution, or commercial modelling artifact. It is the measured proof layer generated from the aggregate your warehouse produces.
+
 ## What Is Automatic Already
 
 - Signal collects browser-side data automatically once deployed.
@@ -54,6 +56,12 @@ Recommended cadence:
 - daily refresh for the shareable internal report
 - optional intraday refresh only if the team needs a same-day preview of launch movement
 
+Canonical production window for the shipped `/r` artifact:
+
+- last 7 complete calendar days
+- exclude the current in-progress day
+- keep `p=7` aligned with that exact warehouse slice
+
 Why this is the default:
 
 - the validation query stays available for debugging
@@ -86,6 +94,8 @@ What each field is for:
 
 This table is intentionally small. It is not your raw event table and not your aggregate warehouse model. It is just the handoff layer for the latest shareable report URL.
 
+For the canonical daily artifact, `window_start` and `window_end` should bracket the last 7 complete days, not a today-inclusive rolling slice.
+
 ## Daily Vs Intraday
 
 Use daily when:
@@ -104,6 +114,7 @@ Recommended rule:
 
 - daily is the canonical production artifact
 - intraday is optional and operational
+- the canonical daily artifact uses the last 7 complete days and excludes today
 
 ## Where The Final URL Lives
 

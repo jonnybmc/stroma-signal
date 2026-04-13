@@ -17,7 +17,7 @@ Each page load produces a single JSON event with the following structure.
 | `ts` | `number` | Unix timestamp (milliseconds) when the event was finalized. |
 | `host` | `string` | Origin hostname. |
 | `url` | `string` | Page path. |
-| `ref` | `string \| null` | Referrer URL. |
+| `ref` | `string \| null` | Referrer origin + path (query and hash stripped for privacy). |
 
 ### Network classification
 
@@ -113,10 +113,10 @@ This measures the actual round-trip time between the user's device and the serve
 
 | Tier | TCP connect time | Typical conditions |
 |---|---|---|
-| `urban` | < 50ms | Fibre, strong 4G/5G, low-latency urban mobile. |
-| `moderate` | 50-150ms | Suburban 4G, moderate congestion. |
-| `constrained_moderate` | 150-400ms | Congested 4G, weak signal, high-density peri-urban areas. |
-| `constrained` | > 400ms | 3G fallback, extreme congestion, satellite backhaul, rural edge. |
+| `urban` | < 50 ms | Fibre, strong 4G/5G, low-latency urban mobile. |
+| `moderate` | 50–150 ms (inclusive) | Suburban 4G, moderate congestion. |
+| `constrained_moderate` | 151–400 ms (inclusive) | Congested 4G, weak signal, high-density peri-urban areas. |
+| `constrained` | > 400 ms | 3G fallback, extreme congestion, satellite backhaul, rural edge. |
 
 Default thresholds are calibrated against Opensignal network quality reports and CrUX BigQuery RTT distributions. They are configuration-overridable to match the network conditions of any market.
 
@@ -190,7 +190,43 @@ The aggregation layer produces a `SignalAggregateV1` containing:
 - **Network distribution:** percentage breakdown across urban, moderate, constrained_moderate, constrained, and unknown (unclassified).
 - **Device distribution:** percentage breakdown across low, mid, and high.
 - **Comparison tier:** the highest-proportion non-urban tier, automatically selected as the comparison baseline.
-- **Per-tier metric summaries:** p75 values for LCP, FCP, and TTFB for both urban and comparison tiers, with per-metric observation counts and coverage percentages.
+- **Per-tier metric summaries:** p75 values for LCP, FCP, and TTFB for both urban and comparison tiers, with per-metric observation counts and coverage percentages. INP uses the 98th percentile (p98) of per-interaction durations, consistent with the CrUX/web-vitals methodology for responsiveness.
+- **Measured experience funnel:** an additive `experience_funnel` block for the hosted Tier Report. It carries active stages, measured session coverage, poor-session share, stage thresholds, and per-tier stage summaries for FCP, LCP, and INP when coverage is defensible.
+- **Actionable signal blocks** (iteration 6, additive): `device_hardware`, `network_signals`, and `environment` — see below.
+
+### Actionable signal blocks (iteration 6)
+
+Each block preserves signals the SDK already captures per session but the aggregator previously collapsed. Every field has to pass the usefulness filter — it unlocks a concrete product-team decision, isn't redundant with existing analytics, and isn't derivable at CSS / runtime.
+
+**`device_hardware`** (universal cores, Chromium-only memory)
+
+| Field | Source | Buckets / shape | Decision it unlocks |
+|---|---|---|---|
+| `cores_hist` | `navigator.hardwareConcurrency` | `1 / 2 / 4 / 6 / 8 / 12_plus` | JS-bundle budget: tighten critical path for the low-core share |
+| `memory_gb_hist` | `navigator.deviceMemory` | `0_5 / 1 / 2 / 4 / 8_plus / unknown` | Memory budget: audit in-memory caches, leak-profile budget devices |
+| `memory_coverage` | derived | percent of sessions with `deviceMemory` exposed | Renders the "Chromium · N% coverage" caveat honestly |
+
+**`network_signals`** (Chromium-only Network Information API; Safari / Firefox land in `unknown`)
+
+| Field | Source | Shape | Decision it unlocks |
+|---|---|---|---|
+| `effective_type_hist` | `navigator.connection.effectiveType` | `slow_2g / 2g / 3g / 4g / unknown` | Adaptive loading: defer non-critical resources, lower-res srcset |
+| `effective_type_coverage` | derived | percent | Coverage caveat for the histogram |
+| `save_data_share` | `navigator.connection.saveData` | percent | Honour the Save-Data HTTP header; serve lighter variants |
+| `downlink_mbps` | `navigator.connection.downlink` | `{p25, p50, p75}` or `null` | Page-weight budget for the critical path |
+| `rtt_ms` | `navigator.connection.rtt` | `{p25, p50, p75}` or `null` | Request consolidation: collapse origins, use Early Hints |
+
+Quartile blocks return `null` when the underlying sample is below 20 — the report surfaces a "not enough data to defend" caveat instead of a noisy made-up number.
+
+**`environment`**
+
+| Field | Source | Shape | Decision it unlocks |
+|---|---|---|---|
+| `browser_hist` | `navigator.userAgent` parsed | `chrome / safari / firefox / edge / other` | Testing matrix priority: webkit smoke coverage in proportion to real audience share |
+
+**Deliberately excluded** — viewport, device pixel ratio, touch points, `connection.type`, TCP quartiles, `nav_type` histogram. Each was interrogated against the usefulness filter and cut.
+
+All three blocks are additive and backward-compatible. `rv=1` URLs without these fields decode cleanly; the report surfaces the blocks only when present.
 
 ### Coverage honesty
 
@@ -205,6 +241,8 @@ The aggregate explicitly tracks:
 | `selected_metric_urban_coverage` | Coverage of the selected race metric in the urban tier. |
 | `selected_metric_comparison_coverage` | Coverage of the selected race metric in the comparison tier. |
 
+If the hosted report compresses that race coverage honesty into one footer value, it should use the weaker of the two selected-metric tier coverages so the artifact never overstates confidence.
+
 ### Race metric fallback cascade
 
 The aggregation selects the best available metric for the performance comparison ("race") between tiers:
@@ -215,6 +253,24 @@ The aggregation selects the best available metric for the performance comparison
 4. **None** if no metric has sufficient coverage. Reason: `insufficient_comparable_data`.
 
 This cascade ensures the report never presents a comparison that lacks statistical backing. The fallback reason is included in the aggregate and displayed in the report.
+
+### Act 3 thresholds and activation
+
+The hosted Tier Report uses the additive `experience_funnel` block to render Act 3 as a measured experience funnel, not a revenue model.
+
+Thresholds:
+
+- FCP poor: `> 3000ms`
+- LCP poor: `> 4000ms`
+- INP poor: `> 500ms`
+
+Activation:
+
+- `fcp` is active whenever there is reportable classified sample
+- `lcp` activates only when measured classified LCP coverage is defensible
+- `inp` activates only when measured classified INP coverage is defensible
+
+If the funnel block is absent because an older `rv=1` URL predates this additive contract, the report shell falls back to a reduced legacy Act 3 state instead of fabricating data.
 
 For the full aggregation specification including comparison tier selection logic, see [Aggregation Spec](./aggregation-spec.md).
 
@@ -229,9 +285,13 @@ Two generation paths:
 | Path | Source | Typical use |
 |---|---|---|
 | **Preview** | In-browser `getReportUrl()` from the preview collector | Developer testing, stakeholder demos. Single-session data. Carries `mode=preview` flag. |
-| **Production** | BigQuery URL builder SQL query against GA4 export | Site-level aggregate from real traffic. Recommended: 7+ days of data, 100+ classified page loads. |
+| **Production** | BigQuery URL builder SQL query against GA4 export | Site-level aggregate from real traffic. Canonical automation window: the last 7 complete calendar days, excluding the current day. |
 
 The preview minimum sample threshold is 100 classified page loads. Below this, the URL is still generated but the report displays a coverage warning.
+
+Teams can still run longer exploratory windows manually, but the shipped production SQL templates and the canonical `p=7` artifact are aligned to 7 complete days, not a today-inclusive rolling slice.
+
+The Tier Report is not a diagnostic, attribution, or commercial modelling artifact. It is the measured proof layer that visualises audience shape, experience gap, and poor-performance progression.
 
 ---
 
@@ -256,3 +316,5 @@ The repository includes development harnesses that are not part of the published
 - **Builder** (hosted at `/build`): zero-code builder and validator for report URLs.
 
 These tools support contributors and maintainers but are not required for package adoption.
+
+The canonical presentation-layer source of truth for the hosted report lives in [Tier Report Design Spec](./tier-report-design-spec.md).
