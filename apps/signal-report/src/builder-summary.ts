@@ -1,7 +1,22 @@
-import type { SignalAggregateV1 } from '@stroma-labs/signal-contracts';
+import type { SignalAggregateV1, SignalRaceFallbackReason } from '@stroma-labs/signal-contracts';
 
 import { escapeHtml } from './render-utils';
 import { buildReportViewModel, humanizeToken } from './report-view-model';
+
+const RACE_FALLBACK_REASON_COPY: Record<SignalRaceFallbackReason, string> = {
+  lcp_coverage_below_threshold: 'LCP coverage was too thin to race on. The report falls back to FCP or TTFB for Act 2.',
+  fcp_unavailable: 'FCP was missing for a required cohort. The report falls back to TTFB or drops the race.',
+  insufficient_comparable_data:
+    'No comparable cohort had enough sessions to stage a defensible race. Act 2 is presented without a winner.'
+};
+
+const ACT3_MODE_COPY: Record<'full' | 'reduced' | 'legacy', string> = {
+  full: 'All three stages (FCP, LCP, INP) meet coverage. Act 3 renders the full measured funnel.',
+  reduced:
+    'One stage (usually INP) has too little coverage to be defensible. Act 3 renders the defensible stages only and says so.',
+  legacy:
+    'This aggregate pre-dates the measured funnel. Act 3 renders the legacy narrative link rather than a stage waterfall.'
+};
 
 export function renderAggregateSummary(aggregate: SignalAggregateV1): string {
   const viewModel = buildReportViewModel(aggregate);
@@ -39,10 +54,16 @@ export function renderAggregateSummary(aggregate: SignalAggregateV1): string {
       <article class="summary-card">
         <p class="label">Fallback</p>
         <p class="summary-value">${escapeHtml(aggregate.race_fallback_reason ? humanizeToken(aggregate.race_fallback_reason) : 'none')}</p>
+        ${
+          aggregate.race_fallback_reason
+            ? `<p class="summary-reason">${escapeHtml(RACE_FALLBACK_REASON_COPY[aggregate.race_fallback_reason])}</p>`
+            : ''
+        }
       </article>
       <article class="summary-card">
         <p class="label">Act 3 stages</p>
         <p class="summary-value">${escapeHtml(viewModel.act3.mode === 'legacy' ? 'legacy link' : viewModel.act3.active_stage_keys.length === 0 ? 'no defensible funnel' : viewModel.act3.active_stage_keys.map((stage) => stage.toUpperCase()).join(' → '))}</p>
+        <p class="summary-reason">${escapeHtml(ACT3_MODE_COPY[viewModel.act3.mode])}</p>
       </article>
     </div>
     <div class="summary-section">

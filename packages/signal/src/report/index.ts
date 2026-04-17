@@ -1,6 +1,9 @@
 import {
   aggregateSignalEvents,
   encodeSignalReportUrl,
+  exportSignalEventsToCSV,
+  exportSignalEventsToJSON,
+  formatSignalSummary,
   SIGNAL_PREVIEW_MINIMUM_SAMPLE,
   SIGNAL_REPORT_BASE_URL,
   type SignalAggregateV1,
@@ -19,6 +22,8 @@ export interface PreviewCollector extends SignalSink {
   getAggregate: () => SignalAggregateV1 | null;
   getReportUrl: () => SignalReportUrlResult;
   getEvents: () => readonly SignalEventV1[];
+  getSummary: () => string | null;
+  exportEvents: (format: 'json' | 'csv') => string;
   reset: () => void;
 }
 
@@ -55,7 +60,9 @@ export function createPreviewCollector(options: PreviewCollectorOptions = {}): P
 
       if (options.consoleLog) {
         const report = collector.getReportUrl();
-        console.info('[signal] preview report', report.url);
+        const summary = collector.getSummary();
+        if (summary) console.info(`[signal] summary\n${summary}`);
+        console.info('[signal] report', report.url);
       }
     },
     getAggregate() {
@@ -77,6 +84,14 @@ export function createPreviewCollector(options: PreviewCollectorOptions = {}): P
     },
     getEvents() {
       return [...events];
+    },
+    getSummary() {
+      const aggregate = collector.getAggregate();
+      if (!aggregate) return null;
+      return formatSignalSummary(aggregate);
+    },
+    exportEvents(format: 'json' | 'csv') {
+      return format === 'csv' ? exportSignalEventsToCSV(events) : exportSignalEventsToJSON(events);
     },
     reset() {
       events.splice(0, events.length);

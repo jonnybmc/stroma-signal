@@ -22,7 +22,7 @@ describe('report view model', () => {
     expect(viewModel.act3.active_stage_keys).toEqual(['fcp', 'lcp', 'inp']);
     expect(viewModel.act3.stages.map((stage) => stage.key)).toEqual(['fcp', 'lcp', 'inp']);
     expect(viewModel.mood_tier).toBe('urgent');
-    expect(viewModel.offer_cards.map((card) => card.title)).toEqual(['Run a deeper scan', 'Talk to the team']);
+    expect(viewModel.offer_cards.map((card) => card.title)).toEqual(['Rapid Fix Plan', 'Performance Intelligence']);
   });
 
   it('drops to a reduced measured funnel when INP coverage is too weak', () => {
@@ -103,7 +103,11 @@ describe('report view model', () => {
     }
     // CPU cores and Browser cells are always present because the underlying
     // fields are universally captured (hardwareConcurrency + UA parsing).
+    // Form-factor cell leads when present — derived from device_screen_w
+    // which is universally captured on every event.
     const cellKeys = cells.map((cell) => cell.key);
+    expect(cellKeys).toContain('form-factor');
+    expect(cellKeys[0]).toBe('form-factor');
     expect(cellKeys).toContain('js-budget');
     expect(cellKeys).toContain('testing-matrix');
   });
@@ -359,11 +363,7 @@ describe('report view model', () => {
       // Landing section present
       expect(html).toContain('data-role="landing"');
 
-      // Evidence rail rendered
-      expect(html).toContain('sr-evidence-rail');
-      expect(html).toContain('sr-evidence-pill');
-
-      // Credibility strip rendered
+      // Credibility strip rendered (single provenance surface for the landing)
       expect(html).toContain('sr-credibility-strip');
       expect(html).toContain('classified');
       expect(html).toContain('conn reuse');

@@ -22,7 +22,8 @@
       "@stroma-labs/signal-contracts": ["packages/signal-contracts/src/index.ts"],
       "@stroma-labs/signal": ["packages/signal/src/index.ts"],
       "@stroma-labs/signal/ga4": ["packages/signal/src/ga4/index.ts"],
-      "@stroma-labs/signal/report": ["packages/signal/src/report/index.ts"]
+      "@stroma-labs/signal/report": ["packages/signal/src/report/index.ts"],
+      "@stroma-labs/signal/summary": ["packages/signal/src/summary/index.ts"]
     }
   }
 }

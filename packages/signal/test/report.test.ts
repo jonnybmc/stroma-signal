@@ -38,4 +38,46 @@ describe('preview collector', () => {
 
     expect(collector.getEvents()[0]?.meta.browser).toBe(chromeColdNavFixture.meta.browser);
   });
+
+  it('getSummary returns null before any events are collected', () => {
+    const collector = createPreviewCollector();
+    expect(collector.getSummary()).toBeNull();
+  });
+
+  it('getSummary returns a non-empty string after events are collected', () => {
+    const collector = createPreviewCollector();
+    collector.handle(chromeColdNavFixture);
+    const summary = collector.getSummary();
+    expect(summary).toBeTypeOf('string');
+    expect(summary).not.toBeNull();
+    expect(summary?.length).toBeGreaterThan(0);
+    expect(summary).toContain('Signal Report');
+  });
+
+  it('exportEvents produces valid JSON', () => {
+    const collector = createPreviewCollector();
+    collector.handle(chromeColdNavFixture);
+    const json = collector.exportEvents('json');
+    const parsed = JSON.parse(json);
+    expect(parsed).toHaveLength(1);
+    expect(parsed[0].event_id).toBe('evt_chrome_cold_nav');
+  });
+
+  it('exportEvents produces valid CSV with header and data row', () => {
+    const collector = createPreviewCollector();
+    collector.handle(chromeColdNavFixture);
+    const csv = collector.exportEvents('csv');
+    const lines = csv.split('\n');
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toContain('event_id');
+    expect(lines[1]).toContain('evt_chrome_cold_nav');
+  });
+
+  it('exportEvents returns header-only CSV when no events collected', () => {
+    const collector = createPreviewCollector();
+    const csv = collector.exportEvents('csv');
+    const lines = csv.split('\n');
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toContain('event_id');
+  });
 });

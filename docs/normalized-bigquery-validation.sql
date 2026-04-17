@@ -13,6 +13,7 @@ SELECT
   navigation_type,
   net_tier,
   device_tier,
+  device_screen_w,
   lcp_ms,
   fcp_ms,
   inp_ms,

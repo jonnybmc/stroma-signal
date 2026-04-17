@@ -10,7 +10,8 @@ const packageJson = JSON.parse(fs.readFileSync(path.join(packageDir, 'package.js
 const expectedEntries = [
   ['.', ['import', 'default', 'types']],
   ['./ga4', ['import', 'default', 'types']],
-  ['./report', ['import', 'default', 'types']]
+  ['./report', ['import', 'default', 'types']],
+  ['./summary', ['import', 'default', 'types']]
 ];
 
 for (const [entry, conditions] of expectedEntries) {
@@ -30,6 +31,7 @@ for (const [entry, conditions] of expectedEntries) {
 const mainModule = await import(pathToFileURL(path.join(packageDir, packageJson.exports['.'].import)).href);
 const ga4Module = await import(pathToFileURL(path.join(packageDir, packageJson.exports['./ga4'].import)).href);
 const reportModule = await import(pathToFileURL(path.join(packageDir, packageJson.exports['./report'].import)).href);
+const summaryModule = await import(pathToFileURL(path.join(packageDir, packageJson.exports['./summary'].import)).href);
 
 assert.equal(typeof mainModule.init, 'function', 'Expected main package to export init()');
 assert.equal(typeof mainModule.createBeaconSink, 'function', 'Expected main package to export createBeaconSink()');
@@ -38,4 +40,9 @@ assert.equal(
   typeof reportModule.createPreviewCollector,
   'function',
   'Expected report subpath to export createPreviewCollector()'
+);
+assert.equal(
+  typeof summaryModule.formatSignalSummary,
+  'function',
+  'Expected summary subpath to export formatSignalSummary()'
 );

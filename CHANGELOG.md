@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `createCallbackSink()` for custom in-app handling
 - `createDataLayerSink()` via `@stroma-labs/signal/ga4` for GTM / GA4 integration
 - `createPreviewCollector()` via `@stroma-labs/signal/report` for local preview URLs
+- `@stroma-labs/signal/summary` helper surface for plain-text summaries plus JSON/CSV export
 - Device tier classification (cores, memory, screen width)
 - Network tier classification (TCP round-trip from Navigation Timing)
 - Web Vitals observation (LCP, INP, CLS) with attribution
@@ -27,3 +28,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Proof-of-life spike lab with local collector
 - Playwright E2E tests across Chromium, Firefox, and WebKit
 - Bundle size budgets, import boundary checks, and export validation
+
+### Changed
+
+- release metadata and docs now align to the canonical `jonnybmc/stroma-signal` repository
+- npm packaging excludes sourcemaps while keeping local build sourcemaps enabled
+- contributor installs now fail fast on unsupported Node versions via root `engine-strict=true`
+
+### Security
+
+- strengthened collector and warehouse guidance around validation, dedupe, rate limiting, privacy retention, and access control

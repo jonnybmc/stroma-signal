@@ -1,27 +1,58 @@
+/* Spike-lab shares the Stroma Signal design system with /r and /build so
+ * the QA harness, final report, and report builder read as one product.
+ * Token subset mirrors report-tokens.css --sr-* contract; see that file
+ * for the canonical documentation. Keep in sync when those tokens shift.
+ */
 :root {
-  color-scheme: light;
-  --bg: #f6f0e6;
-  --panel: rgba(255, 255, 255, 0.72);
-  --line: rgba(24, 31, 38, 0.12);
-  --text: #181f26;
-  --muted: #6a706e;
-  --blue: #3d79b7;
-  --amber: #b87c1d;
+  color-scheme: dark;
+
+  --sr-bg: #0a0a0f;
+  --sr-bg-panel: #0d0d14;
+  --sr-bg-card: #15151c;
+  --sr-border: #2c2c2a;
+  --sr-border-strong: rgba(244, 238, 224, 0.18);
+  --sr-fg: #e8e6df;
+  --sr-fg-muted: #9c9a92;
+
+  --sr-tier-urban: #378add;
+  --sr-tier-moderate: #5dcaa5;
+  --sr-tier-constrained-moderate: #ef9f27;
+  --sr-tier-constrained: #e24b4a;
+
+  --sr-brand: #5d2dff;
+  --sr-brand-soft: color-mix(in srgb, var(--sr-brand) 18%, transparent);
+  --sr-brand-glow: color-mix(in srgb, var(--sr-brand) 28%, transparent);
+
+  --sr-sans:
+    "Inter Variable", "Inter", system-ui, -apple-system, "Segoe UI Variable",
+    "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --sr-mono:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "JetBrains Mono", "Liberation Mono", monospace;
+
+  --sr-motion-micro: 180ms;
+  --sr-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 * {
   box-sizing: border-box;
 }
 
+html {
+  background: var(--sr-bg);
+}
+
 body {
   margin: 0;
   min-height: 100vh;
   background:
-    radial-gradient(circle at top left, rgba(61, 121, 183, 0.12), transparent 32%),
-    radial-gradient(circle at bottom right, rgba(184, 124, 29, 0.15), transparent 30%),
-    var(--bg);
-  color: var(--text);
-  font-family: "Avenir Next", "Segoe UI", sans-serif;
+    radial-gradient(circle at 12% 12%, rgba(55, 138, 221, 0.14), transparent 28%),
+    radial-gradient(circle at 86% 20%, rgba(93, 202, 165, 0.1), transparent 22%),
+    radial-gradient(circle at 60% 74%, rgba(239, 159, 39, 0.1), transparent 24%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 22%),
+    var(--sr-bg);
+  color: var(--sr-fg);
+  font-family: var(--sr-sans);
 }
 
 .page-shell {
@@ -32,11 +63,16 @@ body {
 
 .hero,
 .card {
-  border: 1px solid var(--line);
-  border-radius: 24px;
-  background: var(--panel);
-  backdrop-filter: blur(16px);
-  box-shadow: 0 12px 40px rgba(24, 31, 38, 0.08);
+  position: relative;
+  border: 1px solid var(--sr-border);
+  border-radius: 16px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 18%),
+    var(--sr-bg-panel);
+  backdrop-filter: blur(12px);
+  box-shadow:
+    0 1px 0 rgba(0, 0, 0, 0.3),
+    0 8px 18px rgba(0, 0, 0, 0.35);
 }
 
 .hero {
@@ -44,32 +80,43 @@ body {
 }
 
 .hero.alt {
-  background: rgba(255, 248, 236, 0.82);
+  background:
+    radial-gradient(circle at 30% 0%, var(--sr-brand-soft), transparent 55%),
+    var(--sr-bg-panel);
 }
 
 .eyebrow,
 .card-label,
 .muted {
-  color: var(--muted);
+  color: var(--sr-fg-muted);
 }
 
 .eyebrow,
 .card-label {
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  font-size: 0.76rem;
-  font-weight: 700;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  font-family: var(--sr-mono);
+  margin: 0;
 }
 
 h1 {
   margin: 12px 0;
   font-size: clamp(2.2rem, 4vw, 4rem);
   line-height: 0.98;
+  letter-spacing: -0.02em;
+  color: var(--sr-fg);
 }
 
 .lede {
   max-width: 60ch;
   line-height: 1.6;
+  color: var(--sr-fg);
+}
+
+.muted {
+  line-height: 1.55;
 }
 
 .hero-actions {
@@ -82,18 +129,55 @@ h1 {
 .hero-actions a,
 .hero-actions button {
   appearance: none;
-  border: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: 1px solid var(--sr-border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--sr-fg);
   border-radius: 999px;
-  padding: 12px 18px;
+  padding: 0.625rem 1.125rem;
   font: inherit;
+  font-size: 0.9375rem;
+  font-weight: 500;
   text-decoration: none;
   cursor: pointer;
+  transition:
+    transform var(--sr-motion-micro) var(--sr-ease-out),
+    border-color var(--sr-motion-micro) var(--sr-ease-out),
+    background-color var(--sr-motion-micro) var(--sr-ease-out),
+    box-shadow var(--sr-motion-micro) var(--sr-ease-out);
 }
 
-.hero-actions .primary,
-.hero-actions button {
-  background: var(--text);
-  color: white;
+.hero-actions a:hover,
+.hero-actions button:hover {
+  transform: translateY(-1px);
+  border-color: var(--sr-border-strong);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.hero-actions a:active,
+.hero-actions button:active {
+  transform: translateY(0) scale(0.997);
+  transition-duration: 80ms;
+}
+
+.hero-actions a:focus-visible,
+.hero-actions button:focus-visible {
+  outline: 2px solid var(--sr-brand);
+  outline-offset: 3px;
+}
+
+.hero-actions .primary {
+  background: var(--sr-brand);
+  border-color: transparent;
+  color: #fff;
+}
+
+.hero-actions .primary:hover {
+  background: color-mix(in srgb, var(--sr-brand) 85%, #fff);
+  box-shadow: 0 4px 16px var(--sr-brand-glow);
+  border-color: transparent;
 }
 
 .card-grid,
@@ -118,23 +202,39 @@ h1 {
 .link-block,
 .mono,
 pre {
-  font-family: "IBM Plex Mono", "SFMono-Regular", monospace;
+  font-family: var(--sr-mono);
 }
 
 .link-block {
   display: block;
-  color: var(--blue);
+  margin-top: 8px;
+  color: var(--sr-tier-urban);
   word-break: break-all;
+  text-decoration: none;
+  transition: color var(--sr-motion-micro) var(--sr-ease-out);
+}
+
+.link-block:hover {
+  color: color-mix(in srgb, var(--sr-tier-urban) 80%, #fff);
+  text-decoration: underline;
+}
+
+.mono {
+  margin: 8px 0 0;
+  color: var(--sr-fg);
+  font-size: 0.8125rem;
 }
 
 pre {
   overflow: auto;
   margin: 12px 0 0;
-  padding: 12px;
-  border-radius: 16px;
-  background: rgba(24, 31, 38, 0.9);
-  color: #f3ead9;
-  font-size: 0.85rem;
+  padding: 14px;
+  border: 1px solid var(--sr-border);
+  border-radius: 12px;
+  background: var(--sr-bg-card);
+  color: var(--sr-fg);
+  font-size: 0.8125rem;
+  line-height: 1.5;
 }
 
 @media (max-width: 720px) {

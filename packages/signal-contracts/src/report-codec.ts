@@ -7,6 +7,7 @@ import type {
   SignalEnvironment,
   SignalExperienceFunnel,
   SignalExperienceStage,
+  SignalFormFactorDistribution,
   SignalNetworkSignals,
   SignalQuartiles,
   SignalRaceFallbackReason,
@@ -276,6 +277,16 @@ function encodeAggregate(aggregate: SignalAggregateV1): URLSearchParams {
   if (aggregate.environment) {
     encodeEnvironment(params, aggregate.environment);
   }
+  if (aggregate.form_factor_distribution) {
+    params.set(
+      'ff',
+      joinInts([
+        aggregate.form_factor_distribution.mobile,
+        aggregate.form_factor_distribution.tablet,
+        aggregate.form_factor_distribution.desktop
+      ])
+    );
+  }
   if (aggregate.top_page_path) params.set('v', aggregate.top_page_path);
   params.set('ga', String(aggregate.generated_at));
   return params;
@@ -467,6 +478,16 @@ function readOptionalEnvironment(params: URLSearchParams): SignalEnvironment | u
   };
 }
 
+function readOptionalFormFactor(params: URLSearchParams): SignalFormFactorDistribution | undefined {
+  if (params.get('ff') == null) return undefined;
+  const shares = parseInts(params.get('ff'), 3);
+  return {
+    mobile: shares[0] ?? 0,
+    tablet: shares[1] ?? 0,
+    desktop: shares[2] ?? 0
+  };
+}
+
 export function decodeSignalReportUrl(value: string | URL): SignalAggregateV1 {
   const url = typeof value === 'string' ? new URL(value) : value;
   const params = url.searchParams;
@@ -564,6 +585,7 @@ export function decodeSignalReportUrl(value: string | URL): SignalAggregateV1 {
     device_hardware: readOptionalDeviceHardware(params),
     network_signals: readOptionalNetworkSignals(params),
     environment: readOptionalEnvironment(params),
+    form_factor_distribution: readOptionalFormFactor(params),
     top_page_path: params.get('v'),
     warnings
   };

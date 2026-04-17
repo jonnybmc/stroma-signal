@@ -1,6 +1,6 @@
 <img src="./docs/images/signal-stroma-logo.png" alt="Signal by Stroma logo" width="270" />
 
-[![CI](https://github.com/jonathanbooysen/stroma-signal/actions/workflows/ci.yml/badge.svg)](https://github.com/jonathanbooysen/stroma-signal/actions/workflows/ci.yml)
+[![CI](https://github.com/jonnybmc/stroma-signal/actions/workflows/ci.yml/badge.svg)](https://github.com/jonnybmc/stroma-signal/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/@stroma-labs/signal)](https://www.npmjs.com/package/@stroma-labs/signal)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 [![Bundle Size](https://img.shields.io/bundlephobia/minzip/@stroma-labs/signal)](https://bundlephobia.com/package/@stroma-labs/signal)
@@ -24,6 +24,7 @@ The published npm surface is the browser package and its public helper subpaths:
 - `@stroma-labs/signal`
 - `@stroma-labs/signal/ga4`
 - `@stroma-labs/signal/report`
+- `@stroma-labs/signal/summary`
 
 For most teams, the shortest path is:
 
@@ -31,6 +32,7 @@ For most teams, the shortest path is:
 - `@stroma-labs/signal/ga4` if you already use GTM / GA4
 
 `@stroma-labs/signal/report` is optional. It is a helper surface for preview/report workflows, not part of the minimum instrumentation setup.
+`@stroma-labs/signal/summary` is optional. It is a local summary/export helper for plain-text, JSON, and CSV workflows.
 
 ## Choose Your Role
 
@@ -64,7 +66,7 @@ Your team still configures the warehouse refresh once:
 
 Signal does not create BigQuery scheduled queries, persistence tables, or dashboards for you in v0.1.
 
-The Tier Report is not a diagnostic, attribution, or commercial modelling artifact. It is the measured proof layer that makes audience shape, experience gap, and poor-performance progression visible enough to act on.
+The Tier Report is not a diagnostic, attribution, or commercial modelling artifact. It is the measured proof layer that makes audience shape (including mobile / tablet / desktop form-factor split), experience gap, and poor-performance progression visible enough to act on.
 
 ## Companion Tooling In This Repo
 
@@ -179,6 +181,7 @@ Signal is framework-agnostic. These recipes cover where to initialise, SSR guard
 
 ## Deeper Docs
 
+- [first successful report](./docs/first-successful-report.md) — the single linear walkthrough
 - [why Signal exists](./docs/why-signal.md)
 - [tier report design spec](./docs/tier-report-design-spec.md)
 - [choose your setup](./docs/client-integrations.md)
@@ -191,6 +194,7 @@ Signal is framework-agnostic. These recipes cover where to initialise, SSR guard
 - [collector contract](./docs/collector-contract.md)
 - [warehouse schema](./docs/warehouse-schema.md)
 - [BigQuery saved query setup](./docs/bigquery-saved-query-setup.md)
+- [release deployment checklist](./docs/release-deployment-checklist.md)
 - [launch troubleshooting](./docs/launch-troubleshooting.md)
 
 ## Additional Diagnostics

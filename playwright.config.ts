@@ -5,7 +5,11 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   use: {
-    trace: 'on-first-retry'
+    trace: 'on-first-retry',
+    // Skip the landing entrance orchestration in e2e lanes so tests land in
+    // final state immediately. `reducedMotion: 'reduce'` also zeros all
+    // CSS transitions via the --sr-motion-* tokens → deterministic runs.
+    reducedMotion: 'reduce'
   },
   projects: [
     {

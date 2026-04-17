@@ -5,10 +5,10 @@ Recommended flat warehouse row shape for non-GA4 collection:
 | Column | Type | Notes |
 | --- | --- | --- |
 | `schema_version` | INT64 | Currently `1` |
-| `event_id` | STRING | Ephemeral once-only delivery identifier |
+| `event_id` | STRING | Ephemeral once-only delivery identifier. Use as the dedupe / idempotency key. |
 | `observed_at` | TIMESTAMP | Event observation time |
 | `host` | STRING | Domain/host name |
-| `path` | STRING | Path and query if retained |
+| `path` | STRING | Path and query if retained. Apply your retention policy if the query string may carry sensitive business context. |
 | `referrer` | STRING | Nullable |
 | `net_tier` | STRING | Nullable: `urban`, `moderate`, `constrained_moderate`, `constrained`; null for non-load-shaped `restore`/`prerender` rows |
 | `net_tcp_ms` | INT64 | Nullable and null for non-load-shaped `restore`/`prerender` rows |
@@ -16,7 +16,7 @@ Recommended flat warehouse row shape for non-GA4 collection:
 | `device_tier` | STRING | `low`, `mid`, `high` |
 | `device_cores` | INT64 | Browser logical cores |
 | `device_memory_gb` | FLOAT64 | Nullable |
-| `device_screen_w` | INT64 | CSS pixels |
+| `device_screen_w` | INT64 | CSS pixels. Feeds the aggregate-time form-factor split (<768 mobile, 768–1279 tablet, ≥1280 desktop). |
 | `device_screen_h` | INT64 | CSS pixels |
 | `lcp_ms` | INT64 | Nullable outside Chromium and null for non-load-shaped `restore`/`prerender` rows |
 | `cls` | FLOAT64 | Nullable outside Chromium |
@@ -34,7 +34,7 @@ Recommended flat warehouse row shape for non-GA4 collection:
 | `lcp_load_state` | STRING | Nullable: `loading`, `interactive`, `complete` |
 | `lcp_target` | STRING | Nullable safe label from `generateTarget()` or default tag name |
 | `lcp_element_type` | STRING | Nullable: `image` or `text` |
-| `lcp_resource_url` | STRING | Nullable sanitized URL hint with query/hash stripped |
+| `lcp_resource_url` | STRING | Nullable sanitized URL hint with query/hash stripped. Retain only as long as your privacy policy allows. |
 | `inp_load_state` | STRING | Nullable: `loading`, `interactive`, `complete` |
 | `interaction_target` | STRING | Nullable safe label from `generateTarget()` or default tag name |
 | `interaction_type` | STRING | Nullable: `pointer` or `keyboard` |
@@ -51,5 +51,8 @@ Notes:
 - Prefer `navigation_type` in new warehouse models and analysis.
 - Default Signal URL-builder templates exclude `navigation_type = restore` and `navigation_type = prerender` before computing coverage and percentiles.
 - Treat target/resource fields as diagnostic hints, not stable identifiers.
+- Keep raw event-table access limited to the smallest group that needs it; the table can contain operationally sensitive path/referrer/resource context even though Signal is not a user-identity system.
+- Apply warehouse retention and deletion policies intentionally, especially for `path`, `referrer`, `lcp_resource_url`, `lcp_target`, and `interaction_target`.
+- If you materialize the latest `signal_report_url` into a current-state table, keep that table read-limited by default and publish outward only on purpose.
 
 See also: [Collector Contract](./collector-contract.md) for endpoint requirements, [Aggregation Spec](./aggregation-spec.md) for how warehouse rows feed report generation.

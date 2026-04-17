@@ -56,6 +56,16 @@ interface Particle {
   opacity: number;
   targetOpacity: number;
   state: ParticleState;
+  // Timestamp of the entering→clustering state flip. Drives the gather →
+  // jump → dissolve phased spring in updateParticle. Null when the particle
+  // was flipped by a non-orchestrated path (mobile / qa skip), in which
+  // case the legacy steady-state spring is used.
+  clusterStartedAt: number | null;
+  // Particles whose home sits on the outer edge of the cluster pool fade
+  // to a dimmer target opacity during the dissolve phase, creating the
+  // "dense inner core + soft halo" silhouette that reads as sessions
+  // melting into the tier-dot.
+  outerParticle: boolean;
 }
 
 interface DeckState {
@@ -89,9 +99,13 @@ interface MotionRuntime {
   moodMultiplier: number;
   actsObserved: Set<number>;
   horizonEntryAt: number | null;
+  reachedHorizon: boolean;
   scrollableHeight: number;
   resizeTimer: number | null;
   deck: DeckState;
+  // When true, initDeck holds slide 0's data-visible attribute so that
+  // runLandingOrchestration can flip it at the correct beat.
+  holdLandingReveal: boolean;
 }
 
 const TIER_COLORS: Record<string, string> = {
@@ -135,8 +149,10 @@ function sizeCanvas(runtime: MotionRuntime): void {
 /**
  * Resolve cluster anchor positions for the given slide. Different slides
  * position their pools differently:
- *   - Slide 0 (landing): pool sits in the gap LEFT of the row label
- *     at the row's vertical midpoint — a thin band beside the legend.
+ *   - Slide 0 (landing): pool sits AT the tier-row's left edge, aligned
+ *     horizontally with the tier-dot and vertically centred on the row.
+ *     Creates the literal "each particle is a session in this tier"
+ *     metaphor — the cluster dissolves into the row's coloured dot.
  *   - Slide 1 (Act 1 narrative cards): pool sits BELOW each narrative card,
  *     centred under its horizontal midpoint — a compact blob attached to
  *     the base of the card.
@@ -163,12 +179,13 @@ function resolveClusterAnchors(runtime: MotionRuntime, slideIndex?: number): Map
       continue;
     }
 
-    // Default / landing positioning: pool sits in the gap to the LEFT
-    // of its row at the row's own vertical midpoint.
+    // Landing positioning: aligned with the tier-dot at the row's left
+    // edge. The ~20px offset compensates for the cell's left padding plus
+    // the dot's own inset inside the flex layout of .sr-tier-label-name.
+    // Vertically centred on the row so the cluster reads as "this row's
+    // tier-dot, multiplied by session count".
     const centerY = rect.top + rect.height / 2;
-    const gapLeft = Math.max(24, rect.left - runtime.width * 0.38);
-    const clusterX =
-      rect.left > runtime.width * 0.5 ? Math.max(gapLeft, rect.left - 140) : rect.left + rect.width * 0.5;
+    const clusterX = rect.left + 20;
     anchors.set(key, {
       x: clusterX,
       y: centerY
@@ -211,16 +228,21 @@ function createParticles(runtime: MotionRuntime): void {
     const clusterX = anchor?.x ?? sectionWidth * (index + 0.5);
     const clusterY = anchor?.y ?? fallbackClusterY;
 
-    // Elliptical home positions — wider than tall — so each tier's pool
-    // lands as a short horizontal band beside its rail row rather than a
-    // big radial blob bleeding into neighbouring rows.
+    // Tight vertical column — reads as a "bar" of dots aligned to the tier
+    // row's left edge rather than a loose radial blob. poolHeight clamps at
+    // ~20px so low-share tiers still form a visible stack and high-share
+    // tiers don't bleed into neighbouring rows. Skewed more vertical than
+    // horizontal so outer particles form a soft top/bottom halo around the
+    // tier-dot rather than spilling sideways into the row copy.
     const countScale = Math.sqrt(count);
-    const poolWidth = 28 + countScale * 5.8;
-    const poolHeight = 14 + countScale * 2.4;
+    const poolWidth = 6;
+    const poolHeight = Math.min(20, 8 + countScale * 1.2);
 
     for (let i = 0; i < count; i += 1) {
       const angle = Math.random() * Math.PI * 2;
       const distance = Math.sqrt(Math.random());
+      const homeOffsetX = Math.cos(angle) * distance * poolWidth;
+      const homeOffsetY = Math.sin(angle) * distance * poolHeight;
       particles.push({
         tier: tier.key,
         color,
@@ -231,11 +253,17 @@ function createParticles(runtime: MotionRuntime): void {
         vy: (Math.random() - 0.5) * 1.1,
         clusterX,
         clusterY,
-        homeOffsetX: Math.cos(angle) * distance * poolWidth,
-        homeOffsetY: Math.sin(angle) * distance * poolHeight,
+        homeOffsetX,
+        homeOffsetY,
         opacity: 0,
         targetOpacity: 0.55 + Math.random() * 0.3,
-        state: 'entering'
+        state: 'entering',
+        clusterStartedAt: null,
+        // ~30% of particles are "outer" — those with |homeOffsetY| above
+        // 55% of pool height. These fade to 65% target opacity during the
+        // dissolve phase, forming the soft halo that makes the bright
+        // inner core read as the tier's concentrated presence.
+        outerParticle: Math.abs(homeOffsetY) > poolHeight * 0.55
       });
     }
   });
@@ -245,6 +273,11 @@ function createParticles(runtime: MotionRuntime): void {
 
 function updateParticle(particle: Particle, runtime: MotionRuntime): void {
   const { phase, width, height, moodMultiplier } = runtime;
+
+  if (particle.targetOpacity <= 0) {
+    particle.opacity = Math.max(0, particle.opacity - 0.015);
+    return;
+  }
 
   if (phase === 'reveal') {
     if (particle.state === 'entering') {
@@ -259,29 +292,87 @@ function updateParticle(particle: Particle, runtime: MotionRuntime): void {
       const dx = homeX - particle.x;
       const dy = homeY - particle.y;
       const distance = Math.hypot(dx, dy);
-      // Spring toward the particle's assigned home offset, then keep a tiny
-      // breathing jitter once settled so the pool still feels alive.
-      particle.x += dx * 0.06;
-      particle.y += dy * 0.06;
-      const jitter = distance < 8 ? 0.18 : 0.35;
+      const elapsed = particle.clusterStartedAt != null ? performance.now() - particle.clusterStartedAt : null;
+
+      // Phased spring — only the orchestrated path (elapsed != null) runs
+      // the gather → jump → dissolve choreography. Mobile and qa-skip paths
+      // keep the legacy steady-state spring so unorchestrated entrances
+      // still look coherent.
+      let springConstant: number;
+      let jitter: number;
+
+      if (elapsed == null) {
+        // Non-orchestrated (mobile / qa skip): legacy steady spring.
+        springConstant = 0.06;
+        jitter = distance < 8 ? 0.18 : 0.35;
+      } else if (elapsed < CLUSTER_GATHER_MS) {
+        // GATHER — particles pause in place, velocity dampened. The 220ms
+        // lull reads as "listening" before the jump. Low spring + small
+        // jitter means they stop drifting but don't snap yet.
+        springConstant = 0.012;
+        jitter = 0.14;
+      } else if (elapsed < CLUSTER_GATHER_MS + CLUSTER_JUMP_MS) {
+        // JUMP — decisive acceleration toward home. Spring ramps from
+        // gather to peak over the first 120ms of the jump window, then
+        // holds. Jitter minimum → directional, clean convergence.
+        const rampT = Math.min(1, (elapsed - CLUSTER_GATHER_MS) / CLUSTER_JUMP_RAMP_MS);
+        springConstant = CLUSTER_GATHER_SPRING + (CLUSTER_JUMP_SPRING - CLUSTER_GATHER_SPRING) * rampT;
+        jitter = 0.07;
+      } else if (elapsed < CLUSTER_GATHER_MS + CLUSTER_JUMP_MS + CLUSTER_DISSOLVE_MS) {
+        // DISSOLVE — spring decays from peak back to steady state as the
+        // particle nears home; jitter returns to its living-motion level.
+        // Outer particles begin fading toward 65% of target opacity, so
+        // the bright inner core reads as the concentrated tier presence
+        // and the softer halo reads as "dissolving into the row".
+        const dissolveT = Math.min(1, (elapsed - CLUSTER_GATHER_MS - CLUSTER_JUMP_MS) / CLUSTER_DISSOLVE_MS);
+        const eased = 1 - (1 - dissolveT) ** 3;
+        springConstant = CLUSTER_JUMP_SPRING - (CLUSTER_JUMP_SPRING - CLUSTER_HOMED_SPRING) * eased;
+        jitter = 0.07 + (0.22 - 0.07) * eased;
+      } else {
+        // HOMED — settled. Gentle living motion so the cluster still feels
+        // alive without drawing the eye away from surrounding content.
+        springConstant = CLUSTER_HOMED_SPRING;
+        jitter = distance < 8 ? 0.18 : 0.3;
+      }
+
+      particle.x += dx * springConstant;
+      particle.y += dy * springConstant;
       particle.x += (Math.random() - 0.5) * jitter;
       particle.y += (Math.random() - 0.5) * jitter;
-      if (particle.opacity < particle.targetOpacity) particle.opacity += 0.012;
+
+      // Opacity target: outer particles fade to 65% once the dissolve beat
+      // begins. Inner particles always target full targetOpacity. Lerp
+      // toward whichever target applies — going UP fades in, going DOWN
+      // softens the outer halo on dissolve.
+      const dissolveStarted = elapsed != null && elapsed >= CLUSTER_GATHER_MS + CLUSTER_JUMP_MS;
+      const opacityTarget =
+        dissolveStarted && particle.outerParticle
+          ? particle.targetOpacity * CLUSTER_OUTER_OPACITY_RATIO
+          : particle.targetOpacity;
+      if (particle.opacity < opacityTarget) {
+        particle.opacity = Math.min(opacityTarget, particle.opacity + 0.012);
+      } else if (particle.opacity > opacityTarget) {
+        particle.opacity = Math.max(opacityTarget, particle.opacity - 0.008);
+      }
       return;
     }
   }
 
   if (phase === 'cluster-hold') {
-    // Act 1 narrative: particles spring toward their current cluster home
-    // (which was retargeted to the narrative card positions on slide
-    // activation), with a small breathing jitter on top.
-    const homeX = particle.clusterX + particle.homeOffsetX;
-    const homeY = particle.clusterY + particle.homeOffsetY;
-    particle.x += (homeX - particle.x) * 0.055;
-    particle.y += (homeY - particle.y) * 0.055;
-    particle.x += (Math.random() - 0.5) * 0.25;
-    particle.y += (Math.random() - 0.5) * 0.25;
-    if (particle.opacity < particle.targetOpacity) particle.opacity += 0.012;
+    // Act 1: particles drift to the top of the viewport and dim to an
+    // ambient presence so the persona cards and data own the attention.
+    const ceilingY = height * 0.08 + particle.homeOffsetY * 0.3;
+    const targetX = width / 2 + particle.homeOffsetX * 1.2;
+    particle.x += (targetX - particle.x) * 0.025;
+    particle.y += (ceilingY - particle.y) * 0.03;
+    particle.x += (Math.random() - 0.5) * 0.3;
+    particle.y += (Math.random() - 0.5) * 0.15;
+    const ambient = 0.14;
+    if (particle.opacity > ambient) {
+      particle.opacity = Math.max(ambient, particle.opacity - 0.008);
+    } else if (particle.opacity < ambient) {
+      particle.opacity = Math.min(ambient, particle.opacity + 0.004);
+    }
     return;
   }
 
@@ -709,6 +800,17 @@ function navigateToSlide(runtime: MotionRuntime, rawIndex: number, options: { fr
 }
 
 function applyPhaseTransition(runtime: MotionRuntime, phase: Phase): void {
+  if (runtime.reachedHorizon && phase !== 'horizon') {
+    // Post-horizon: particles have served their narrative purpose. Fade
+    // out on any backward navigation instead of replaying.
+    runtime.phase = phase;
+    for (const particle of runtime.particles) {
+      particle.targetOpacity = 0;
+    }
+    if (runtime.rafId == null) tick(runtime);
+    return;
+  }
+
   if (phase === 'race' && runtime.phase !== 'race') {
     runtime.phase = 'race';
     runAct2Race(runtime);
@@ -720,6 +822,7 @@ function applyPhaseTransition(runtime: MotionRuntime, phase: Phase): void {
     runAct3Counter(runtime);
   } else if (phase === 'horizon' && runtime.phase !== 'horizon') {
     runtime.phase = 'horizon';
+    runtime.reachedHorizon = true;
     runtime.horizonEntryAt = performance.now();
     for (const particle of runtime.particles) {
       if (particle.state === 'falling') continue;
@@ -731,16 +834,9 @@ function applyPhaseTransition(runtime: MotionRuntime, phase: Phase): void {
   } else if (phase === 'cluster-hold' || phase === 'reveal') {
     runtime.phase = phase;
     if (phase === 'reveal') runtime.horizonEntryAt = null;
-    // Retarget cluster homes to the current slide's anchors. Reveal goes
-    // to slide 0 (landing), cluster-hold goes to slide 1 (narrative
-    // cards). The particle update loop springs particles to the new home
-    // on subsequent frames.
+
     const targetSlide = phase === 'reveal' ? 0 : 1;
-    // Defer by a frame so the slide's transform has started translating
-    // and getBoundingClientRect returns the post-layout rects.
     window.requestAnimationFrame(() => refreshClusterAnchors(runtime, targetSlide));
-    // Run again after the slide transition settles (700ms + buffer) so
-    // anchors reflect the final resting position.
     window.setTimeout(() => refreshClusterAnchors(runtime, targetSlide), 820);
     if (runtime.rafId == null) tick(runtime);
   }
@@ -773,7 +869,10 @@ function initDeck(runtime: MotionRuntime): void {
   for (let i = 0; i <= startIndex; i += 1) deck.visitedSlides.add(i);
   // Reveal every visited slide immediately — CSS collapses the stagger for
   // visited slides, so their atoms appear without the fade sequence.
+  // Exception: when holdLandingReveal is active, skip slide 0 here and let
+  // runLandingOrchestration flip it at the correct entrance beat.
   for (const visited of deck.visitedSlides) {
+    if (runtime.holdLandingReveal && visited === 0) continue;
     markSlideVisible(runtime, visited);
   }
 
@@ -872,7 +971,256 @@ function revealStatically(root: HTMLElement): void {
   if (fill) fill.style.width = '100%';
 }
 
-export function initReportMotion(motionMode: ReportMotionMode): void {
+// Landing entrance orchestration ----------------------------------------
+// The landing slide's data-visible attribute is gated: when staged entrance
+// is enabled, particles enter first and we hold the landing content hidden
+// for ORCHESTRATION_HOLD_MS before flipping data-visible. When the fact-line
+// number becomes visible, we tween it from 0 to its final value. When the
+// final reveal settles we mark the root with data-orchestration="complete"
+// so tests and downstream code can depend on a single state bit.
+
+const ORCHESTRATION_HOLD_MS = 1400;
+const COUNT_UP_DURATION_MS = 520;
+// Count-up fires during Stage A, just after the prelude fades in, so the
+// number tweens while particles are still drifting and the landing cards
+// are still held. Kept short so the count finishes before the reveal beat.
+const COUNT_UP_START_DELAY_MS = 380;
+
+// Cluster jump-and-dissolve choreography — the emotional beat that links
+// drifting particles to the tier rows they represent. Times are measured
+// from the moment the particle state flips entering→clustering.
+//
+//   0              → 220ms   GATHER   (pause, dampen velocity, "listen")
+//   220            → 770ms   JUMP     (decisive acceleration toward home)
+//   770            → 1170ms  DISSOLVE (settle, outer ring fades to halo)
+//   1170+          → HOMED   (gentle living motion)
+//
+// The cluster flip fires 1400ms after the landing reveal cascade begins
+// (= 2800ms from page load), once the network-spread rail has finished
+// revealing and laid out for accurate anchor resolution. Total landing
+// orchestration is ~4070ms — within Emil's "rare / first-time = considered
+// motion is correct" bucket.
+const CLUSTER_BEAT_DELAY_AFTER_REVEAL_MS = 1400;
+const CLUSTER_GATHER_MS = 220;
+const CLUSTER_JUMP_MS = 550;
+const CLUSTER_JUMP_RAMP_MS = 120;
+const CLUSTER_DISSOLVE_MS = 400;
+const CLUSTER_HOMED_SETTLE_PAD_MS = 120;
+// Spring constants — dimensionless per-frame pull toward home. Gather is
+// near-zero (particles quiesce), jump peaks for decisive motion, dissolve
+// decays back to the homed breathing spring.
+const CLUSTER_GATHER_SPRING = 0.012;
+const CLUSTER_JUMP_SPRING = 0.17;
+const CLUSTER_HOMED_SPRING = 0.055;
+// Opacity the outer ring of particles settles to during dissolve. Creates
+// the dense-core + soft-halo silhouette that reads as sessions melting
+// into the tier-dot rather than piling on top of it.
+const CLUSTER_OUTER_OPACITY_RATIO = 0.65;
+
+interface OrchestrationCompletion {
+  settleCountUps?: boolean;
+}
+
+function completeOrchestration(root: HTMLElement, options: OrchestrationCompletion = {}): void {
+  if (options.settleCountUps) {
+    for (const el of root.querySelectorAll<HTMLElement>('[data-count-up]')) {
+      const targetAttr = el.dataset.countUpTarget;
+      if (!targetAttr) continue;
+      const target = Number(targetAttr);
+      if (!Number.isFinite(target)) continue;
+      el.textContent = target.toLocaleString();
+    }
+  }
+  root.setAttribute('data-orchestration', 'complete');
+}
+
+function tweenCountUp(el: HTMLElement, target: number): void {
+  if (!Number.isFinite(target) || target <= 0) {
+    el.textContent = target.toLocaleString();
+    return;
+  }
+  const startedAt = performance.now();
+  // Cubic ease-out — chosen to parity-match --sr-ease-out: cubic-bezier(0.22, 1, 0.36, 1).
+  // The curve shape is similar enough that the count-up settling feels aligned
+  // with the surrounding opacity/transform reveal transitions.
+  const ease = (t: number): number => 1 - (1 - t) ** 3;
+  const step = (now: number): void => {
+    const progress = Math.min(1, (now - startedAt) / COUNT_UP_DURATION_MS);
+    const value = Math.round(target * ease(progress));
+    el.textContent = value.toLocaleString();
+    if (progress < 1) window.requestAnimationFrame(step);
+    else el.textContent = target.toLocaleString();
+  };
+  window.requestAnimationFrame(step);
+}
+
+function scheduleCountUps(root: HTMLElement, delayMs: number): void {
+  const elements = Array.from(root.querySelectorAll<HTMLElement>('[data-count-up]'));
+  for (const el of elements) {
+    const targetAttr = el.dataset.countUpTarget;
+    if (!targetAttr) continue;
+    const target = Number(targetAttr);
+    if (!Number.isFinite(target)) continue;
+    el.textContent = '0';
+    window.setTimeout(() => tweenCountUp(el, target), delayMs);
+  }
+}
+
+// Report hover tooltips --------------------------------------------------
+// Singleton floating tooltip that populates from any [data-tooltip] element
+// across the report (landing actionable signals, network/device tier rows,
+// Act 3 stage cards, and any future empathetic-interpretation surfaces) on
+// hover or keyboard focus. Desktop-only via @media (hover: hover) in CSS;
+// the handler still wires focus-visible so keyboard users get access.
+// Positioning is below the element by default, flipping above when too
+// close to the viewport bottom. Pointer-events:none on the panel so
+// moving between rows doesn't trap hover.
+
+const TOOLTIP_GAP_PX = 10;
+const TOOLTIP_EDGE_PADDING_PX = 12;
+
+function attachLandingTooltips(root: HTMLElement): void {
+  const tooltip = root.querySelector<HTMLElement>('[data-role="landing-tooltip"]');
+  if (!tooltip) return;
+
+  // Only register when the environment supports hover — otherwise tooltips
+  // would be stuck open on touch devices after a tap.
+  const hoverMedia = typeof window.matchMedia === 'function' ? window.matchMedia('(hover: hover)') : null;
+  if (hoverMedia && !hoverMedia.matches) return;
+
+  const hosts = Array.from(root.querySelectorAll<HTMLElement>('[data-tooltip]'));
+  if (hosts.length === 0) return;
+
+  let activeHost: HTMLElement | null = null;
+
+  const hide = (): void => {
+    activeHost = null;
+    tooltip.setAttribute('aria-hidden', 'true');
+    tooltip.removeAttribute('data-visible');
+  };
+
+  const show = (host: HTMLElement): void => {
+    const copy = host.dataset.tooltip ?? '';
+    if (!copy) return;
+    activeHost = host;
+    tooltip.textContent = copy;
+    tooltip.setAttribute('aria-hidden', 'false');
+    // Force a synchronous layout read so width is known before we position.
+    tooltip.setAttribute('data-visible', 'true');
+    position(host);
+  };
+
+  const position = (host: HTMLElement): void => {
+    const hostRect = host.getBoundingClientRect();
+    const panelRect = tooltip.getBoundingClientRect();
+    const viewportH = window.innerHeight;
+    const viewportW = window.innerWidth;
+
+    // Default: below the host, horizontally centered on its midpoint.
+    let top = hostRect.bottom + TOOLTIP_GAP_PX;
+    let left = hostRect.left + hostRect.width / 2 - panelRect.width / 2;
+
+    // Flip above if we'd clip the viewport bottom.
+    if (top + panelRect.height + TOOLTIP_EDGE_PADDING_PX > viewportH) {
+      top = hostRect.top - panelRect.height - TOOLTIP_GAP_PX;
+    }
+
+    // Clamp horizontally so we never clip left/right edges.
+    left = Math.max(TOOLTIP_EDGE_PADDING_PX, left);
+    left = Math.min(viewportW - panelRect.width - TOOLTIP_EDGE_PADDING_PX, left);
+
+    tooltip.style.top = `${Math.round(top)}px`;
+    tooltip.style.left = `${Math.round(left)}px`;
+  };
+
+  for (const host of hosts) {
+    // Give each host a stable aria-describedby → the shared tooltip id. This
+    // works because only one host is "active" at a time; screen readers read
+    // the description whenever the user navigates onto the host.
+    if (!host.getAttribute('aria-describedby')) {
+      host.setAttribute('aria-describedby', 'sr-landing-tooltip');
+    }
+    host.addEventListener('mouseenter', () => show(host));
+    host.addEventListener('mouseleave', () => {
+      if (activeHost === host) hide();
+    });
+    host.addEventListener('focus', () => show(host));
+    host.addEventListener('blur', () => {
+      if (activeHost === host) hide();
+    });
+  }
+
+  // Re-position on scroll or resize in case the active host has moved.
+  const refresh = (): void => {
+    if (activeHost) position(activeHost);
+  };
+  window.addEventListener('scroll', refresh, { passive: true });
+  window.addEventListener('resize', refresh, { passive: true });
+
+  // Hide on Escape for keyboard users.
+  window.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && activeHost) {
+      activeHost.blur();
+      hide();
+    }
+  });
+}
+
+function runLandingOrchestration(runtime: MotionRuntime): void {
+  // Stage A: particles drift in, domain + fact-line prelude renders with the
+  // data-orchestration="pending" state translating it into viewport centre.
+  // initDeck's visitedSlides loop skipped slide 0 while holdLandingReveal
+  // is true, so the landing slide's data-reveal children (mood pill, lede,
+  // KPI grid, tables) remain hidden.
+  const landing = runtime.root.querySelector<HTMLElement>('[data-role="landing"]');
+  if (!landing) {
+    completeOrchestration(runtime.root, { settleCountUps: true });
+    return;
+  }
+
+  // Fire the count-up early in Stage A so the number tweens while the
+  // prelude is still centred and particles are drifting.
+  scheduleCountUps(runtime.root, COUNT_UP_START_DELAY_MS);
+
+  // Stage B→C: release the prelude translate and reveal the landing slide.
+  // Both happen on the same beat — the prelude eases up to its natural
+  // position while the surrounding cards fade in beneath it.
+  window.setTimeout(() => {
+    runtime.root.setAttribute('data-orchestration', 'revealing');
+    markSlideVisible(runtime, 0);
+
+    // Stage D (the emotional beat): once the network-spread rail has
+    // finished revealing and the tier rows are laid out, trigger the
+    // gather → jump → dissolve cluster transition. Anchors are refreshed
+    // here so getBoundingClientRect reads the final post-reveal rect
+    // positions rather than the pre-reveal translated ones.
+    window.setTimeout(() => {
+      refreshClusterAnchors(runtime, 0);
+      const stampedAt = performance.now();
+      for (const particle of runtime.particles) {
+        if (particle.state === 'entering') {
+          particle.state = 'clustering';
+          particle.clusterStartedAt = stampedAt;
+        }
+      }
+
+      // Mark orchestration complete once the cluster settles. Fires AFTER
+      // the dissolve phase resolves so downstream waiters (e2e, keyboard
+      // handoff) don't observe a still-moving canvas.
+      const clusterTotal = CLUSTER_GATHER_MS + CLUSTER_JUMP_MS + CLUSTER_DISSOLVE_MS + CLUSTER_HOMED_SETTLE_PAD_MS;
+      window.setTimeout(() => completeOrchestration(runtime.root), clusterTotal);
+    }, CLUSTER_BEAT_DELAY_AFTER_REVEAL_MS);
+  }, ORCHESTRATION_HOLD_MS);
+}
+
+export interface ReportMotionFlags {
+  // When true, skip the landing entrance orchestration and reveal everything
+  // in its final state immediately. Set by qa=deterministic, qa=1, scene=*,
+  // or any condition where staged entrance would break a snapshot/test lane.
+  skipOrchestration?: boolean;
+}
+
+export function initReportMotion(motionMode: ReportMotionMode, flags: ReportMotionFlags = {}): void {
   const root = document.querySelector<HTMLElement>('.sr-root');
   if (!root) return;
 
@@ -881,12 +1229,14 @@ export function initReportMotion(motionMode: ReportMotionMode): void {
 
   if (motionMode === 'reduced' || prefersReduced) {
     revealStatically(root);
+    completeOrchestration(root, { settleCountUps: true });
     return;
   }
 
   const payload = readMotionPayload(root);
   if (!payload) {
     revealStatically(root);
+    completeOrchestration(root, { settleCountUps: true });
     return;
   }
 
@@ -894,6 +1244,7 @@ export function initReportMotion(motionMode: ReportMotionMode): void {
   const ctx = canvas?.getContext('2d') ?? null;
   if (!canvas || !ctx) {
     revealStatically(root);
+    completeOrchestration(root, { settleCountUps: true });
     return;
   }
 
@@ -913,8 +1264,10 @@ export function initReportMotion(motionMode: ReportMotionMode): void {
     moodMultiplier: moodMultiplierFor(payload.mood),
     actsObserved: new Set(),
     horizonEntryAt: null,
+    reachedHorizon: false,
     scrollableHeight: 0,
     resizeTimer: null,
+    holdLandingReveal: !flags.skipOrchestration,
     deck: {
       enabled: false,
       currentSlide: 0,
@@ -955,18 +1308,37 @@ export function initReportMotion(motionMode: ReportMotionMode): void {
     runtime.phase = 'reveal';
   }
 
-  window.setTimeout(() => {
-    for (const particle of runtime.particles) {
-      if (particle.state === 'entering') particle.state = 'clustering';
-    }
-  }, 1400);
+  // Landing entrance orchestration — runs only on deck viewport + full motion.
+  // Flags.skipOrchestration covers qa=deterministic, qa=1, scene=*, and any
+  // mode where staged reveal would race a snapshot or test assertion.
+  const orchestrationWillRun = isDeckViewport && !flags.skipOrchestration;
+  if (orchestrationWillRun) {
+    runLandingOrchestration(runtime);
+  } else {
+    completeOrchestration(root, { settleCountUps: true });
+    // Mobile / qa / skip paths: fire the legacy cluster flip at the
+    // original 1400ms beat and refresh anchors once the reveal cascade
+    // has settled. These paths do NOT get the gather/jump/dissolve beat
+    // (clusterStartedAt stays null → the phased-spring branch falls
+    // through to the legacy steady-state spring).
+    window.setTimeout(() => {
+      for (const particle of runtime.particles) {
+        if (particle.state === 'entering') particle.state = 'clustering';
+      }
+    }, 1400);
+    // The act wrapper uses transform: translateY(24px) in its hidden
+    // state, and individual data-reveal atoms also start translated.
+    // When anchors are first resolved, getBoundingClientRect returns
+    // pre-reveal positions, so particle clusters land a few dozen pixels
+    // off their final row centres. Re-resolve once the reveal stagger
+    // has settled.
+    window.setTimeout(() => refreshClusterAnchors(runtime, 0), 1600);
+  }
 
-  // The act wrapper uses transform: translateY(24px) in its hidden state,
-  // and individual data-reveal atoms also start translated. When anchors
-  // are first resolved, getBoundingClientRect() returns those pre-reveal
-  // positions, so particle clusters land a few dozen pixels off their
-  // final row centres. Re-resolve once the reveal stagger has settled.
-  window.setTimeout(() => refreshClusterAnchors(runtime, 0), 1600);
+  // Attach landing hover tooltips — desktop-only via (hover: hover), no-op
+  // elsewhere. Runs regardless of orchestration state so tooltips work in
+  // both live and QA modes once content is visible.
+  attachLandingTooltips(root);
 
   tick(runtime);
 

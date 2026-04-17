@@ -171,9 +171,11 @@ Signal normalizes the browser's navigation context into five semantic types:
 
 The GA4 dataLayer sink pushes a flattened `perf_tier_report` event with a compact subset of the full schema. This path is designed for GTM forwarding, GA4 DebugView, and BigQuery export. The subset stays within GA4's standard event parameter limits.
 
-The GA4 compact subset includes 20 fields: `event_id`, `host`, `url`, `net_tier`, `net_tcp_ms`, `net_tcp_source`, `device_tier`, `lcp_ms`, `fcp_ms`, `ttfb_ms`, `browser`, `nav_type`, `navigation_type`, `lcp_load_state`, `lcp_element_type`, `inp_load_state`, `interaction_type`, `input_delay_ms`, `processing_duration_ms`, `presentation_delay_ms`.
+The GA4 compact subset includes 21 fields: `event_id`, `host`, `url`, `net_tier`, `net_tcp_ms`, `net_tcp_source`, `device_tier`, `device_screen_w`, `lcp_ms`, `fcp_ms`, `ttfb_ms`, `browser`, `nav_type`, `navigation_type`, `lcp_load_state`, `lcp_element_type`, `inp_load_state`, `interaction_type`, `input_delay_ms`, `processing_duration_ms`, `presentation_delay_ms`.
 
-Fields deliberately excluded from the GA4 path (warehouse-only): `v`, `ts`, `ref`, `device_cores`, `device_memory_gb`, `device_screen_w`, `device_screen_h`, `cls`, `inp_ms`, `effective_type`, `downlink_mbps`, `rtt_ms`, `save_data`, `connection_type`, `pkg_version`, `lcp_target`, `lcp_resource_url`, `interaction_target`, `interaction_time_ms`.
+`device_screen_w` unlocks the aggregate-time form-factor split (mobile / tablet / desktop) that the hosted report surfaces in the persistent footer. Breakpoints and rationale in [aggregation-spec.md](./aggregation-spec.md).
+
+Fields deliberately excluded from the GA4 path (warehouse-only): `v`, `ts`, `ref`, `device_cores`, `device_memory_gb`, `device_screen_h`, `cls`, `inp_ms`, `effective_type`, `downlink_mbps`, `rtt_ms`, `save_data`, `connection_type`, `pkg_version`, `lcp_target`, `lcp_resource_url`, `interaction_target`, `interaction_time_ms`.
 
 The full warehouse path (beacon or callback sink) carries the complete `SignalEventV1` including all attribution fields and diagnostic context that the GA4 path omits.
 

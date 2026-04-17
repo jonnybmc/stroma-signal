@@ -28,7 +28,9 @@ const files = await readAllFiles(signalRoot);
 const coreFiles = files.filter(
   (file) => file.includes('/core/') || file.endsWith('/src/index.ts') || file.includes('/sinks/')
 );
-const optionalFiles = files.filter((file) => file.includes('/ga4/') || file.includes('/report/'));
+const optionalFiles = files.filter(
+  (file) => file.includes('/ga4/') || file.includes('/report/') || file.includes('/summary/')
+);
 
 for (const file of coreFiles) {
   const content = await readFile(file, 'utf8');

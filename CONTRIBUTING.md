@@ -5,7 +5,7 @@ Thanks for your interest in contributing! This guide covers the basics.
 ## Getting Started
 
 ```bash
-git clone https://github.com/jonathanbooysen/stroma-signal.git
+git clone https://github.com/jonnybmc/stroma-signal.git
 cd stroma-signal
 pnpm install
 pnpm test:unit
@@ -13,6 +13,7 @@ pnpm build
 ```
 
 Requires Node >= 22 and pnpm 10.28+.
+The monorepo uses Node 22 for contributors and release automation, while the published `@stroma-labs/signal` package intentionally keeps consumer support at Node >= 18.
 
 ## Development
 
@@ -57,6 +58,7 @@ These docs are a coordinated public onboarding surface and should stay aligned w
 - `docs/marketer-quickstart.md`
 - `docs/production-report-automation.md`
 - `docs/bigquery-saved-query-setup.md`
+- `docs/release-deployment-checklist.md`
 
 In particular, keep the automation boundary consistent:
 
@@ -82,7 +84,7 @@ fix beacon sink error when sendBeacon returns false
 
 ## Reporting Bugs
 
-Open an issue at https://github.com/jonathanbooysen/stroma-signal/issues with:
+Open an issue at https://github.com/jonnybmc/stroma-signal/issues with:
 
 - Steps to reproduce
 - Expected vs actual behavior

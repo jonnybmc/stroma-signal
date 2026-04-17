@@ -15,7 +15,8 @@ const removedWarehouseOnlyFields = [
   'ref',
   'device_cores',
   'device_memory_gb',
-  'device_screen_w',
+  // device_screen_w is now GA4-compact-eligible — it feeds form_factor_distribution
+  // on both GA4 and normalized paths.
   'device_screen_h',
   'cls',
   'inp_ms',
@@ -60,6 +61,7 @@ function expectSharedUrlContract(sql: string): void {
   expect(sql).toContain("'&lps='");
   expect(sql).toContain("'&ics='");
   expect(sql).toContain("'&ips='");
+  expect(sql).toContain("'&ff='");
   expect(sql).toContain("'&ulc='");
   expect(sql).toContain("'&ufc='");
   expect(sql).toContain("'&utc='");
@@ -119,6 +121,25 @@ describe('bigquery sql templates', () => {
 
     for (const key of referencedKeys) {
       expect(ga4SafeFieldNames).toContain(key);
+    }
+  });
+
+  it('extracts every GA4-safe event param across validation + URL-builder queries', () => {
+    // Completeness check — the prior test asserted `extracted ⊆ safe`, which
+    // allowed safe-listed fields to be silently omitted from both SQL files
+    // (e.g. net_tcp_ms was configured in GTM but never pulled from
+    // event_params, producing silent data loss). This asserts the full set
+    // of safe fields is reachable across the two GA4 SQL templates combined.
+    const referencedKeys = new Set([
+      ...extractEventParamKeys(readSqlTemplate('ga4-bigquery-validation.sql')),
+      ...extractEventParamKeys(readSqlTemplate('ga4-bigquery-url-builder.sql'))
+    ]);
+
+    for (const safeField of ga4SafeFieldNames) {
+      expect(
+        referencedKeys.has(safeField),
+        `Expected GA4-safe field "${safeField}" to be extracted via WHERE key = '${safeField}' in either the validation or URL-builder SQL; neither file references it. This field will be silently lost in BigQuery aggregation even though GA4 receives it.`
+      ).toBe(true);
     }
   });
 

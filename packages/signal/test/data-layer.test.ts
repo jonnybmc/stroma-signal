@@ -57,10 +57,10 @@ describe('dataLayer sink', () => {
     sink.handle(chromeColdNavFixture);
 
     const payload = (target as unknown as { dataLayer: Array<Record<string, unknown>> }).dataLayer[0];
-    expect(Object.keys(payload)).toHaveLength(21);
+    expect(Object.keys(payload)).toHaveLength(22);
+    expect(payload.device_screen_w).toBe(chromeColdNavFixture.device_screen_w);
     expect(payload).not.toHaveProperty('device_cores');
     expect(payload).not.toHaveProperty('device_memory_gb');
-    expect(payload).not.toHaveProperty('device_screen_w');
     expect(payload).not.toHaveProperty('device_screen_h');
     expect(payload).not.toHaveProperty('effective_type');
     expect(payload).not.toHaveProperty('downlink_mbps');

@@ -303,6 +303,13 @@ export function explainSignalAggregateIssues(value: unknown): string[] {
     }
   }
 
+  if (value.form_factor_distribution != null) {
+    const ff = value.form_factor_distribution;
+    if (!isRecord(ff) || !isNumber(ff.mobile) || !isNumber(ff.tablet) || !isNumber(ff.desktop)) {
+      issues.push('Expected "form_factor_distribution" to include mobile, tablet, and desktop shares when present.');
+    }
+  }
+
   if (!Array.isArray(value.warnings) || value.warnings.some((warning) => !isString(warning))) {
     issues.push('Expected "warnings" to be an array of strings.');
   }
@@ -449,6 +456,23 @@ export function explainSignalAggregateIssues(value: unknown): string[] {
         if (isNumber(v) && (v < 0 || v > 100)) {
           issues.push(`Expected "environment.browser_hist.${k}" to be between 0 and 100.`);
         }
+      }
+    }
+  }
+
+  // Validate optional form_factor_distribution — range + sum-to-100.
+  if (value.form_factor_distribution != null && isRecord(value.form_factor_distribution)) {
+    const ff = value.form_factor_distribution;
+    for (const key of ['mobile', 'tablet', 'desktop'] as const) {
+      const v = ff[key];
+      if (isNumber(v) && (v < 0 || v > 100)) {
+        issues.push(`Expected "form_factor_distribution.${key}" to be between 0 and 100.`);
+      }
+    }
+    if (isNumber(ff.mobile) && isNumber(ff.tablet) && isNumber(ff.desktop)) {
+      const ffSum = ff.mobile + ff.tablet + ff.desktop;
+      if (ffSum > 0 && Math.abs(ffSum - 100) > 2) {
+        issues.push(`Expected form_factor_distribution to sum to ~100 (got ${ffSum}).`);
       }
     }
   }

@@ -2,6 +2,7 @@ import type {
   SignalAggregateV1,
   SignalExperienceStage,
   SignalNetworkTier,
+  SignalRaceFallbackReason,
   SignalRaceMetric
 } from '@stroma-labs/signal-contracts';
 import {
@@ -50,6 +51,7 @@ export interface ReportRaceViewModel {
   metric_label: string;
   race_available: boolean;
   fallback_label: string;
+  fallback_reason: SignalRaceFallbackReason | null;
   urban_ms: number | null;
   comparison_ms: number | null;
   comparison_label: string;
@@ -101,6 +103,15 @@ export interface ReportCredibilityStripViewModel {
   metric_coverage_label: string;
 }
 
+// Form-factor visualization — mobile / tablet / desktop audience split,
+// surfaced inside Act 1 below the persona grid. Null when
+// form_factor_distribution is absent on the aggregate. Segments are
+// magnitude-first sorted (dominant form factor reads first) and
+// zero-share buckets filtered.
+export interface ReportFormFactorViewModel {
+  segments: Array<{ label: string; share: number }>;
+}
+
 export type SignalTone = 'alert' | 'watch' | 'steady' | 'neutral';
 
 export interface ReportSignalBucket {
@@ -144,6 +155,12 @@ export interface ReportPersonaProfile {
   memory_label: string;
   browser: string | null;
   save_data: boolean;
+  // When true, the cohort this persona represents is absent from the
+  // measured window (0% share). Renderer shows a stripped empty-state
+  // card instead of fabricated detail rows. empty_message carries the
+  // honest explanation of what's absent and why the card is muted.
+  is_empty: boolean;
+  empty_message: string;
 }
 
 export interface ReportPersonaContrast {
@@ -167,6 +184,7 @@ export interface ReportViewModel {
   boundary_statement: string;
   evidence_items: ReportEvidenceItem[];
   credibility_strip: ReportCredibilityStripViewModel;
+  form_factor: ReportFormFactorViewModel | null;
   act1_intro: string;
   act1_tiers: ReportTierVisual[];
   act1_device_tiers: ReportDeviceTierVisual[];
@@ -348,6 +366,7 @@ function buildRaceViewModel(aggregate: SignalAggregateV1): ReportRaceViewModel {
       aggregate.race_fallback_reason == null
         ? 'Primary comparison metric selected from measured coverage.'
         : humanizeToken(aggregate.race_fallback_reason),
+    fallback_reason: aggregate.race_fallback_reason,
     urban_ms: urbanMs,
     comparison_ms: comparisonMs,
     comparison_label: comparisonLabel,
@@ -618,9 +637,9 @@ function buildHeroCopy(
       hero_kicker: 'Measured proof from real traffic',
       hero_title: title,
       hero_lede:
-        'One part of your audience lives in a slower world. This report turns that hidden reality into something visible, temporal, and difficult to dismiss.',
+        'A real share of the traffic you send here lands in a slower world. This report turns that hidden post-click reality into something visible, temporal, and difficult to dismiss.',
       act1_intro:
-        'These are not average users. They are materially different infrastructure realities landing on the same experience.',
+        'These are not average users. They are materially different infrastructure realities that a real share of your traffic already lands on.',
       act4_lede: 'The gap is proven. What follows is root cause, cost, and fix order.'
     };
   }
@@ -630,9 +649,9 @@ function buildHeroCopy(
       hero_kicker: 'Measured proof from real traffic',
       hero_title: title,
       hero_lede:
-        'The measured story is more controlled here. The experience still shifts across tiers, but most sessions stay on the safer side of the thresholds that matter.',
+        'The measured story is more controlled here. Traffic still lands into different conditions across tiers, but most sessions stay on the safer side of the thresholds that matter.',
       act1_intro:
-        'The audience still lives in different conditions. The difference is that this report shows the experience holding together across more of them.',
+        'Your traffic still lands into different conditions. The difference is that this report shows the experience holding together across more of them.',
       act4_lede: 'The gap is restrained, but it exists. What follows is why it holds and where it could weaken.'
     };
   }
@@ -641,9 +660,9 @@ function buildHeroCopy(
     hero_kicker: 'Measured proof from real traffic',
     hero_title: title,
     hero_lede:
-      'The experience gap is real, but it sits in the middle ground: meaningful enough to feel, not yet severe enough to scream. That still deserves attention.',
+      'The post-click reality is real, but it sits in the middle ground: meaningful enough to feel, not yet severe enough to scream. That still deserves attention.',
     act1_intro:
-      'These clusters show the spread of conditions your team is really shipping into, not the calmer average implied by a single lab run.',
+      'These clusters show the real conditions your traffic lands on, not the calmer average implied by a single lab run.',
     act4_lede: 'The gap is measurable. What follows is cause, cost, and fix order.'
   };
 }
@@ -671,16 +690,16 @@ function buildAct4SummaryPoints(
 function buildOfferCards(): Array<{ title: string; body: string; href: string; cta: string }> {
   return [
     {
-      title: 'Run a deeper scan',
-      body: 'A light scan surfaces the actual performance issues behind the gap this report proved. See what is costing you before committing to anything.',
-      href: 'https://www.stroma.design',
-      cta: 'Scan your site'
+      title: 'Rapid Fix Plan',
+      body: 'Trace the proven gap to the landing pages and routes causing the most drag, and get the sequenced fixes that close it fastest.',
+      href: 'https://www.stroma.design/rapid-fix-plan',
+      cta: 'Commission a plan'
     },
     {
-      title: 'Talk to the team',
-      body: 'Walk through your report with someone who can explain root cause, fix order, and what recovery looks like for your stack.',
-      href: 'https://www.stroma.design/book',
-      cta: 'Book a discovery call'
+      title: 'Performance Intelligence',
+      body: 'Join measured user, device, and network conditions to GA4, Google Ads, Search Console, and warehouse context — see which campaigns, landing pages, and audience segments are most exposed.',
+      href: 'https://www.stroma.design/performance-intelligence',
+      cta: 'Explore the service'
     }
   ];
 }
@@ -775,6 +794,30 @@ function buildCredibilityStrip(
 }
 
 /**
+ * Form-factor visualization for Act 1. Always emits all three form factors
+ * (mobile / tablet / desktop) so the card's three-column layout rhythm
+ * stays consistent across scenarios — zero-share buckets render as
+ * muted "0%" placeholder columns rather than being filtered out.
+ * Segments are sorted magnitude-first so the dominant reads first and
+ * zero-share columns naturally land at the end.
+ *
+ * Returns null when the aggregate carries no form_factor_distribution
+ * (legacy decoded URLs, or consumers without the GA4 DLV wired) OR when
+ * every form factor is zero (degenerate / no valid rows aggregated).
+ */
+function buildFormFactor(aggregate: SignalAggregateV1): ReportFormFactorViewModel | null {
+  const ff = aggregate.form_factor_distribution;
+  if (!ff) return null;
+  const segments = [
+    { label: 'Mobile', share: ff.mobile },
+    { label: 'Tablet', share: ff.tablet },
+    { label: 'Desktop', share: ff.desktop }
+  ].sort((a, b) => b.share - a.share);
+  if (segments.every((segment) => segment.share === 0)) return null;
+  return { segments };
+}
+
+/**
  * Format a histogram record into the "label: pct · label: pct" compact line
  * used inside signal cell values. Zero-share buckets are filtered out.
  */
@@ -803,6 +846,20 @@ function dominantBucket<K extends string>(hist: Record<K, number>, fallback: K):
     }
   }
   return best;
+}
+
+/**
+ * Detect histograms where every bucket is zero — `dominantBucket` would
+ * otherwise return the hardcoded `fallback` key and a downstream label
+ * lookup would confidently display a fabricated value (e.g. "4 cores")
+ * for an audience with no measured hardware. Callers use this to skip
+ * the label lookup and render a literal "—" instead.
+ */
+function histogramHasAnyObservations<K extends string>(hist: Record<K, number>): boolean {
+  for (const key of Object.keys(hist) as K[]) {
+    if (hist[key] > 0) return true;
+  }
+  return false;
 }
 
 const CORES_LABEL: Record<string, string> = {
@@ -839,44 +896,61 @@ function buildPersonaContrast(aggregate: SignalAggregateV1): ReportPersonaContra
   const ns = aggregate.network_signals;
   const env = aggregate.environment;
 
-  const bestCores = hw ? (CORES_LABEL[dominantBucket(hw.cores_hist, '4')] ?? '—') : '—';
-  const bestMemory = hw ? (MEMORY_LABEL[dominantBucket(hw.memory_gb_hist, 'unknown')] ?? '—') : '—';
-  const bestEffective = ns ? (EFFECTIVE_TYPE_LABEL[dominantBucket(ns.effective_type_hist, 'unknown')] ?? null) : null;
+  // Hardware / network / environment labels. Guarded by both block-presence
+  // (hw / ns / env truthy) AND histogram-has-observations — otherwise
+  // dominantBucket() would silently fall back to a hardcoded key and render
+  // a fabricated label (e.g. "4 cores") for a cohort with no measured
+  // hardware.
+  const hasHardwareCoresSignal = hw != null && histogramHasAnyObservations(hw.cores_hist);
+  const hasHardwareMemorySignal = hw != null && histogramHasAnyObservations(hw.memory_gb_hist);
+  const hasNetworkEffectiveSignal = ns != null && histogramHasAnyObservations(ns.effective_type_hist);
+  const hasEnvironmentBrowserSignal = env != null && histogramHasAnyObservations(env.browser_hist);
+
+  const bestCores = hasHardwareCoresSignal && hw ? (CORES_LABEL[dominantBucket(hw.cores_hist, '4')] ?? '—') : '—';
+  const bestMemory =
+    hasHardwareMemorySignal && hw ? (MEMORY_LABEL[dominantBucket(hw.memory_gb_hist, 'unknown')] ?? '—') : '—';
+  const bestEffective =
+    hasNetworkEffectiveSignal && ns
+      ? (EFFECTIVE_TYPE_LABEL[dominantBucket(ns.effective_type_hist, 'unknown')] ?? null)
+      : null;
   const bestDownlink = ns?.downlink_mbps ? `${ns.downlink_mbps.p75} Mbps` : null;
   const bestRtt = ns?.rtt_ms ? `${ns.rtt_ms.p25} ms` : null;
-  const bestBrowser = env ? dominantBucket(env.browser_hist, 'other') : null;
+  const bestBrowser = hasEnvironmentBrowserSignal && env ? dominantBucket(env.browser_hist, 'other') : null;
 
-  const constrainedCores = hw
-    ? (CORES_LABEL[
-        hw.cores_hist['1'] + hw.cores_hist['2'] > 0
-          ? hw.cores_hist['1'] >= hw.cores_hist['2']
-            ? '1'
-            : '2'
-          : dominantBucket(hw.cores_hist, '2')
-      ] ?? '—')
-    : '—';
-  const constrainedMemory = hw
-    ? (MEMORY_LABEL[
-        hw.memory_gb_hist['0_5'] + hw.memory_gb_hist['1'] + hw.memory_gb_hist['2'] > 0
-          ? '2'
-          : dominantBucket(hw.memory_gb_hist, 'unknown')
-      ] ?? '—')
-    : '—';
-  const constrainedEffective = ns
-    ? (EFFECTIVE_TYPE_LABEL[
-        ns.effective_type_hist['3g'] + ns.effective_type_hist['2g'] + ns.effective_type_hist.slow_2g > 0
-          ? ns.effective_type_hist['3g'] > 0
-            ? '3g'
-            : '2g'
-          : dominantBucket(ns.effective_type_hist, 'unknown')
-      ] ?? null)
-    : null;
+  const constrainedCores =
+    hasHardwareCoresSignal && hw
+      ? (CORES_LABEL[
+          hw.cores_hist['1'] + hw.cores_hist['2'] > 0
+            ? hw.cores_hist['1'] >= hw.cores_hist['2']
+              ? '1'
+              : '2'
+            : dominantBucket(hw.cores_hist, '2')
+        ] ?? '—')
+      : '—';
+  const constrainedMemory =
+    hasHardwareMemorySignal && hw
+      ? (MEMORY_LABEL[
+          hw.memory_gb_hist['0_5'] + hw.memory_gb_hist['1'] + hw.memory_gb_hist['2'] > 0
+            ? '2'
+            : dominantBucket(hw.memory_gb_hist, 'unknown')
+        ] ?? '—')
+      : '—';
+  const constrainedEffective =
+    hasNetworkEffectiveSignal && ns
+      ? (EFFECTIVE_TYPE_LABEL[
+          ns.effective_type_hist['3g'] + ns.effective_type_hist['2g'] + ns.effective_type_hist.slow_2g > 0
+            ? ns.effective_type_hist['3g'] > 0
+              ? '3g'
+              : '2g'
+            : dominantBucket(ns.effective_type_hist, 'unknown')
+        ] ?? null)
+      : null;
   const constrainedDownlink = ns?.downlink_mbps ? `${ns.downlink_mbps.p25} Mbps` : null;
   const constrainedRtt = ns?.rtt_ms ? `${ns.rtt_ms.p75} ms` : null;
 
   return {
     best: {
-      label: 'Your best-connected',
+      label: urbanShare > 0 ? 'Your best-connected' : 'No best-connected cohort',
       share: urbanShare,
       tone: 'steady',
       network_tier: TIER_LABELS.urban,
@@ -887,10 +961,13 @@ function buildPersonaContrast(aggregate: SignalAggregateV1): ReportPersonaContra
       cores_label: bestCores,
       memory_label: bestMemory,
       browser: bestBrowser ? bestBrowser.charAt(0).toUpperCase() + bestBrowser.slice(1) : null,
-      save_data: false
+      save_data: false,
+      is_empty: urbanShare === 0,
+      empty_message:
+        'No sessions in this window met the urban tier threshold (< 50 ms TCP). Every measured session lives outside the best-connected band.'
     },
     constrained: {
-      label: 'Your most constrained',
+      label: constrainedShare > 0 ? 'Your most constrained' : 'No constrained cohort',
       share: constrainedShare,
       tone: 'alert',
       network_tier:
@@ -898,7 +975,7 @@ function buildPersonaContrast(aggregate: SignalAggregateV1): ReportPersonaContra
           ? nd.constrained >= nd.constrained_moderate
             ? TIER_LABELS.constrained
             : TIER_LABELS.constrained_moderate
-          : 'None',
+          : TIER_LABELS.constrained,
       network_criteria: nd.constrained >= nd.constrained_moderate ? '≥ 400 ms TCP' : '150–400 ms TCP',
       effective_type: constrainedEffective !== 'Unknown' ? constrainedEffective : null,
       downlink_label: constrainedDownlink,
@@ -906,16 +983,44 @@ function buildPersonaContrast(aggregate: SignalAggregateV1): ReportPersonaContra
       cores_label: constrainedCores,
       memory_label: constrainedMemory,
       browser: bestBrowser ? bestBrowser.charAt(0).toUpperCase() + bestBrowser.slice(1) : null,
-      save_data: (ns?.save_data_share ?? 0) > 0
+      save_data: (ns?.save_data_share ?? 0) > 0,
+      is_empty: constrainedShare === 0,
+      empty_message:
+        'No sessions in this window fell into the constrained tiers (> 150 ms TCP). The full audience lives in better-connected bands.'
     }
   };
 }
 
 function buildActionableSignals(aggregate: SignalAggregateV1): ReportActionableSignalsViewModel {
   const cells: ReportSignalCell[] = [];
+  const formFactor = aggregate.form_factor_distribution;
   const hardware = aggregate.device_hardware;
   const network = aggregate.network_signals;
   const environment = aggregate.environment;
+
+  // Form-factor cell leads the Actionable Signals section when present —
+  // it is the single most buyer-legible signal in the section for paid-media
+  // / CRO / SEO operators, mapping directly to Google's mobile-page-experience
+  // scoring. Buckets are sorted magnitude-first so the dominant form factor
+  // reads first regardless of what the real distribution looks like.
+  if (formFactor) {
+    const formFactorBuckets = filterBuckets(
+      [
+        { label: 'Mobile', share: formFactor.mobile, tone: 'neutral' as SignalTone },
+        { label: 'Tablet', share: formFactor.tablet, tone: 'neutral' as SignalTone },
+        { label: 'Desktop', share: formFactor.desktop, tone: 'neutral' as SignalTone }
+      ].sort((a, b) => b.share - a.share)
+    );
+    cells.push({
+      key: 'form-factor',
+      label: 'Form factor',
+      value: formatHistogramLine(formFactorBuckets),
+      decision:
+        "Informs Google's mobile-page-experience and mobile-usability scoring. A mobile-heavy share with a weak mobile-tier experience is where paid-media ROI typically leaks.",
+      coverage_caveat: null,
+      buckets: formFactorBuckets
+    });
+  }
 
   if (hardware) {
     const cores = hardware.cores_hist;
@@ -1071,6 +1176,7 @@ export function buildReportViewModel(aggregate: SignalAggregateV1): ReportViewMo
     boundary_statement: BOUNDARY_STATEMENT,
     evidence_items: buildEvidenceItems(aggregate, race, act3, mood),
     credibility_strip: buildCredibilityStrip(aggregate, race),
+    form_factor: buildFormFactor(aggregate),
     act1_intro: heroCopy.act1_intro,
     act1_tiers: buildAct1Tiers(aggregate),
     act1_device_tiers: buildAct1DeviceTiers(aggregate),

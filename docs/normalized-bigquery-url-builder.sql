@@ -18,6 +18,7 @@ WITH source_events AS (
     ttfb_ms,
     device_cores,
     device_memory_gb,
+    device_screen_w,
     effective_type,
     downlink_mbps,
     rtt_ms,
@@ -46,6 +47,12 @@ counts AS (
     IFNULL(ROUND(100 * SAFE_DIVIDE(COUNTIF(device_tier = 'low'), COUNT(*))), 0) AS dt_low,
     IFNULL(ROUND(100 * SAFE_DIVIDE(COUNTIF(device_tier = 'mid'), COUNT(*))), 0) AS dt_mid,
     IFNULL(ROUND(100 * SAFE_DIVIDE(COUNTIF(device_tier = 'high'), COUNT(*))), 0) AS dt_high,
+    -- Form-factor split from device_screen_w. Breakpoints: <768 mobile,
+    -- 768-1279 tablet, >=1280 desktop. Denominator is the count of rows
+    -- with a valid screen width so missing values don't dilute shares.
+    IFNULL(ROUND(100 * SAFE_DIVIDE(COUNTIF(device_screen_w IS NOT NULL AND device_screen_w > 0 AND device_screen_w < 768), COUNTIF(device_screen_w IS NOT NULL AND device_screen_w > 0))), 0) AS ff_mobile,
+    IFNULL(ROUND(100 * SAFE_DIVIDE(COUNTIF(device_screen_w IS NOT NULL AND device_screen_w >= 768 AND device_screen_w < 1280), COUNTIF(device_screen_w IS NOT NULL AND device_screen_w > 0))), 0) AS ff_tablet,
+    IFNULL(ROUND(100 * SAFE_DIVIDE(COUNTIF(device_screen_w IS NOT NULL AND device_screen_w >= 1280), COUNTIF(device_screen_w IS NOT NULL AND device_screen_w > 0))), 0) AS ff_desktop,
     (SELECT SPLIT(url, '?')[OFFSET(0)] FROM UNNEST(ARRAY_AGG(url)) AS url GROUP BY 1 ORDER BY COUNT(*) DESC LIMIT 1) AS top_path
   FROM source_events
 ),
@@ -371,6 +378,7 @@ SELECT CONCAT(
   '&lps=', CAST(urban_lcp_poor_share AS STRING), ',', CAST(moderate_lcp_poor_share AS STRING), ',', CAST(constrained_moderate_lcp_poor_share AS STRING), ',', CAST(constrained_lcp_poor_share AS STRING),
   '&ics=', CAST(urban_inp_stage_coverage AS STRING), ',', CAST(moderate_inp_stage_coverage AS STRING), ',', CAST(constrained_moderate_inp_stage_coverage AS STRING), ',', CAST(constrained_inp_stage_coverage AS STRING),
   '&ips=', CAST(urban_inp_poor_share AS STRING), ',', CAST(moderate_inp_poor_share AS STRING), ',', CAST(constrained_moderate_inp_poor_share AS STRING), ',', CAST(constrained_inp_poor_share AS STRING),
+  '&ff=', CAST(ff_mobile AS STRING), ',', CAST(ff_tablet AS STRING), ',', CAST(ff_desktop AS STRING),
   IFNULL(CONCAT('&v=', top_path), ''),
   -- iteration-6: device_hardware
   '&dhc=', CAST(cores_1 AS STRING), ',', CAST(cores_2 AS STRING), ',', CAST(cores_4 AS STRING), ',', CAST(cores_6 AS STRING), ',', CAST(cores_8 AS STRING), ',', CAST(cores_12plus AS STRING),
