@@ -9,6 +9,7 @@ const SIGNAL_GA4_SAFE_FIELDS_V1: SignalGa4FieldMapV1['fields'] = {
   net_tcp_ms: 'net_tcp_ms',
   net_tcp_source: 'net_tcp_source',
   device_tier: 'device_tier',
+  device_screen_w: 'device_screen_w',
   lcp_ms: 'lcp_ms',
   fcp_ms: 'fcp_ms',
   ttfb_ms: 'ttfb_ms',
@@ -29,6 +30,14 @@ export const SIGNAL_GA4_FIELD_MAP_V1: SignalGa4FieldMapV1 = {
   fields: SIGNAL_GA4_SAFE_FIELDS_V1
 };
 
+// `lcp_target` and `interaction_target` (CSS-selector strings from LCP /
+// INP attribution) and `interaction_time_ms` are deliberately excluded
+// from the GA4 compact subset to preserve 4 slots of headroom against
+// GA4's 25-custom-parameter-per-event cap. They're carried in the
+// normalized warehouse path (`toSignalWarehouseRow`) below and remain
+// available via the beacon / callback sinks. Form-factor is derived from
+// `device_screen_w` at aggregation time, so the attribution targets
+// aren't needed in the GA4 report-URL path.
 export function flattenSignalEventForGa4(event: SignalEventV1): Record<string, string | number | boolean | null> {
   return {
     event: SIGNAL_GA4_EVENT_NAME,
@@ -39,6 +48,7 @@ export function flattenSignalEventForGa4(event: SignalEventV1): Record<string, s
     net_tcp_ms: event.net_tcp_ms,
     net_tcp_source: event.net_tcp_source,
     device_tier: event.device_tier,
+    device_screen_w: event.device_screen_w,
     lcp_ms: event.vitals.lcp_ms,
     fcp_ms: event.vitals.fcp_ms,
     ttfb_ms: event.vitals.ttfb_ms,

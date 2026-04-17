@@ -25,3 +25,6 @@ docs/release-checklist-v*.md
 docs/release-notes-v*.md
 docs/screenshot-capture-checklist.md
 docs/safari-manual-checklist.md
+
+# Output of scripts/bootstrap-sql.mjs — contains consumer-specific project/host values
+bootstrapped-sql/

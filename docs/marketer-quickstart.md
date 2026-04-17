@@ -16,6 +16,7 @@ By the end of this flow you should have:
 - `perf_tier_report` appearing in GA4 DebugView
 - BigQuery rows landing
 - a final hosted `signal_report_url` with a documented manual or scheduled refresh path
+- a persistent-footer form-factor strip in the hosted report showing your mobile / tablet / desktop split (requires the `DLV - device_screen_w` variable from [gtm-recipe.md](./gtm-recipe.md))
 
 ## Who Does What
 

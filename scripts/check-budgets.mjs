@@ -44,10 +44,10 @@ for (const file of reportFiles) {
 // device_hardware / network_signals / environment aggregate blocks +
 // the Actionable Signals slide. Iteration 7 added evidence rail,
 // credibility strip, guard range validation, strict decode, and
-// freshness provenance. Bumped from 192 KB to 224 KB to accommodate
-// the truth-boundary and coverage-honesty surfaces. The ceiling is a
-// hard guardrail against casual bloat; any further bump should be
-// justified in the PR.
-assertUnderBudget('signal-report static weight', reportWeight, 224 * 1024);
+// freshness provenance. Bumped from 192 KB → 224 KB → 228 KB → 232 KB
+// → 236 KB. The latest +4 KB accommodates the share button, refactored
+// footer / credibility-strip extraction, and summary/export subpath in
+// the contracts build output.
+assertUnderBudget('signal-report static weight', reportWeight, 236 * 1024);
 
 console.log('Bundle budgets passed.');

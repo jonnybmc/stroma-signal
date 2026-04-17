@@ -35,6 +35,7 @@ Act 1 shows audience shape.
 It visualises:
 
 - network distribution across urban, moderate, constrained moderate, constrained, and unknown
+- form-factor split across mobile / tablet / desktop (buyer-first audience fact, surfaced in the persistent footer above the credibility strip)
 - sample size
 - days collected
 - classified versus unclassified share
@@ -95,8 +96,8 @@ Act 4 is the handoff layer.
 
 The report should make two next steps obvious:
 
-- `Rapid Fix Plan` = cause on one page
-- `Performance Intelligence` = cost, cause, and fix order across the funnel
+- `Rapid Fix Plan` = trace the proven gap to the landing pages and routes causing the most drag, and return the sequenced fixes that close it fastest
+- `Performance Intelligence` = join measured user, device, and network conditions to GA4, Google Ads, Search Console, and warehouse context to surface which campaigns, landing pages, and audience segments are most exposed
 
 The report does not give away those deeper layers for free. It proves the gap and hands off cleanly.
 
@@ -231,8 +232,8 @@ The free report is a proof artifact, not a consulting deliverable.
 
 The CTA language must preserve that:
 
-- Rapid Fix Plan explains the likely cause on one page
-- Performance Intelligence explains cost, cause, and fix order across the funnel
+- Rapid Fix Plan pinpoints the landing pages and routes carrying the most drag and returns a sequenced fix order
+- Performance Intelligence joins measured user, device, and network conditions to GA4, Google Ads, Search Console, and warehouse context to surface exposed campaigns, landing pages, and audience segments
 
 Benchmark or comparative extras, if present later, should remain tertiary.
 

@@ -42,6 +42,7 @@ At minimum, create Data Layer Variables for:
 - `net_tcp_ms`
 - `net_tcp_source`
 - `device_tier`
+- `device_screen_w` — required for the form-factor (mobile / tablet / desktop) report cell; without this DLV the report's form-factor strip will be absent.
 - `lcp_ms`
 - `fcp_ms`
 - `ttfb_ms`
@@ -76,6 +77,7 @@ Map the GA4 event params from the matching Data Layer Variables. Example:
 - `net_tcp_ms` -> `{{DLV - net_tcp_ms}}`
 - `net_tcp_source` -> `{{DLV - net_tcp_source}}`
 - `device_tier` -> `{{DLV - device_tier}}`
+- `device_screen_w` -> `{{DLV - device_screen_w}}`
 - `lcp_ms` -> `{{DLV - lcp_ms}}`
 - `fcp_ms` -> `{{DLV - fcp_ms}}`
 - `ttfb_ms` -> `{{DLV - ttfb_ms}}`

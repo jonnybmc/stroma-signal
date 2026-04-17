@@ -228,6 +228,7 @@ function createRuntime(config: SignalInitConfig): RuntimeInternals {
   globalThis.addEventListener?.('pageshow', onPageShow);
 
   const teardown = (): void => {
+    globalThis.document?.removeEventListener('prerenderingchange', startObserving);
     globalThis.document?.removeEventListener('visibilitychange', onVisibilityChange);
     globalThis.removeEventListener?.('pagehide', onPageHide);
     globalThis.removeEventListener?.('pageshow', onPageShow);

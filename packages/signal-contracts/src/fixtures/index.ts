@@ -242,6 +242,13 @@ interface SeriesOptions {
   deviceTier?: 'high' | 'mid' | 'low';
   deviceCores?: number;
   deviceMemoryGb?: number | null;
+  // Screen-width rotation. Events in the series get device_screen_w =
+  // screenMix[index % screenMix.length]. When omitted, every event inherits
+  // the root fixture's width (390 — mobile). Used by scenario fixtures to
+  // produce differentiated form_factor_distribution splits for QA and demo.
+  // Breakpoints for form-factor aggregation are <768 mobile, 768–1279
+  // tablet, ≥1280 desktop — pick widths accordingly.
+  screenMix?: number[];
   effectiveType?: 'slow-2g' | '2g' | '3g' | '4g' | null;
   downlinkMbps?: number | null;
   rttMs?: number | null;
@@ -299,6 +306,11 @@ function createSeries(options: SeriesOptions): SignalEventV1[] {
     // defaulting it at 2 keeps backward-compatible fixture behaviour.
     const deviceMemoryGb = isSafari ? null : (options.deviceMemoryGb ?? 2);
 
+    const screenW =
+      options.screenMix && options.screenMix.length > 0
+        ? options.screenMix[index % options.screenMix.length]
+        : undefined;
+
     return createFixtureEvent(`${options.prefix}_${index}`, options.startTs + index * 1_000, {
       url: options.path,
       net_tier: options.tier,
@@ -306,6 +318,7 @@ function createSeries(options: SeriesOptions): SignalEventV1[] {
       device_tier: deviceTier,
       device_cores: deviceCores,
       device_memory_gb: deviceMemoryGb,
+      ...(screenW != null ? { device_screen_w: screenW } : {}),
       vitals: {
         lcp_ms: isSafari || !lcpEnabled ? null : lcpBase + index * lcpStep,
         cls: isSafari ? null : Number((clsBase + index * clsStep).toFixed(3)),
@@ -358,11 +371,14 @@ export const strongLcpCoverageAggregateFixture: SignalAggregateV1 = aggregateSig
       count: 62,
       startTs: Date.UTC(2026, 3, 9, 8, 0, 0),
       path: '/landing',
-      // Urban audience: high-end Chromium devices, fast 4G, no Save-Data
+      // Urban audience: high-end Chromium devices, fast 4G, no Save-Data.
+      // Form-factor mix leans desktop — reflects a B2B / SaaS landing page
+      // that draws office-hour traffic on laptops + some tablet + mobile.
       browser: 'chrome',
       deviceTier: 'high',
       deviceCores: 8,
       deviceMemoryGb: 8,
+      screenMix: [1920, 1440, 1440, 1366, 768, 390, 390],
       effectiveType: '4g',
       downlinkMbps: 12.4,
       rttMs: 40,
@@ -384,10 +400,13 @@ export const strongLcpCoverageAggregateFixture: SignalAggregateV1 = aggregateSig
       path: '/pricing',
       // Constrained audience: budget Chromium devices, throttled 3G,
       // Save-Data on, noticeably worse hardware across the board.
+      // Form-factor mix leans heavily mobile — this cohort is on phones,
+      // which is where the paid-media-ROI gap actually lives.
       browser: 'chrome',
       deviceTier: 'low',
       deviceCores: 2,
       deviceMemoryGb: 2,
+      screenMix: [390, 390, 390, 412, 414, 768],
       effectiveType: '3g',
       downlinkMbps: 1.4,
       rttMs: 380,
@@ -414,10 +433,13 @@ export const affirmingAggregateFixture: SignalAggregateV1 = aggregateSignalEvent
       count: 58,
       startTs: Date.UTC(2026, 3, 9, 11, 0, 0),
       path: '/landing',
+      // Affirming/B2B pattern — desktop-dominant urban cohort on office
+      // networks + some large-tablet + the usual mobile share.
       browser: 'chrome',
       deviceTier: 'high',
       deviceCores: 8,
       deviceMemoryGb: 8,
+      screenMix: [1920, 1920, 1440, 1440, 1366, 1024, 390],
       effectiveType: '4g',
       downlinkMbps: 14.2,
       rttMs: 35,
@@ -436,10 +458,12 @@ export const affirmingAggregateFixture: SignalAggregateV1 = aggregateSignalEvent
       count: 34,
       startTs: Date.UTC(2026, 3, 9, 12, 0, 0),
       path: '/landing',
+      // Moderate cohort skews mobile — the away-from-desk visitor path.
       browser: 'safari',
       deviceTier: 'mid',
       deviceCores: 6,
       deviceMemoryGb: 4,
+      screenMix: [390, 390, 414, 768, 1024],
       effectiveType: '4g',
       downlinkMbps: 6.2,
       rttMs: 120,
@@ -465,6 +489,9 @@ export const fcpFallbackAggregateFixture: SignalAggregateV1 = aggregateSignalEve
       count: 55,
       startTs: Date.UTC(2026, 3, 10, 8, 0, 0),
       path: '/home',
+      // Ecommerce / DTC / paid-media reality — heavily mobile, small
+      // tablet slice, a handful of desktop from office browsing.
+      screenMix: [390, 390, 412, 390, 768, 1440],
       lcpCoverage: 0.32
     }),
     ...createSeries({
@@ -473,6 +500,8 @@ export const fcpFallbackAggregateFixture: SignalAggregateV1 = aggregateSignalEve
       count: 38,
       startTs: Date.UTC(2026, 3, 10, 9, 0, 0),
       path: '/offers',
+      // Constrained cohort is almost entirely mobile.
+      screenMix: [390, 412, 414, 390, 768],
       lcpCoverage: 0.21
     })
   ],
@@ -488,6 +517,8 @@ export const ttfbFallbackAggregateFixture: SignalAggregateV1 = aggregateSignalEv
       count: 58,
       startTs: Date.UTC(2026, 3, 11, 8, 0, 0),
       path: '/home',
+      // Balanced mix — highlights the three-way split in the TTFB-fallback demo.
+      screenMix: [390, 768, 1440, 390, 1024, 1920, 412],
       lcpCoverage: 0,
       fcpCoverage: 0
     }),
@@ -497,6 +528,7 @@ export const ttfbFallbackAggregateFixture: SignalAggregateV1 = aggregateSignalEv
       count: 36,
       startTs: Date.UTC(2026, 3, 11, 9, 0, 0),
       path: '/apply',
+      screenMix: [390, 412, 390, 768, 1440],
       lcpCoverage: 0,
       fcpCoverage: 0
     })
@@ -628,7 +660,9 @@ export const lowInpCoverageAggregateFixture: SignalAggregateV1 = aggregateSignal
  * -------------------------------------------------------------------------- */
 export const fullDepthAggregateFixture: SignalAggregateV1 = aggregateSignalEvents(
   [
-    // Urban — high-end Chrome, fast 4G, 8-core / 8 GB
+    // Urban — high-end Chrome, fast 4G, 8-core / 8 GB.
+    // Full-depth showcases the three-way form-factor split: urban cohort
+    // leans desktop/laptop, with some tablet and mobile office-hour visits.
     ...createSeries({
       prefix: 'full_urban_chrome',
       tier: 'urban',
@@ -639,6 +673,7 @@ export const fullDepthAggregateFixture: SignalAggregateV1 = aggregateSignalEvent
       deviceTier: 'high',
       deviceCores: 8,
       deviceMemoryGb: 8,
+      screenMix: [1920, 1440, 1440, 1366, 1280, 768, 390],
       effectiveType: '4g',
       downlinkMbps: 15.2,
       rttMs: 28,
@@ -652,7 +687,8 @@ export const fullDepthAggregateFixture: SignalAggregateV1 = aggregateSignalEvent
       inpBase: 85,
       inpStep: 8
     }),
-    // Urban — Safari slice (no LCP/CLS/INP, but contributes FCP/TTFB)
+    // Urban — Safari slice (no LCP/CLS/INP, but contributes FCP/TTFB).
+    // Safari users lean iPad — tablet + large mobile.
     ...createSeries({
       prefix: 'full_urban_safari',
       tier: 'urban',
@@ -662,12 +698,13 @@ export const fullDepthAggregateFixture: SignalAggregateV1 = aggregateSignalEvent
       browser: 'safari',
       deviceTier: 'high',
       deviceCores: 6,
+      screenMix: [1024, 768, 390, 414, 1024],
       fcpBase: 680,
       fcpStep: 6,
       ttfbBase: 130,
       ttfbStep: 3
     }),
-    // Moderate — mid-tier Chrome, decent 4G, 6-core / 4 GB
+    // Moderate — mid-tier Chrome. Balanced mix.
     ...createSeries({
       prefix: 'full_moderate_chrome',
       tier: 'moderate',
@@ -678,6 +715,7 @@ export const fullDepthAggregateFixture: SignalAggregateV1 = aggregateSignalEvent
       deviceTier: 'mid',
       deviceCores: 6,
       deviceMemoryGb: 4,
+      screenMix: [390, 1440, 768, 390, 1366, 414],
       effectiveType: '4g',
       downlinkMbps: 6.8,
       rttMs: 95,
@@ -691,7 +729,7 @@ export const fullDepthAggregateFixture: SignalAggregateV1 = aggregateSignalEvent
       inpBase: 180,
       inpStep: 14
     }),
-    // Moderate — Firefox slice
+    // Moderate — Firefox slice. Mostly desktop (Firefox is rare on mobile).
     ...createSeries({
       prefix: 'full_moderate_firefox',
       tier: 'moderate',
@@ -702,6 +740,7 @@ export const fullDepthAggregateFixture: SignalAggregateV1 = aggregateSignalEvent
       deviceTier: 'mid',
       deviceCores: 4,
       deviceMemoryGb: 4,
+      screenMix: [1920, 1440, 1366, 1280, 390],
       effectiveType: null,
       downlinkMbps: null,
       rttMs: null,
@@ -715,7 +754,8 @@ export const fullDepthAggregateFixture: SignalAggregateV1 = aggregateSignalEvent
       inpBase: 210,
       inpStep: 16
     }),
-    // Constrained moderate — budget Chrome, 3G, 4-core / 2 GB, some Save-Data
+    // Constrained moderate — budget Chrome. Mobile-dominated (constrained
+    // cohorts are overwhelmingly phones).
     ...createSeries({
       prefix: 'full_cm_chrome',
       tier: 'constrained_moderate',
@@ -726,6 +766,7 @@ export const fullDepthAggregateFixture: SignalAggregateV1 = aggregateSignalEvent
       deviceTier: 'low',
       deviceCores: 4,
       deviceMemoryGb: 2,
+      screenMix: [390, 390, 414, 412, 768],
       effectiveType: '3g',
       downlinkMbps: 1.8,
       rttMs: 310,
@@ -739,7 +780,7 @@ export const fullDepthAggregateFixture: SignalAggregateV1 = aggregateSignalEvent
       inpBase: 420,
       inpStep: 18
     }),
-    // Constrained — severely budget Chrome, 2G-3G, 2-core / 1 GB
+    // Constrained — severely budget Chrome. Entirely mobile.
     ...createSeries({
       prefix: 'full_constrained_chrome',
       tier: 'constrained',
@@ -750,6 +791,7 @@ export const fullDepthAggregateFixture: SignalAggregateV1 = aggregateSignalEvent
       deviceTier: 'low',
       deviceCores: 2,
       deviceMemoryGb: 1,
+      screenMix: [390, 412, 414, 390, 360],
       effectiveType: '2g',
       downlinkMbps: 0.4,
       rttMs: 620,
@@ -801,10 +843,14 @@ export const soberMoodAggregateFixture: SignalAggregateV1 = aggregateSignalEvent
       count: 52,
       startTs: Date.UTC(2026, 3, 17, 8, 0, 0),
       path: '/landing',
+      // Sober / middle-ground scenario — a roughly balanced form-factor
+      // split so the strip reads as three meaningful segments rather than
+      // one dominant one.
       browser: 'chrome',
       deviceTier: 'high',
       deviceCores: 8,
       deviceMemoryGb: 8,
+      screenMix: [1440, 390, 1920, 768, 390, 1366, 414],
       effectiveType: '4g',
       downlinkMbps: 11.0,
       rttMs: 45,
@@ -827,6 +873,7 @@ export const soberMoodAggregateFixture: SignalAggregateV1 = aggregateSignalEvent
       deviceTier: 'mid',
       deviceCores: 4,
       deviceMemoryGb: 4,
+      screenMix: [390, 768, 414, 390, 1024],
       effectiveType: '4g',
       downlinkMbps: 4.2,
       rttMs: 160,
@@ -903,6 +950,269 @@ export const singleStageFunnelFixture: SignalAggregateV1 = aggregateSignalEvents
   'production',
   Date.UTC(2026, 3, 18, 10, 30, 0)
 );
+
+/* --------------------------------------------------------------------------
+ * Form-factor edge-case fixtures — exercise the Act 1 form-factor empty
+ * state (muted "0%" placeholder column + dashed bar). Each fixture omits
+ * one form factor from the screen-width rotation so the aggregator reports
+ * a genuine 0% for that bucket.
+ * -------------------------------------------------------------------------- */
+export const mobileDesktopOnlyAggregateFixture: SignalAggregateV1 = aggregateSignalEvents(
+  [
+    ...createSeries({
+      prefix: 'mdo_urban',
+      tier: 'urban',
+      count: 48,
+      startTs: Date.UTC(2026, 3, 19, 8, 0, 0),
+      path: '/landing',
+      // Desktop-heavy urban cohort on laptops + mobile phones. No tablet
+      // widths in the mix → aggregator reports 0% tablet and the Act 1
+      // form-factor card renders the empty-state placeholder column.
+      browser: 'chrome',
+      deviceTier: 'high',
+      deviceCores: 8,
+      deviceMemoryGb: 8,
+      screenMix: [1920, 1440, 1366, 1280, 390, 390],
+      effectiveType: '4g',
+      downlinkMbps: 12.0,
+      rttMs: 45,
+      lcpBase: 1_680,
+      lcpStep: 14,
+      fcpBase: 820,
+      fcpStep: 7,
+      ttfbBase: 170,
+      ttfbStep: 5,
+      inpBase: 100,
+      inpStep: 9
+    }),
+    ...createSeries({
+      prefix: 'mdo_constrained_moderate',
+      tier: 'constrained_moderate',
+      count: 32,
+      startTs: Date.UTC(2026, 3, 19, 9, 0, 0),
+      path: '/pricing',
+      // Constrained cohort is entirely mobile phones.
+      browser: 'chrome',
+      deviceTier: 'low',
+      deviceCores: 4,
+      deviceMemoryGb: 2,
+      screenMix: [390, 412, 414, 390],
+      effectiveType: '3g',
+      downlinkMbps: 1.6,
+      rttMs: 320,
+      lcpBase: 4_280,
+      lcpStep: 22,
+      fcpBase: 2_460,
+      fcpStep: 16,
+      ttfbBase: 360,
+      ttfbStep: 9,
+      inpBase: 380,
+      inpStep: 16
+    })
+  ],
+  'production',
+  Date.UTC(2026, 3, 19, 10, 30, 0)
+);
+
+export const mobileOnlyAggregateFixture: SignalAggregateV1 = aggregateSignalEvents(
+  [
+    ...createSeries({
+      prefix: 'mob_urban',
+      tier: 'urban',
+      count: 38,
+      startTs: Date.UTC(2026, 3, 20, 8, 0, 0),
+      path: '/landing',
+      // DTC / ecommerce mobile-first pattern: every event is a phone.
+      // Exercises two form-factor empty-state columns (tablet + desktop)
+      // alongside a single dominant mobile column.
+      browser: 'chrome',
+      deviceTier: 'mid',
+      deviceCores: 6,
+      deviceMemoryGb: 4,
+      screenMix: [390, 412, 414, 390, 360],
+      effectiveType: '4g',
+      downlinkMbps: 8.0,
+      rttMs: 70,
+      lcpBase: 2_280,
+      lcpStep: 16,
+      fcpBase: 1_080,
+      fcpStep: 8,
+      ttfbBase: 210,
+      ttfbStep: 6,
+      inpBase: 160,
+      inpStep: 12
+    }),
+    ...createSeries({
+      prefix: 'mob_constrained',
+      tier: 'constrained',
+      count: 24,
+      startTs: Date.UTC(2026, 3, 20, 9, 0, 0),
+      path: '/checkout',
+      browser: 'chrome',
+      deviceTier: 'low',
+      deviceCores: 2,
+      deviceMemoryGb: 2,
+      screenMix: [390, 412, 360, 414, 390],
+      effectiveType: '3g',
+      downlinkMbps: 1.2,
+      rttMs: 380,
+      lcpBase: 5_420,
+      lcpStep: 26,
+      fcpBase: 3_060,
+      fcpStep: 20,
+      ttfbBase: 420,
+      ttfbStep: 10,
+      inpBase: 540,
+      inpStep: 18
+    })
+  ],
+  'production',
+  Date.UTC(2026, 3, 20, 10, 30, 0)
+);
+
+export const mobileTabletOnlyAggregateFixture: SignalAggregateV1 = aggregateSignalEvents(
+  [
+    ...createSeries({
+      prefix: 'mto_urban',
+      tier: 'urban',
+      count: 42,
+      startTs: Date.UTC(2026, 3, 21, 8, 0, 0),
+      path: '/blog',
+      // Editorial / content site pattern — mobile + tablet traffic, no
+      // desktop. Exercises the empty-state placeholder column for desktop
+      // while keeping two populated columns.
+      browser: 'safari',
+      deviceTier: 'mid',
+      deviceCores: 6,
+      deviceMemoryGb: 4,
+      screenMix: [390, 768, 414, 1024, 390],
+      effectiveType: '4g',
+      downlinkMbps: 6.4,
+      rttMs: 90,
+      lcpBase: 2_120,
+      lcpStep: 14,
+      fcpBase: 960,
+      fcpStep: 8,
+      ttfbBase: 195,
+      ttfbStep: 5,
+      inpBase: 130,
+      inpStep: 9
+    }),
+    ...createSeries({
+      prefix: 'mto_moderate',
+      tier: 'moderate',
+      count: 28,
+      startTs: Date.UTC(2026, 3, 21, 9, 0, 0),
+      path: '/articles',
+      browser: 'safari',
+      deviceTier: 'mid',
+      deviceCores: 6,
+      deviceMemoryGb: 4,
+      screenMix: [768, 390, 1024, 414, 390],
+      effectiveType: '4g',
+      downlinkMbps: 4.8,
+      rttMs: 140,
+      lcpBase: 2_520,
+      lcpStep: 16,
+      fcpBase: 1_180,
+      fcpStep: 10,
+      ttfbBase: 240,
+      ttfbStep: 6,
+      inpBase: 180,
+      inpStep: 12
+    })
+  ],
+  'production',
+  Date.UTC(2026, 3, 21, 10, 30, 0)
+);
+
+/* --------------------------------------------------------------------------
+ * Edge-case fixtures — exercise the less-travelled fallback paths in the
+ * report renderer so regressions on those paths become visible in /build.
+ *
+ * 1. Zero-classified — every session lands in the `unknown` network tier
+ *    (classifier couldn't determine — typically Safari / privacy browsers).
+ *    Exercises: persona empty-state on BOTH cards, Act 2 race-unavailable
+ *    fallback, actionable-signals still rendering from device + environment
+ *    blocks, coverage.network_coverage = 0.
+ *
+ * 2. Empty-funnel (legacy) — aggregate carries no experience_funnel block
+ *    at all, matching legacy rv=1 URLs that pre-date the funnel contract.
+ *    Exercises: Act 3 legacy-mode fallback card, act3.mode === 'legacy'.
+ *
+ * 3. No-hardware-block — aggregate carries no device_hardware /
+ *    network_signals / environment optional blocks. Exercises: persona
+ *    card hardware-absent path, actionable-signals falling back to the
+ *    form-factor cell only, cores/memory label '—' fallback.
+ * -------------------------------------------------------------------------- */
+export const zeroClassifiedAggregateFixture: SignalAggregateV1 = aggregateSignalEvents(
+  [
+    ...createSeries({
+      prefix: 'zc_unknown_chrome',
+      tier: null,
+      count: 32,
+      startTs: Date.UTC(2026, 3, 22, 8, 0, 0),
+      path: '/landing',
+      browser: 'chrome',
+      netTcpSource: 'unavailable_reused',
+      deviceTier: 'mid',
+      deviceCores: 6,
+      deviceMemoryGb: 4,
+      screenMix: [390, 1440, 390, 768, 412, 1920],
+      effectiveType: '4g',
+      downlinkMbps: 8.0,
+      rttMs: 80,
+      lcpBase: 2_180,
+      lcpStep: 14,
+      fcpBase: 960,
+      fcpStep: 8,
+      ttfbBase: 205,
+      ttfbStep: 5,
+      inpBase: 140,
+      inpStep: 10
+    }),
+    ...createSeries({
+      prefix: 'zc_unknown_safari',
+      tier: null,
+      count: 22,
+      startTs: Date.UTC(2026, 3, 22, 9, 0, 0),
+      path: '/landing',
+      browser: 'safari',
+      netTcpSource: 'unavailable_tls_coalesced',
+      deviceTier: 'mid',
+      deviceCores: 6,
+      screenMix: [390, 414, 1024, 390],
+      lcpBase: 0,
+      fcpBase: 1_120,
+      fcpStep: 8,
+      ttfbBase: 240,
+      ttfbStep: 6
+    })
+  ],
+  'production',
+  Date.UTC(2026, 3, 22, 10, 30, 0)
+);
+
+// Legacy-style aggregate — no experience_funnel. Built from strongLcp
+// (which has valid vitals + classified cohorts) and stripped of the
+// funnel block via structured clone to simulate a report URL decoded from
+// a pre-0.1 `rv=1` link without the `es=` param.
+export const emptyFunnelAggregateFixture: SignalAggregateV1 = {
+  ...strongLcpCoverageAggregateFixture,
+  experience_funnel: undefined
+};
+
+// No hardware / network / environment blocks — the aggregate decodes
+// cleanly but every iteration-6 optional block is absent. Mirrors a
+// report URL that dropped those params (e.g. when re-encoded by an older
+// codec path, or when the normalized-only blocks never made it into the
+// GA4 lane).
+export const noHardwareBlockAggregateFixture: SignalAggregateV1 = {
+  ...strongLcpCoverageAggregateFixture,
+  device_hardware: undefined,
+  network_signals: undefined,
+  environment: undefined
+};
 
 export interface SignalReportScenarioFixture {
   id: string;
@@ -992,5 +1302,47 @@ export const signalReportScenarioFixtures: SignalReportScenarioFixture[] = [
     label: 'Single-stage funnel (FCP only)',
     description: 'LCP and INP coverage both below thresholds. Only FCP stage is active in the experience funnel.',
     aggregate: singleStageFunnelFixture
+  },
+  {
+    id: 'form-factor-mobile-desktop-only',
+    label: 'Form factor: mobile + desktop (no tablet)',
+    description:
+      'Audience splits between mobile and desktop with zero tablet traffic. Exercises the Act 1 form-factor empty-state placeholder column.',
+    aggregate: mobileDesktopOnlyAggregateFixture
+  },
+  {
+    id: 'form-factor-mobile-tablet-only',
+    label: 'Form factor: mobile + tablet (no desktop)',
+    description:
+      'Editorial / content-site pattern — mobile + tablet readership with zero desktop. Exercises the form-factor empty-state for desktop.',
+    aggregate: mobileTabletOnlyAggregateFixture
+  },
+  {
+    id: 'form-factor-mobile-only',
+    label: 'Form factor: mobile only',
+    description:
+      'DTC / ecommerce pattern with 100% mobile traffic. Exercises two empty-state placeholder columns (tablet + desktop) beside one dominant mobile column.',
+    aggregate: mobileOnlyAggregateFixture
+  },
+  {
+    id: 'zero-classified',
+    label: 'Zero-classified traffic (all unknown tier)',
+    description:
+      'Every session landed in the unknown network tier — classifier could not determine (typically Safari / privacy browsers with reused connections). Exercises persona empty-state on both best and constrained cards, plus Act 2 race-unavailable fallback.',
+    aggregate: zeroClassifiedAggregateFixture
+  },
+  {
+    id: 'empty-funnel-legacy',
+    label: 'Empty funnel (legacy rv=1)',
+    description:
+      'Aggregate carries no experience_funnel block — mirrors a pre-0.1 rv=1 URL that lacks the es= param. Exercises the Act 3 legacy-mode fallback card.',
+    aggregate: emptyFunnelAggregateFixture
+  },
+  {
+    id: 'no-hardware-block',
+    label: 'No hardware / network / environment blocks',
+    description:
+      'Aggregate is missing device_hardware, network_signals, and environment. Exercises persona-card hardware-absent path, actionable-signals falling back to form-factor only, and cores/memory "—" fallback labels.',
+    aggregate: noHardwareBlockAggregateFixture
   }
 ];

@@ -121,10 +121,44 @@ import App from './App';
 createRoot(document.getElementById('root')!).render(<App />);
 ```
 
+### Remix / React Router v7
+
+Remix renders on both server and client. Signal must only run in the browser.
+
+```tsx
+// app/root.tsx
+import { useEffect } from 'react';
+import { Links, Meta, Outlet, Scripts, ScrollRestoration } from '@remix-run/react';
+
+export default function App() {
+  useEffect(() => {
+    import('@stroma-labs/signal').then(({ init }) =>
+      import('@stroma-labs/signal/ga4').then(({ createDataLayerSink }) => {
+        init({ sinks: [createDataLayerSink()] });
+      })
+    );
+  }, []);
+
+  return (
+    <html lang="en">
+      <head><Meta /><Links /></head>
+      <body>
+        <Outlet />
+        <ScrollRestoration />
+        <Scripts />
+      </body>
+    </html>
+  );
+}
+```
+
+`useEffect` only runs in the browser, which keeps Signal out of the server bundle. Dynamic `import()` inside the effect ensures the package is client-only even if the bundler would otherwise inline it.
+
 ### React notes
 
 - **React Strict Mode** calls effects twice in development. This does not matter — `init()` is idempotent. The second call returns the existing controller.
 - **SSR (Next.js):** Signal touches browser APIs (`navigator`, `document`). The `'use client'` directive or `typeof window` guard keeps it out of server rendering.
+- **SSR (Remix):** Use `useEffect` + dynamic `import()` as above. Do not import `@stroma-labs/signal` at module scope in any file that the server bundle sees.
 - **SPA navigations:** Signal fires one event per real page load, not per client-side route change. See [SPA/SSR caveats](./spa-ssr-caveats.md).
 
 ---

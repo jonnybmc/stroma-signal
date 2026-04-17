@@ -10,10 +10,13 @@ Signal reads browser APIs (`navigator`, `document`, `performance`). It must not 
 |---|---|
 | Next.js (App Router) | `'use client'` directive |
 | Next.js (Pages Router) | `typeof window !== 'undefined'` check |
+| Remix / React Router v7 | `useEffect` + dynamic `import()` |
 | Nuxt 3 | `.client.ts` plugin suffix |
 | Angular Universal | `isPlatformBrowser(platformId)` |
 | SvelteKit | `import { browser } from '$app/environment'` |
 | Plain Vite / static | No guard needed — always in the browser |
+
+Worked examples for each framework are in [framework-recipes.md](./framework-recipes.md).
 
 If you forget the guard, the import will throw during SSR. Signal does not include a server-side no-op — it is designed to fail fast rather than silently run in the wrong environment.
 

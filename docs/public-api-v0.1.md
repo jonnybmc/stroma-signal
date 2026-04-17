@@ -11,6 +11,7 @@ If another doc, plan, or old PRD example disagrees with this file, this file win
   - `@stroma-labs/signal` as the core runtime surface
   - `@stroma-labs/signal/ga4` as the GTM / GA4 integration helper
   - `@stroma-labs/signal/report` as an optional preview/report helper
+  - `@stroma-labs/signal/summary` as a local summary and export helper
 
 ## Canonical Runtime API
 
@@ -38,6 +39,31 @@ import { createPreviewCollector } from '@stroma-labs/signal/report';
 ```
 
 This subpath is optional and not part of the minimum instrumentation path.
+
+The `PreviewCollector` also exposes local output methods:
+
+- `getSummary(): string | null` — returns a plain-text summary of the current aggregate, or null if no events collected
+- `exportEvents(format: 'json' | 'csv'): string` — exports collected events as JSON or warehouse-compatible CSV
+
+### Summary / export subpath
+
+```ts
+import {
+  formatSignalSummary,
+  exportSignalEventsToJSON,
+  exportSignalEventsToCSV,
+  exportSignalAggregateToJSON
+} from '@stroma-labs/signal/summary';
+```
+
+This subpath provides local output utilities so the package stands alone without the hosted report:
+
+- `formatSignalSummary(aggregate)` — returns a human-readable plain-text summary with tier distribution, race findings, experience funnel, and coverage stats
+- `exportSignalEventsToJSON(events)` — JSON.stringify with 2-space indent
+- `exportSignalEventsToCSV(events)` — flattened CSV matching the `SignalWarehouseRowV1` column order, with formula-injection protection
+- `exportSignalAggregateToJSON(aggregate)` — aggregate as formatted JSON
+
+This subpath is additive and does not affect the frozen v0.1 runtime surface.
 
 ## `init()` contract
 
@@ -190,6 +216,10 @@ The GTM / GA4 path does not emit these warehouse-only fields in v0.1:
 `SignalEventV1` remains unchanged in this phase.
 
 The additive report-layer change lives in `SignalAggregateV1`, which now includes an optional `experience_funnel` block under `rv=1` for the hosted Tier Report. This block powers the measured Act 3 funnel and keeps older `rv=1` links compatible when the funnel fields are absent.
+
+`SignalAggregateV1` also carries an additive optional `form_factor_distribution` field (mobile / tablet / desktop shares) derived from the `device_screen_w` event field at aggregation time. Emitted by both GA4 and normalized SQL paths as the `ff=` URL param. Backward-compatible: legacy decoded URLs without `ff=` leave the field undefined.
+
+The GA4-compact safe-field subset includes `device_screen_w` — the feature that unlocks `form_factor_distribution` on the GA4 path. Total safe-field count is 21, well under GA4's 25-custom-parameter-per-event cap.
 
 The Tier Report uses this additive report contract to show:
 

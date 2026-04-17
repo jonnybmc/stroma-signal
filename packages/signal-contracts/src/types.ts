@@ -215,6 +215,17 @@ export interface SignalExperienceFunnel {
  * first-class fields so the report can surface honest caveats.
  * ------------------------------------------------------------------- */
 
+// Form-factor distribution derived from device_screen_w at aggregation
+// time. Breakpoints: <768 mobile, 768–1279 tablet, ≥1280 desktop.
+// Unlocks the "what's my mobile share?" question that paid-media / CRO /
+// SEO buyers ask first — and the Google mobile-page-experience scoring
+// signal they operate against.
+export interface SignalFormFactorDistribution {
+  mobile: number;
+  tablet: number;
+  desktop: number;
+}
+
 export interface SignalDeviceHardware {
   // Logical CPU cores — universal via navigator.hardwareConcurrency.
   // Drives the JS-bundle-budget decision: how much main-thread work
@@ -309,6 +320,11 @@ export interface SignalAggregateV1 {
   device_hardware?: SignalDeviceHardware;
   network_signals?: SignalNetworkSignals;
   environment?: SignalEnvironment;
+  // Form-factor split (mobile/tablet/desktop), derived from device_screen_w
+  // at aggregation time. Additive optional field landing in 0.1 to surface
+  // the mobile-friendliness axis paid-media buyers ask for first. Emitted
+  // by both GA4 and normalized SQL paths.
+  form_factor_distribution?: SignalFormFactorDistribution;
   top_page_path: string | null;
   warnings: string[];
 }

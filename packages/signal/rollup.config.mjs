@@ -6,7 +6,8 @@ import dts from 'rollup-plugin-dts';
 const input = {
   index: 'src/index.ts',
   'ga4/index': 'src/ga4/index.ts',
-  'report/index': 'src/report/index.ts'
+  'report/index': 'src/report/index.ts',
+  'summary/index': 'src/summary/index.ts'
 };
 
 export default [

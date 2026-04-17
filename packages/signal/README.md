@@ -17,6 +17,7 @@ This npm package ships the browser instrumentation library and its public helper
 - `@stroma-labs/signal`
 - `@stroma-labs/signal/ga4`
 - `@stroma-labs/signal/report`
+- `@stroma-labs/signal/summary`
 
 The minimum adoption path is usually:
 
@@ -24,6 +25,7 @@ The minimum adoption path is usually:
 - `@stroma-labs/signal/ga4` if you already use GTM / GA4
 
 `@stroma-labs/signal/report` is optional. It is a preview helper, not part of the minimum instrumentation setup.
+`@stroma-labs/signal/summary` is optional. It exposes local summary/export helpers for plain-text, JSON, and CSV output.
 
 This package does not ship the repo's local spike lab, hosted report shell, or builder UI as required consumer setup.
 
@@ -68,6 +70,19 @@ init({
 });
 ```
 
+### Generate local summaries and exports
+
+```ts
+import {
+  exportSignalAggregateToJSON,
+  exportSignalEventsToCSV,
+  exportSignalEventsToJSON,
+  formatSignalSummary
+} from '@stroma-labs/signal/summary';
+```
+
+Use this helper surface when you want local report QA, text summaries, or warehouse-compatible exports without depending on the hosted report route.
+
 ## What Is Optional Companion Tooling
 
 The monorepo also contains companion tooling that supports QA, demos, and contributor workflows:
@@ -80,9 +95,9 @@ Those are companion repo assets, not required package setup.
 
 ## Docs
 
-- Repo README: https://github.com/jonathanbooysen/stroma-signal#readme
-- Why Signal exists: https://github.com/jonathanbooysen/stroma-signal/blob/main/docs/why-signal.md
-- Tier Report design spec: https://github.com/jonathanbooysen/stroma-signal/blob/main/docs/tier-report-design-spec.md
-- Setup guide: https://github.com/jonathanbooysen/stroma-signal/blob/main/docs/client-integrations.md
-- GTM / GA4 launch path: https://github.com/jonathanbooysen/stroma-signal/blob/main/docs/marketer-quickstart.md
-- Public API contract: https://github.com/jonathanbooysen/stroma-signal/blob/main/docs/public-api-v0.1.md
+- Repo README: https://github.com/jonnybmc/stroma-signal#readme
+- Why Signal exists: https://github.com/jonnybmc/stroma-signal/blob/main/docs/why-signal.md
+- Tier Report design spec: https://github.com/jonnybmc/stroma-signal/blob/main/docs/tier-report-design-spec.md
+- Setup guide: https://github.com/jonnybmc/stroma-signal/blob/main/docs/client-integrations.md
+- GTM / GA4 launch path: https://github.com/jonnybmc/stroma-signal/blob/main/docs/marketer-quickstart.md
+- Public API contract: https://github.com/jonnybmc/stroma-signal/blob/main/docs/public-api-v0.1.md

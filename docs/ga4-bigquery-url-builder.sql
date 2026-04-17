@@ -9,8 +9,11 @@ WITH ga4_events AS (
     (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'host') AS host,
     (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'url') AS url,
     (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'net_tier') AS net_tier,
+    (SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'net_tcp_ms') AS net_tcp_ms,
     (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'net_tcp_source') AS net_tcp_source,
+    (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'browser') AS browser,
     (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'device_tier') AS device_tier,
+    (SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'device_screen_w') AS device_screen_w,
     (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'navigation_type') AS navigation_type,
     (SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'lcp_ms') AS lcp_ms,
     (SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'fcp_ms') AS fcp_ms,
@@ -19,10 +22,12 @@ WITH ga4_events AS (
     (SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'processing_duration_ms') AS processing_duration_ms,
     (SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'presentation_delay_ms') AS presentation_delay_ms,
     -- Iteration-6 fields (device_cores, device_memory_gb, effective_type,
-    -- downlink_mbps, rtt_ms, save_data, browser) are warehouse-only —
-    -- NOT included in the GA4 20-field event param map due to the GA4
-    -- 25-param standard-property limit. These fields are available via
-    -- the normalized warehouse recipe instead.
+    -- downlink_mbps, rtt_ms, save_data) are warehouse-only — NOT included
+    -- in the GA4 21-field event param map due to the GA4 25-param
+    -- standard-property limit. These fields are available via the
+    -- normalized warehouse recipe instead. device_screen_w IS included
+    -- in the GA4 compact subset as of 0.1 — it unlocks the form-factor
+    -- split (mobile / tablet / desktop) aggregated below.
     -- See: docs/normalized-bigquery-url-builder.sql
     TIMESTAMP_MICROS(event_timestamp) AS observed_at
   FROM `your-project.analytics_XXXXXXXX.events_*`
@@ -40,8 +45,11 @@ source_events AS (
     host,
     url,
     net_tier,
+    net_tcp_ms,
     net_tcp_source,
+    browser,
     device_tier,
+    device_screen_w,
     navigation_type,
     lcp_ms,
     fcp_ms,
@@ -73,6 +81,13 @@ counts AS (
     IFNULL(ROUND(100 * SAFE_DIVIDE(COUNTIF(device_tier = 'low'), COUNT(*))), 0) AS dt_low,
     IFNULL(ROUND(100 * SAFE_DIVIDE(COUNTIF(device_tier = 'mid'), COUNT(*))), 0) AS dt_mid,
     IFNULL(ROUND(100 * SAFE_DIVIDE(COUNTIF(device_tier = 'high'), COUNT(*))), 0) AS dt_high,
+    -- Form-factor split from device_screen_w. Breakpoints: <768 mobile,
+    -- 768-1279 tablet, >=1280 desktop. Denominator is COUNTIF(device_screen_w IS NOT NULL)
+    -- so rows with missing screen width don't dilute the percentages — they
+    -- simply don't contribute to the form-factor distribution.
+    IFNULL(ROUND(100 * SAFE_DIVIDE(COUNTIF(device_screen_w IS NOT NULL AND device_screen_w > 0 AND device_screen_w < 768), COUNTIF(device_screen_w IS NOT NULL AND device_screen_w > 0))), 0) AS ff_mobile,
+    IFNULL(ROUND(100 * SAFE_DIVIDE(COUNTIF(device_screen_w IS NOT NULL AND device_screen_w >= 768 AND device_screen_w < 1280), COUNTIF(device_screen_w IS NOT NULL AND device_screen_w > 0))), 0) AS ff_tablet,
+    IFNULL(ROUND(100 * SAFE_DIVIDE(COUNTIF(device_screen_w IS NOT NULL AND device_screen_w >= 1280), COUNTIF(device_screen_w IS NOT NULL AND device_screen_w > 0))), 0) AS ff_desktop,
     (SELECT SPLIT(url, '?')[OFFSET(0)] FROM UNNEST(ARRAY_AGG(url)) AS url GROUP BY 1 ORDER BY COUNT(*) DESC LIMIT 1) AS top_path
   FROM source_events
 ),
@@ -304,7 +319,7 @@ funnel_rollup AS (
 -- Iteration-6 blocks (device_hardware, network_signals, environment) are
 -- NOT available in the GA4 recipe. The fields they require (device_cores,
 -- device_memory_gb, effective_type, downlink_mbps, rtt_ms, save_data,
--- browser) are warehouse-only — excluded from the GA4 20-field event param
+-- browser) are warehouse-only — excluded from the GA4 21-field event param
 -- map due to the 25-param standard-property limit. Use the normalized
 -- warehouse recipe (normalized-bigquery-url-builder.sql) to produce reports
 -- with the Actionable Signals slide populated.
@@ -346,6 +361,7 @@ SELECT CONCAT(
   '&lps=', CAST(urban_lcp_poor_share AS STRING), ',', CAST(moderate_lcp_poor_share AS STRING), ',', CAST(constrained_moderate_lcp_poor_share AS STRING), ',', CAST(constrained_lcp_poor_share AS STRING),
   '&ics=', CAST(urban_inp_stage_coverage AS STRING), ',', CAST(moderate_inp_stage_coverage AS STRING), ',', CAST(constrained_moderate_inp_stage_coverage AS STRING), ',', CAST(constrained_inp_stage_coverage AS STRING),
   '&ips=', CAST(urban_inp_poor_share AS STRING), ',', CAST(moderate_inp_poor_share AS STRING), ',', CAST(constrained_moderate_inp_poor_share AS STRING), ',', CAST(constrained_inp_poor_share AS STRING),
+  '&ff=', CAST(ff_mobile AS STRING), ',', CAST(ff_tablet AS STRING), ',', CAST(ff_desktop AS STRING),
   IFNULL(CONCAT('&v=', top_path), ''),
   '&ga=', CAST(UNIX_MILLIS(CURRENT_TIMESTAMP()) AS STRING)
   -- Iteration-6 params (dhc, dhm, dhv, nse, nsv, nsd, nsl, nsr, eb) are

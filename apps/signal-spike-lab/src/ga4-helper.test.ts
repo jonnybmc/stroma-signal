@@ -26,11 +26,10 @@ describe('spike-lab ga4 helper', () => {
     );
 
     const payload = gtag.mock.calls[0]?.[2] as Record<string, unknown>;
-    expect(Object.keys(payload)).toHaveLength(21);
+    expect(Object.keys(payload)).toHaveLength(22);
     expect(payload.debug_mode).toBe(true);
     expect(payload).not.toHaveProperty('device_cores');
     expect(payload).not.toHaveProperty('device_memory_gb');
-    expect(payload).not.toHaveProperty('device_screen_w');
     expect(payload).not.toHaveProperty('device_screen_h');
     expect(payload).not.toHaveProperty('effective_type');
     expect(payload).not.toHaveProperty('downlink_mbps');

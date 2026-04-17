@@ -8,6 +8,7 @@ import type {
   SignalExperienceFunnel,
   SignalExperienceStage,
   SignalExperienceStageSummary,
+  SignalFormFactorDistribution,
   SignalMetricSelectionInput,
   SignalMetricSelectionResult,
   SignalNetworkSignals,
@@ -450,6 +451,11 @@ export function aggregateSignalEvents(
   const downlinkSamples: number[] = [];
   const rttSamples: number[] = [];
   const browserCounters = { ...ZERO_BROWSER_HIST };
+  // Form-factor counters — derived from device_screen_w at the three
+  // canonical breakpoints. Stays null if no rows contribute (defensive:
+  // preserves the nullable contract on legacy / empty aggregates).
+  const formFactorCounters = { mobile: 0, tablet: 0, desktop: 0 };
+  let formFactorValidCount = 0;
   const tierAccumulators: Record<SignalNetworkTier, TierAccumulator> = {
     urban: createTierAccumulator(),
     moderate: createTierAccumulator(),
@@ -526,6 +532,17 @@ export function aggregateSignalEvents(
     if (event.context.rtt_ms != null) rttSamples.push(event.context.rtt_ms);
 
     browserCounters[browserBucket(event.meta.browser)] += 1;
+
+    // Form-factor bucket — breakpoints locked in aggregation-spec.md.
+    // Defensive: skip rows with screen_w ≤ 0 (SDK always writes a value,
+    // but the guard costs nothing and keeps the aggregate nullable when
+    // every row happens to be invalid).
+    if (event.device_screen_w > 0) {
+      if (event.device_screen_w < 768) formFactorCounters.mobile += 1;
+      else if (event.device_screen_w < 1280) formFactorCounters.tablet += 1;
+      else formFactorCounters.desktop += 1;
+      formFactorValidCount += 1;
+    }
   }
 
   const classifiedSampleSize = total - networkDistribution.unknown;
@@ -586,6 +603,17 @@ export function aggregateSignalEvents(
     browser_hist: distributePercent(browserCounters, total) as SignalEnvironment['browser_hist']
   };
 
+  // Form-factor distribution stays undefined when no rows contributed —
+  // preserves the nullable contract for legacy / empty decoded aggregates.
+  const formFactorDistribution: SignalFormFactorDistribution | undefined =
+    formFactorValidCount > 0
+      ? {
+          mobile: asPercent(formFactorCounters.mobile, formFactorValidCount),
+          tablet: asPercent(formFactorCounters.tablet, formFactorValidCount),
+          desktop: asPercent(formFactorCounters.desktop, formFactorValidCount)
+        }
+      : undefined;
+
   return {
     v: SIGNAL_EVENT_VERSION,
     rv: SIGNAL_REPORT_VERSION,
@@ -619,6 +647,7 @@ export function aggregateSignalEvents(
     device_hardware: deviceHardware,
     network_signals: networkSignals,
     environment,
+    form_factor_distribution: formFactorDistribution,
     top_page_path: computeTopPagePathFromCounts(topPathCounts),
     warnings
   };

@@ -37,7 +37,7 @@ test('proof-of-life flow flushes one payload into the collector and dataLayer', 
   await expect(page.locator('.sr-hero')).toContainText('localhost:4173');
   await expect(page.locator('.sr-act[data-act="3"]')).toContainText('Where does performance become poor?');
   await expect(page.locator('.sr-act[data-act="4"]')).toContainText('What deeper layer exists beyond this?');
-  await expect(page.locator('.sr-act[data-act="4"]')).toContainText('Run a deeper scan');
+  await expect(page.locator('.sr-act[data-act="4"]')).toContainText('Rapid Fix Plan');
 });
 
 test('multi-page spike flow preserves collector truth and preview url semantics', async ({ page, request }) => {
@@ -123,7 +123,7 @@ test('strong fixture renders the four-act report experience end to end', async (
   await expect(page.locator('.sr-act[data-act="2"]')).toContainText('How far apart are their experiences?');
   await expect(page.locator('.sr-act[data-act="3"]')).toContainText('Where does performance become poor?');
   await expect(page.locator('.sr-act[data-act="4"]')).toContainText('What deeper layer exists beyond this?');
-  await expect(page.locator('.sr-act[data-act="4"]')).toContainText('Talk to the team');
+  await expect(page.locator('.sr-act[data-act="4"]')).toContainText('Performance Intelligence');
   await expect(page.locator('.sr-act[data-act="3"]')).toContainText('Interaction becomes ready');
 });
 
@@ -348,9 +348,10 @@ test('empty-funnel reports stay in an insufficient-data state end to end', async
 
   await expect(page.locator('.sr-act[data-act="3"]')).toContainText('No defensible performance funnel in this sample.');
   await expect(page.locator('.sr-act[data-act="3"]')).toContainText('Insufficient measured data');
-  await expect(page.locator('.sr-evidence-rail')).toContainText('Poor-session share');
-  await expect(page.locator('.sr-evidence-rail')).toContainText('Measured funnel coverage');
-  await expect(page.locator('.sr-evidence-rail')).toContainText('Unavailable');
+  // Fallback honesty surfaces in the footer credibility strip when the race
+  // couldn't run. Proves the insufficient-data state is still visible to the
+  // viewer at the landing level after the evidence rail was cut.
+  await expect(page.locator('[data-role="fallback-honesty"]')).toContainText('No race');
 });
 
 test('builder decodes hostile domain text safely in url-validation mode', async ({ page }) => {

@@ -162,8 +162,9 @@ describe('signal contracts', () => {
     const flattened = flattenSignalEventForGa4(chromeColdNavFixture);
 
     expect(flattened.event).toBe(SIGNAL_GA4_EVENT_NAME);
-    expect(Object.keys(flattened)).toHaveLength(21);
+    expect(Object.keys(flattened)).toHaveLength(22);
     expect(flattened.net_tier).toBe(chromeColdNavFixture.net_tier);
+    expect(flattened.device_screen_w).toBe(chromeColdNavFixture.device_screen_w);
     expect(flattened.lcp_ms).toBe(chromeColdNavFixture.vitals.lcp_ms);
     expect(flattened.navigation_type).toBe('navigate');
     expect(flattened.lcp_load_state).toBe('complete');
@@ -182,7 +183,6 @@ describe('signal contracts', () => {
     expect(flattened).not.toHaveProperty('ref');
     expect(flattened).not.toHaveProperty('device_cores');
     expect(flattened).not.toHaveProperty('device_memory_gb');
-    expect(flattened).not.toHaveProperty('device_screen_w');
     expect(flattened).not.toHaveProperty('device_screen_h');
     expect(flattened).not.toHaveProperty('cls');
     expect(flattened).not.toHaveProperty('inp_ms');
@@ -198,7 +198,7 @@ describe('signal contracts', () => {
     const flattened = flattenSignalEventForGa4(chromeColdNavFixture);
     const ga4SafeFieldCount = Object.keys(SIGNAL_GA4_FIELD_MAP_V1.fields).length;
 
-    expect(ga4SafeFieldCount).toBe(20);
+    expect(ga4SafeFieldCount).toBe(21);
     expect(ga4SafeFieldCount).toBeLessThanOrEqual(25);
     expect(Object.keys(flattened).filter((key) => key !== 'event')).toHaveLength(ga4SafeFieldCount);
   });
@@ -366,7 +366,13 @@ describe('signal contracts', () => {
       'safari-heavy',
       'full-depth',
       'sober-mood',
-      'single-stage-funnel'
+      'single-stage-funnel',
+      'form-factor-mobile-desktop-only',
+      'form-factor-mobile-tablet-only',
+      'form-factor-mobile-only',
+      'zero-classified',
+      'empty-funnel-legacy',
+      'no-hardware-block'
     ]);
     expect(mixedLifecycleAggregateFixture.sample_size).toBe(1);
     expect(strongLcpCoverageAggregateFixture.race_metric).toBe('lcp');

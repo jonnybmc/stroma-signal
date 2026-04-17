@@ -26,6 +26,7 @@ For the canonical production artifact generated from the provided warehouse SQL,
 - `race_fallback_reason`
 - additive `experience_funnel` stage summaries for Act 3
 - additive `device_hardware`, `network_signals`, and `environment` blocks (iteration 6)
+- additive `form_factor_distribution` (mobile / tablet / desktop shares) derived from `device_screen_w`
 - report version `rv=1`
 
 ## Actionable Signal Blocks (Iteration 6)
@@ -50,13 +51,33 @@ The aggregator preserves histograms and quartiles of the signals the SDK already
 
 - `browser_hist` — user-agent-derived browser distribution across five buckets (`chrome`, `safari`, `firefox`, `edge`, `other`). Drives the testing-matrix priority decision.
 
+### `form_factor_distribution` (additive)
+
+Mobile / tablet / desktop split derived from `device_screen_w` at aggregation time. Universal capture (every event carries `device_screen_w`) so no coverage caveat is needed — unlike the Chromium-only blocks above.
+
+Breakpoints:
+
+- **Mobile** — `device_screen_w < 768`
+- **Tablet** — `768 ≤ device_screen_w < 1280`
+- **Desktop** — `device_screen_w ≥ 1280`
+
+Rationale for these thresholds:
+
+- `< 768` catches every phone in portrait and landscape (iPhones up to 430, Androids up to ~410, foldables up to ~540 landscape).
+- `768–1279` catches iPads in portrait (744 / 768 / 834 / 1024) and iPad Pro 11" portrait (1024). It also catches a small fraction of laptops in split-screen or small-window usage — acceptable noise.
+- `≥ 1280` catches every mainstream laptop (13"+) and desktop, and iPad Pro 12.9" in landscape (1366). The iPad Pro landscape case is the only meaningful mis-bucket — low enough frequency to accept.
+
+The aggregator skips rows where `device_screen_w ≤ 0` (defensive — the SDK always writes a value). When no rows contribute, the field remains `undefined` rather than emitting a zero-sum triple, so legacy URLs decode cleanly.
+
+Drives the Google mobile-page-experience decision: the single most buyer-legible signal on the landing for paid-media / CRO / SEO operators. Surfaces as a dedicated strip in the persistent footer (above the credibility strip) rather than nested in the Actionable Signals section.
+
 ### Deliberately excluded
 
 The following fields were considered and **cut** because they fail the usefulness filter:
 
 - Viewport width / height — product teams already run media queries against `window.innerWidth` at CSS time. Aggregate viewport is redundant.
 - Device pixel ratio — already solved at HTML time via `<img srcset>` and CSS `image-set()`. One-time sanity check at most.
-- `navigator.maxTouchPoints` — product teams already know their mobile / desktop split from standard analytics.
+- `navigator.userAgentData.mobile` — Chromium-only boolean. Would give a slightly more accurate form-factor signal on Chromium (catches iPad Pro 12.9" landscape) but at the cost of an additional SDK capture field. Rejected for 0.1 because `device_screen_w` is universal and gives a strong-enough signal; the edge cases are below the noise floor.
 - `navigator.connection.type` (wifi / cellular) — redundant with `effective_type`.
 - TCP handshake quartiles — already abstracted into `net_tier`.
 - `nav_type` histogram — interesting but does not unlock a specific product action.

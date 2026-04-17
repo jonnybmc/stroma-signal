@@ -163,24 +163,31 @@ code {
   line-height: 1.7;
 }
 
+/* Interactive primitives mirror /r's Act 4 language so /build and any    */
+/* legacy shell surfaces read as the same design system. Primary uses the */
+/* Stroma violet brand token; secondary is the quiet bordered pill.       */
 .button-link,
 .builder-actions button,
 .actions a {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 0.5rem;
   border-radius: 999px;
-  padding: 13px 20px;
+  padding: 0.625rem 1.125rem;
   border: 1px solid transparent;
   font: inherit;
-  font-weight: 700;
+  font-size: var(--sr-type-02);
+  font-weight: 500;
+  letter-spacing: 0.01em;
   text-decoration: none;
   cursor: pointer;
   transition:
-    transform 180ms ease,
-    border-color 180ms ease,
-    background-color 180ms ease,
-    color 180ms ease;
+    transform var(--sr-motion-micro) var(--sr-ease-out),
+    border-color var(--sr-motion-micro) var(--sr-ease-out),
+    background-color var(--sr-motion-micro) var(--sr-ease-out),
+    box-shadow var(--sr-motion-micro) var(--sr-ease-out),
+    color var(--sr-motion-micro) var(--sr-ease-out);
 }
 
 .button-link:hover,
@@ -189,25 +196,55 @@ code {
   transform: translateY(-1px);
 }
 
+.button-link:active,
+.builder-actions button:active,
+.actions a:active {
+  transform: translateY(0) scale(0.997);
+  transition-duration: 80ms;
+}
+
+.button-link:focus-visible,
+.builder-actions button:focus-visible,
+.actions a:focus-visible {
+  outline: 2px solid var(--sr-brand);
+  outline-offset: 3px;
+}
+
 .button-link.primary,
 .builder-actions .primary,
 .actions .primary {
-  background: linear-gradient(135deg, var(--mood-accent), color-mix(in srgb, var(--mood-accent) 55%, white));
-  color: #0b0d14;
+  background: var(--sr-brand);
+  color: #fff;
+  border-color: transparent;
+}
+
+.button-link.primary:hover,
+.builder-actions .primary:hover,
+.actions .primary:hover {
+  background: color-mix(in srgb, var(--sr-brand) 85%, #fff);
+  box-shadow: 0 4px 16px var(--sr-brand-glow);
 }
 
 .builder-actions .secondary,
 .button-link.secondary,
 .actions .secondary {
   background: rgba(255, 255, 255, 0.04);
-  border-color: var(--report-line);
-  color: var(--report-ink);
+  border-color: var(--sr-border);
+  color: var(--sr-fg);
+}
+
+.builder-actions .secondary:hover,
+.button-link.secondary:hover,
+.actions .secondary:hover {
+  border-color: var(--sr-border-strong);
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .builder-actions button[disabled] {
   opacity: 0.45;
   cursor: not-allowed;
   transform: none;
+  box-shadow: none;
 }
 
 .report-hero {
@@ -791,25 +828,40 @@ code {
 
 .builder-toggle {
   display: inline-flex;
-  gap: 8px;
-  padding: 6px;
+  gap: 4px;
+  padding: 4px;
   border-radius: 999px;
-  border: 1px solid var(--report-line);
-  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--sr-border);
+  background: rgba(255, 255, 255, 0.03);
 }
 
 .builder-mode {
-  padding: 10px 14px;
+  padding: 0.5rem 0.875rem;
   border: 0;
   border-radius: 999px;
   background: transparent;
-  color: var(--report-muted);
+  color: var(--sr-fg-muted);
+  font: inherit;
+  font-size: var(--sr-type-01);
+  font-weight: 500;
   cursor: pointer;
+  transition:
+    background-color var(--sr-motion-micro) var(--sr-ease-out),
+    color var(--sr-motion-micro) var(--sr-ease-out);
+}
+
+.builder-mode:hover {
+  color: var(--sr-fg);
 }
 
 .builder-mode.active {
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--report-ink);
+  background: color-mix(in srgb, var(--sr-brand) 16%, transparent);
+  color: var(--sr-fg);
+}
+
+.builder-mode:focus-visible {
+  outline: 2px solid var(--sr-brand);
+  outline-offset: 3px;
 }
 
 .builder-field {
@@ -825,11 +877,21 @@ code {
 textarea,
 select {
   width: 100%;
-  border-radius: 18px;
-  border: 1px solid var(--report-line);
-  background: rgba(6, 8, 14, 0.72);
-  color: var(--report-ink);
+  border-radius: 14px;
+  border: 1px solid var(--sr-border);
+  background: var(--sr-bg-card);
+  color: var(--sr-fg);
   font: inherit;
+  transition:
+    border-color var(--sr-motion-micro) var(--sr-ease-out),
+    box-shadow var(--sr-motion-micro) var(--sr-ease-out);
+}
+
+textarea:focus-visible,
+select:focus-visible {
+  outline: none;
+  border-color: color-mix(in srgb, var(--sr-brand) 60%, var(--sr-border-strong));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--sr-brand) 20%, transparent);
 }
 
 textarea {
@@ -866,8 +928,9 @@ select {
 
 .error {
   border-radius: 18px;
-  border: 1px solid rgba(195, 71, 62, 0.34);
-  background: rgba(195, 71, 62, 0.1);
+  border: 1px solid var(--sr-tone-alert-edge);
+  background: var(--sr-tone-alert-bg);
+  color: var(--sr-tone-alert-fg);
   padding: 14px 16px;
 }
 
@@ -897,6 +960,13 @@ select {
   margin: 8px 0 0;
   color: var(--report-ink);
   line-height: 1.5;
+}
+
+.summary-reason {
+  margin: 8px 0 0;
+  color: var(--report-ink-muted, rgba(255, 255, 255, 0.62));
+  font-size: 0.8125rem;
+  line-height: 1.45;
 }
 
 .summary-section {

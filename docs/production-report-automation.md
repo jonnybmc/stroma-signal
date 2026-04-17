@@ -39,8 +39,10 @@ Then do this once:
 2. Save the URL-builder query.
 3. Decide whether the URL should refresh manually or on a schedule.
 4. Decide where the latest URL should live for the rest of the team.
+5. Lock the owner, access controls, and retention policy for the persistence path before broader rollout.
 
 If you are still in the GTM/GA4 onboarding stage, start with [marketer-quickstart.md](./marketer-quickstart.md).
+If you want the step-by-step release and launch gates in one place, use [release-deployment-checklist.md](./release-deployment-checklist.md).
 
 ## Recommended Production Setup
 
@@ -131,6 +133,14 @@ The important part is consistency:
 - one canonical current URL
 - one agreed refresh cadence
 - one owner for the scheduled query
+- one explicit access policy for who can read or update the current-state table
+
+Recommended controls for the current-state table:
+
+- write access limited to the scheduled query owner or deployment automation
+- read access limited to the team that actually consumes the internal report
+- no public exposure unless the report is intentionally being shared outside your trusted workspace
+- explicit retention for stale rows if you keep history beyond the single current artifact
 
 ## Alternatives And Escape Hatches
 

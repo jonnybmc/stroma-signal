@@ -48,6 +48,14 @@ class MockEventTarget {
       }
     }
   }
+
+  listenerCount(type: string): number {
+    return (this.listeners.get(type) ?? []).length;
+  }
+
+  totalListeners(): number {
+    return [...this.listeners.values()].reduce((sum, listeners) => sum + listeners.length, 0);
+  }
 }
 
 class MockDocument extends MockEventTarget {
@@ -362,6 +370,44 @@ describe('signal runtime integration', () => {
     controller2.flushNow();
     expect(sink2.handle).toHaveBeenCalledTimes(1);
     expect(sink1.handle).toHaveBeenCalledTimes(0);
+  });
+
+  it('removes every registered lifecycle listener when destroy is called', () => {
+    const { documentTarget, windowTarget } = setupGlobals({ prerendering: true });
+
+    init({ sinks: [createSink()], packageVersion: 'test' });
+
+    expect(documentTarget.listenerCount('prerenderingchange')).toBe(1);
+    expect(documentTarget.listenerCount('visibilitychange')).toBe(1);
+    expect(windowTarget.listenerCount('pagehide')).toBe(1);
+    expect(windowTarget.listenerCount('pageshow')).toBe(1);
+
+    destroy();
+
+    expect(documentTarget.listenerCount('prerenderingchange')).toBe(0);
+    expect(documentTarget.listenerCount('visibilitychange')).toBe(0);
+    expect(windowTarget.listenerCount('pagehide')).toBe(0);
+    expect(windowTarget.listenerCount('pageshow')).toBe(0);
+    expect(documentTarget.totalListeners()).toBe(0);
+    expect(windowTarget.totalListeners()).toBe(0);
+  });
+
+  it('does not accumulate lifecycle listeners across destroy and re-init cycles', () => {
+    const { documentTarget, windowTarget } = setupGlobals();
+
+    init({ sinks: [createSink()], packageVersion: 'test' });
+    destroy();
+
+    expect(documentTarget.totalListeners()).toBe(0);
+    expect(windowTarget.totalListeners()).toBe(0);
+
+    init({ sinks: [createSink()], packageVersion: 'test' });
+
+    expect(documentTarget.listenerCount('visibilitychange')).toBe(1);
+    expect(windowTarget.listenerCount('pagehide')).toBe(1);
+    expect(windowTarget.listenerCount('pageshow')).toBe(1);
+    expect(documentTarget.totalListeners()).toBe(1);
+    expect(windowTarget.totalListeners()).toBe(2);
   });
 
   it('ignores flushNow during booting when vital observer is not yet ready', () => {

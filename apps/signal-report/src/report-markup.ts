@@ -1,3 +1,5 @@
+import type { SignalDeviceTier, SignalNetworkTier, SignalRaceFallbackReason } from '@stroma-labs/signal-contracts';
+
 import { escapeHtml } from './render-utils';
 import { REPORT_BRAND } from './report-brand';
 import { type IconName, renderIcon } from './report-icons';
@@ -7,6 +9,7 @@ import {
   type ReportActionableSignalsViewModel,
   type ReportDeviceTierVisual,
   type ReportExperienceStageViewModel,
+  type ReportFormFactorViewModel,
   type ReportMotionMode,
   type ReportPersonaContrast,
   type ReportPersonaProfile,
@@ -15,6 +18,14 @@ import {
 } from './report-view-model';
 
 type SeverityTone = 'steady' | 'watch' | 'alert';
+
+// Compact footer copy for the race-fallback signal — shorter than the /build
+// QA map because the credibility strip is dot-separated and must stay tight.
+const FOOTER_FALLBACK_COPY: Record<SignalRaceFallbackReason, string> = {
+  lcp_coverage_below_threshold: 'FCP race (LCP coverage below threshold)',
+  fcp_unavailable: 'TTFB race (FCP unavailable)',
+  insufficient_comparable_data: 'No race (no comparable cohort)'
+};
 
 /**
  * Radial severity gauge (LogRocket health-score pattern). One circular
@@ -50,7 +61,13 @@ function stageIcon(stageKey: string): string {
 // Classification criteria derived from the SDK classification thresholds.
 // These explain what each tier MEANS in real measurable terms so the
 // landing tables tell the full story, not just the label + share.
-const NETWORK_CRITERIA: Record<string, string> = {
+// Typed as exhaustive records — adding a new tier to the contract's
+// SignalNetworkTier / SignalDeviceTier enum will fail to compile here
+// until the criteria + meaning copy is added, preventing silent empty
+// fallback on future tier additions.
+type TierKeyAll = SignalNetworkTier | 'unknown';
+
+const NETWORK_CRITERIA: Record<TierKeyAll, string> = {
   urban: '< 50 ms TCP',
   moderate: '50–150 ms TCP',
   constrained_moderate: '150–400 ms TCP',
@@ -58,10 +75,29 @@ const NETWORK_CRITERIA: Record<string, string> = {
   unknown: 'Not classifiable'
 };
 
-const DEVICE_CRITERIA: Record<string, string> = {
+const DEVICE_CRITERIA: Record<SignalDeviceTier, string> = {
   high: '6+ cores · 4+ GB · 1280px+',
   mid: '4–6 cores · 2–4 GB · 768px+',
   low: '≤2 cores · ≤2 GB · <768px'
+};
+
+// Plain-English interpretation copy for desktop hover tooltips. These are
+// not measured values — they're empathetic pre-interpretation aimed at a
+// non-technical paid-media / CRO / SEO buyer. Stays within the truth
+// boundary: describes what the tier *means* in real user terms, without
+// claiming root cause, commercial exposure, or prescription.
+const NETWORK_MEANING: Record<TierKeyAll, string> = {
+  urban: 'Fibre, strong mobile, low latency. Usually the cohort your internal team tests on.',
+  moderate: 'Solid home broadband or good LTE. Small but measurable delays vs urban.',
+  constrained_moderate: 'Congested mobile, older 4G, or backup connections. Slowdowns are visible to the user.',
+  constrained: 'Unstable cell, roaming, or satellite tethers. Where the experience starts to break.',
+  unknown: 'Classifier could not determine the tier — usually Safari or privacy browsers that hide connection timing.'
+};
+
+const DEVICE_MEANING: Record<SignalDeviceTier, string> = {
+  high: 'Recent flagship phones and modern laptops. Ample CPU and memory for heavy pages.',
+  mid: 'Two- to three-year-old devices, the mainstream market. Start to feel JS-heavy pages.',
+  low: 'Older, low-RAM, or entry-level devices. Below the threshold where heavy bundles stay responsive.'
 };
 
 function renderTierLabels(tiers: readonly ReportTierVisual[], sampleSize: number): string {
@@ -70,12 +106,14 @@ function renderTierLabels(tiers: readonly ReportTierVisual[], sampleSize: number
       const sessions = Math.round((tier.share / 100) * sampleSize);
       const emptyAttr = tier.share === 0 ? ' data-empty="true"' : '';
       const criteria = NETWORK_CRITERIA[tier.key] ?? '';
+      const meaning = NETWORK_MEANING[tier.key] ?? '';
+      const tooltipAttr = meaning ? ` data-tooltip="${escapeHtml(meaning)}" tabindex="0"` : '';
       return `
         <tr
           class="sr-tier-label"
           data-tier="${escapeHtml(tier.key)}"
           data-cluster-anchor="${escapeHtml(tier.key)}"
-          style="--share:${tier.share}"${emptyAttr}
+          style="--share:${tier.share}"${emptyAttr}${tooltipAttr}
         >
           <th scope="row" class="sr-tier-label-name">
             <span class="sr-tier-dot" aria-hidden="true"></span>
@@ -113,11 +151,13 @@ function renderDeviceLabels(devices: readonly ReportDeviceTierVisual[], sampleSi
       const sessions = Math.round((device.share / 100) * sampleSize);
       const emptyAttr = device.share === 0 ? ' data-empty="true"' : '';
       const criteria = DEVICE_CRITERIA[device.key] ?? '';
+      const meaning = DEVICE_MEANING[device.key] ?? '';
+      const tooltipAttr = meaning ? ` data-tooltip="${escapeHtml(meaning)}" tabindex="0"` : '';
       return `
         <tr
           class="sr-tier-label sr-device-row"
           data-device-tier="${escapeHtml(device.key)}"
-          style="--share:${device.share}"${emptyAttr}
+          style="--share:${device.share}"${emptyAttr}${tooltipAttr}
         >
           <th scope="row" class="sr-tier-label-name">
             <span class="sr-tier-dot" aria-hidden="true"></span>
@@ -288,6 +328,24 @@ function _renderDeviceNarratives(devices: readonly ReportDeviceTierVisual[], sam
  * Values are dominant-bucket summaries, not per-cohort measurements.
  */
 function renderPersonaCard(profile: ReportPersonaProfile): string {
+  // Empty-state variant — cohort share is 0%. Drops the detail rows (none
+  // of which can be honestly attributed) and renders a muted explanatory
+  // card instead. Preserves the two-card layout symmetry in Act 1 so the
+  // persona grid rhythm stays intact across every scenario.
+  if (profile.is_empty) {
+    return `
+      <article class="sr-persona-card sr-persona-card-empty" data-tone="${profile.tone}" data-state="empty">
+        <header class="sr-persona-card-header">
+          <h3 class="sr-persona-card-title">${escapeHtml(profile.label)}</h3>
+          <span class="sr-persona-card-share sr-mono">0%</span>
+        </header>
+        <div class="sr-persona-card-body sr-persona-card-empty-body">
+          <p class="sr-persona-empty-message">${escapeHtml(profile.empty_message)}</p>
+        </div>
+      </article>
+    `;
+  }
+
   const rows: Array<{ icon: IconName; label: string; value: string }> = [
     {
       icon: 'users',
@@ -344,6 +402,60 @@ function renderPersonaCards(contrast: ReportPersonaContrast): string {
       ${renderPersonaCard(contrast.best)}
       ${renderPersonaCard(contrast.constrained)}
     </div>
+  `;
+}
+
+/**
+ * Act 1 form-factor block — appears below the persona grid when the
+ * aggregate carries form_factor_distribution. Three-up numeric display
+ * with a proportional bar below, monochromatic opacity ramp on --sr-fg so
+ * segments are distinguishable without colliding with the network-tier or
+ * device-tier colour palettes. aria-label on the bar describes the split.
+ */
+function renderAct1FormFactor(formFactor: ReportFormFactorViewModel | null): string {
+  if (!formFactor || formFactor.segments.length === 0) return '';
+  const ariaSegments = formFactor.segments.map((s) => `${s.label} ${s.share}%`).join(', ');
+  const columns = formFactor.segments
+    .map((segment, index) => {
+      // Three states:
+      //   - empty: share === 0 → placeholder column (fixed width, muted,
+      //     dashed bar). Communicates "absence measured" not "data missing".
+      //   - narrow: 0 < share < 14 → hides text label and tightens the
+      //     share-number scale so a tight column still reads.
+      //   - wide: share >= 14 → full treatment.
+      const state = segment.share === 0 ? 'empty' : 'populated';
+      const band = segment.share >= 14 ? 'wide' : segment.share > 0 ? 'narrow' : 'wide';
+      return `
+        <div
+          class="sr-act1-ff-column"
+          data-rank="${index}"
+          data-state="${state}"
+          data-share-band="${band}"
+          style="--share:${segment.share}"
+        >
+          <div class="sr-act1-ff-column-head">
+            <span class="sr-act1-ff-share sr-mono">${segment.share}%</span>
+            <span class="sr-act1-ff-label">${escapeHtml(segment.label)}</span>
+          </div>
+          <span class="sr-act1-ff-segment" data-rank="${index}"></span>
+        </div>
+      `;
+    })
+    .join('');
+  return `
+    <section class="sr-act1-form-factor" data-reveal style="--reveal-order:2">
+      <header class="sr-act1-ff-header">
+        <p class="sr-eyebrow">Form factor</p>
+        <p class="sr-act1-ff-header-caption">Mobile-page-experience axis</p>
+      </header>
+      <div class="sr-act1-ff-body">
+        <div
+          class="sr-act1-ff-stack"
+          role="img"
+          aria-label="Audience form-factor distribution: ${escapeHtml(ariaSegments)}"
+        >${columns}</div>
+      </div>
+    </section>
   `;
 }
 
@@ -409,12 +521,15 @@ function severityToneForWaitDelta(waitDeltaMs: number | null): SeverityTone {
 }
 
 function renderLaneSampleLine(coverage: number | null, tierLabel: string): string {
-  const share = coverage ?? 0;
+  // Distinguish genuine 0% (measured the cohort, none had the metric) from
+  // absent (coverage field unset). The legacy `coverage ?? 0` coercion read
+  // "0% measured" for both, silently conflating absence with zero.
+  const measuredFragment = coverage != null ? `${coverage}% measured` : 'coverage unavailable';
   return `
     <span class="sr-lane-sample sr-mono sr-mono-sm">
       ${escapeHtml(tierLabel.toLowerCase())} cohort
       <span class="sr-lane-sample-sep" aria-hidden="true">·</span>
-      ${share}% measured
+      ${measuredFragment}
     </span>
   `;
 }
@@ -584,10 +699,29 @@ const ACT3_STAGE_ORDER: ReadonlyArray<{
   key: 'fcp' | 'lcp' | 'inp';
   label: string;
   caption: string;
+  tooltip: string;
 }> = [
-  { key: 'fcp', label: 'First content appears', caption: 'Is the page even trying to load?' },
-  { key: 'lcp', label: 'Main content becomes visible', caption: 'Can the user see what they came for?' },
-  { key: 'inp', label: 'Interaction becomes ready', caption: 'Can the user act without waiting?' }
+  {
+    key: 'fcp',
+    label: 'First content appears',
+    caption: 'Is the page even trying to load?',
+    tooltip:
+      "The moment your page shows its first sign of life — a logo, heading, or any visible pixel. Slow here and visitors bounce before they ever see what you're offering."
+  },
+  {
+    key: 'lcp',
+    label: 'Main content becomes visible',
+    caption: 'Can the user see what they came for?',
+    tooltip:
+      "The moment your hero image or main content fully renders. This is the visitor's real 'page loaded' sensation — slow here and they've mentally moved on before your value proposition lands."
+  },
+  {
+    key: 'inp',
+    label: 'Interaction becomes ready',
+    caption: 'Can the user act without waiting?',
+    tooltip:
+      'The delay between a tap or click and the site responding. Slow here and form submits feel broken, checkouts stall, and trust erodes silently — often costing conversion without any visible error.'
+  }
 ];
 
 /**
@@ -602,17 +736,17 @@ function renderFunnelWaterfall(act3: ReportViewModel['act3']): string {
   const parts: string[] = [];
   let previousActive: ReportExperienceStageViewModel | null = null;
 
-  ACT3_STAGE_ORDER.forEach(({ key, label, caption }, index) => {
+  ACT3_STAGE_ORDER.forEach(({ key, label, caption, tooltip }, index) => {
     if (index > 0) {
       const current = byKey.get(key);
       parts.push(renderFunnelConnector(previousActive, current ?? null));
     }
     const stage = byKey.get(key);
     if (stage) {
-      parts.push(renderFunnelNodeActive(stage));
+      parts.push(renderFunnelNodeActive(stage, tooltip));
       previousActive = stage;
     } else {
-      parts.push(renderFunnelNodeInactive(key, label, caption));
+      parts.push(renderFunnelNodeInactive(key, label, caption, tooltip));
     }
   });
 
@@ -624,10 +758,16 @@ function renderFunnelWaterfall(act3: ReportViewModel['act3']): string {
   `;
 }
 
-function renderFunnelNodeActive(stage: ReportExperienceStageViewModel): string {
+function renderFunnelNodeActive(stage: ReportExperienceStageViewModel, tooltip: string): string {
   const tone = stageToneForShare(stage.weighted_poor_share);
   return `
-    <article class="sr-funnel-node" data-stage="${escapeHtml(stage.key)}" data-tone="${tone}">
+    <article
+      class="sr-funnel-node"
+      data-stage="${escapeHtml(stage.key)}"
+      data-tone="${tone}"
+      data-tooltip="${escapeHtml(tooltip)}"
+      tabindex="0"
+    >
       <header class="sr-funnel-node-head">
         <span class="sr-funnel-node-icon" aria-hidden="true">${stageIcon(stage.key)}</span>
         <p class="sr-eyebrow sr-funnel-node-label">${escapeHtml(stage.label)}</p>
@@ -638,9 +778,14 @@ function renderFunnelNodeActive(stage: ReportExperienceStageViewModel): string {
   `;
 }
 
-function renderFunnelNodeInactive(key: 'fcp' | 'lcp' | 'inp', label: string, caption: string): string {
+function renderFunnelNodeInactive(key: 'fcp' | 'lcp' | 'inp', label: string, caption: string, tooltip: string): string {
   return `
-    <article class="sr-funnel-node sr-funnel-node-inactive" data-stage="${escapeHtml(key)}">
+    <article
+      class="sr-funnel-node sr-funnel-node-inactive"
+      data-stage="${escapeHtml(key)}"
+      data-tooltip="${escapeHtml(tooltip)}"
+      tabindex="0"
+    >
       <header class="sr-funnel-node-head">
         <span class="sr-funnel-node-icon" aria-hidden="true">${stageIcon(key)}</span>
         <p class="sr-eyebrow sr-funnel-node-label">${escapeHtml(label)}</p>
@@ -719,15 +864,34 @@ function renderAct3(viewModel: ReportViewModel): string {
     `;
   }
 
-  const poorShare = act3.poor_session_share ?? 0;
-  const coverage = act3.measured_session_coverage ?? 0;
-  const tone = stageToneForShare(poorShare);
-  const severityLabel =
-    tone === 'alert'
+  // Distinguish genuine 0% (measured and found none crossed threshold) from
+  // absent (funnel exists but no defensible poor-share measurement). The
+  // legacy ?? 0 coercion silently rendered "0% of classified sessions
+  // crossed a poor-performance threshold" when the truth was "we couldn't
+  // measure this" — actively misleading.
+  const hasPoor = act3.poor_session_share != null;
+  const hasCoverage = act3.measured_session_coverage != null;
+  const poorShare = hasPoor ? (act3.poor_session_share as number) : 0;
+  const coverage = hasCoverage ? (act3.measured_session_coverage as number) : 0;
+  // Tone computation only trusts a measured share. Absent data defaults to
+  // 'steady' (neutral) rather than 'alert' (which would imply risk).
+  const tone = hasPoor ? stageToneForShare(poorShare) : 'steady';
+  const severityLabel = !hasPoor
+    ? 'Performance cliff unmeasurable'
+    : tone === 'alert'
       ? 'Critical performance cliff'
       : tone === 'watch'
         ? 'Measurable performance cliff'
         : 'Controlled performance cliff';
+  const heroNumber = hasPoor
+    ? `<strong class="sr-takeaway-number sr-counter sr-mono" data-role="counter" data-counter-final="${poorShare}">${poorShare}%</strong>`
+    : '<strong class="sr-takeaway-number sr-mono sr-takeaway-absent" aria-label="No measured poor-session share available">—</strong>';
+  const heroCaption = hasPoor
+    ? 'of classified sessions crossed a poor-performance threshold.'
+    : 'Insufficient stage-level data to compute the threshold-crossing share for this window.';
+  const titleAttr = hasCoverage
+    ? `Threshold basis: ${escapeHtml(act3.threshold_basis)} · Confidence: ${coverage}% of sessions had every stage measured`
+    : `Threshold basis: ${escapeHtml(act3.threshold_basis)} · Confidence: measured-session coverage unavailable for this window`;
 
   const reducedNote =
     act3.mode === 'reduced'
@@ -741,16 +905,12 @@ function renderAct3(viewModel: ReportViewModel): string {
       class="sr-act3-hero"
       data-reveal
       style="--reveal-order:1"
-      title="Threshold basis: ${escapeHtml(act3.threshold_basis)} · Confidence: ${coverage}% of sessions had every stage measured"
+      title="${titleAttr}"
     >
       ${renderSeverityGauge(tone, severityLabel)}
       <div class="sr-act3-hero-body">
-        <strong
-          class="sr-takeaway-number sr-counter sr-mono"
-          data-role="counter"
-          data-counter-final="${poorShare}"
-        >${poorShare}%</strong>
-        <p class="sr-act3-hero-caption">of classified sessions crossed a poor-performance threshold.</p>
+        ${heroNumber}
+        <p class="sr-act3-hero-caption">${heroCaption}</p>
       </div>
     </div>
 
@@ -771,14 +931,18 @@ function renderAct4(viewModel: ReportViewModel): string {
     <div class="sr-act4-body" data-reveal style="--reveal-order:1">
       <div class="sr-act4-findings">
         <p class="sr-act4-findings-eyebrow sr-eyebrow">What you now know</p>
-        <ul class="sr-act4-findings-list">
-          ${viewModel.act4_summary_points.map((point) => `<li>${escapeHtml(point)}</li>`).join('')}
-        </ul>
+        ${
+          viewModel.act4_summary_points.length > 0
+            ? `<ul class="sr-act4-findings-list">${viewModel.act4_summary_points
+                .map((point) => `<li>${escapeHtml(point)}</li>`)
+                .join('')}</ul>`
+            : `<p class="sr-act4-findings-empty">This sample did not produce enough measured signal for a defensible summary — Acts 1 and 2 carry the observed evidence.</p>`
+        }
       </div>
 
       <div class="sr-act4-horizon">
-        <p class="sr-eyebrow">The next layer</p>
-        <p class="sr-act4-horizon-body">This report proves the gap. It does not explain root cause, quantify exposure, or prescribe fixes.</p>
+        <p class="sr-eyebrow">The boundary of this artifact</p>
+        <p class="sr-act4-horizon-body">This report proves the existence and shape of the experience gap. It does not explain root cause, quantify business exposure, or prescribe remediation.</p>
         <div class="sr-offers">
           ${viewModel.offer_cards
             .map(
@@ -813,6 +977,60 @@ function computeSlowerShare(viewModel: ReportViewModel): number {
 }
 
 export function renderReportMarkup(viewModel: ReportViewModel, motionMode: ReportMotionMode): string {
+  return renderFullReport(viewModel, motionMode);
+}
+
+function renderCredibilityStrip(viewModel: ReportViewModel): string {
+  return `
+    <div class="sr-credibility-strip">
+      <span class="sr-credibility-item">${viewModel.credibility_strip.sample_size.toLocaleString()} sessions</span>
+      <span class="sr-credibility-sep" aria-hidden="true">·</span>
+      <span class="sr-credibility-item">${viewModel.credibility_strip.period_days}d window</span>
+      <span class="sr-credibility-sep" aria-hidden="true">·</span>
+      <span class="sr-credibility-item">${viewModel.credibility_strip.classified_share}% classified</span>
+      <span class="sr-credibility-sep" aria-hidden="true">·</span>
+      <span class="sr-credibility-item">${viewModel.credibility_strip.connection_reuse_share}% conn reuse</span>
+      <span class="sr-credibility-sep" aria-hidden="true">·</span>
+      <span class="sr-credibility-item">${viewModel.credibility_strip.metric_coverage}% ${escapeHtml(viewModel.credibility_strip.metric_coverage_label)}</span>
+      ${
+        viewModel.race.fallback_reason != null
+          ? `
+        <span class="sr-credibility-sep" aria-hidden="true">·</span>
+        <span class="sr-credibility-item" data-role="fallback-honesty">${escapeHtml(FOOTER_FALLBACK_COPY[viewModel.race.fallback_reason])}</span>
+      `
+          : ''
+      }
+      ${
+        viewModel.freshness_known
+          ? `
+        <span class="sr-credibility-sep" aria-hidden="true">·</span>
+        <span class="sr-credibility-item">${new Date(viewModel.generated_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+      `
+          : ''
+      }
+    </div>
+  `;
+}
+
+function renderFooter(viewModel: ReportViewModel): string {
+  return `
+    <footer class="sr-landing-footer" data-role="persistent-footer">
+      <p class="sr-landing-boundary">${escapeHtml(viewModel.boundary_statement)}</p>
+      ${renderCredibilityStrip(viewModel)}
+      ${viewModel.warnings.length > 0 ? `<div class="sr-warnings">${viewModel.warnings.map((w) => `<p class="sr-warning">${escapeHtml(w)}</p>`).join('')}</div>` : ''}
+      <div class="sr-landing-brand">
+        <button class="sr-share-btn sr-mono sr-mono-sm" data-role="share-copy" type="button">Copy report link</button>
+        <img
+          class="sr-wordmark"
+          src="${REPORT_BRAND.wordmarkUrl}"
+          alt="${escapeHtml(REPORT_BRAND.alt)}"
+        />
+      </div>
+    </footer>
+  `;
+}
+
+function renderFullReport(viewModel: ReportViewModel, motionMode: ReportMotionMode): string {
   const motionPayload = JSON.stringify(extractMotionPayload(viewModel));
   const slowerShare = computeSlowerShare(viewModel);
 
@@ -822,6 +1040,7 @@ export function renderReportMarkup(viewModel: ReportViewModel, motionMode: Repor
       data-mood="${escapeHtml(viewModel.mood_tier)}"
       data-motion="${escapeHtml(motionMode)}"
       data-mode="${escapeHtml(viewModel.mode)}"
+      data-orchestration="pending"
     >
       <canvas class="sr-canvas" data-role="canvas" aria-hidden="true"></canvas>
 
@@ -877,51 +1096,54 @@ export function renderReportMarkup(viewModel: ReportViewModel, motionMode: Repor
         <span class="sr-mono sr-mono-sm">Use ← → to navigate</span>
       </div>
 
-      <footer class="sr-landing-footer" data-role="persistent-footer">
-        <p class="sr-landing-boundary">${escapeHtml(viewModel.boundary_statement)}</p>
-        <div class="sr-credibility-strip">
-          <span class="sr-credibility-item">${viewModel.credibility_strip.sample_size.toLocaleString()} sessions</span>
-          <span class="sr-credibility-sep" aria-hidden="true">·</span>
-          <span class="sr-credibility-item">${viewModel.credibility_strip.period_days}d window</span>
-          <span class="sr-credibility-sep" aria-hidden="true">·</span>
-          <span class="sr-credibility-item">${viewModel.credibility_strip.classified_share}% classified</span>
-          <span class="sr-credibility-sep" aria-hidden="true">·</span>
-          <span class="sr-credibility-item">${viewModel.credibility_strip.connection_reuse_share}% conn reuse</span>
-          <span class="sr-credibility-sep" aria-hidden="true">·</span>
-          <span class="sr-credibility-item">${viewModel.credibility_strip.metric_coverage}% ${escapeHtml(viewModel.credibility_strip.metric_coverage_label)}</span>
-          ${
-            viewModel.freshness_known
-              ? `
-            <span class="sr-credibility-sep" aria-hidden="true">·</span>
-            <span class="sr-credibility-item">${new Date(viewModel.generated_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
-          `
-              : ''
-          }
-        </div>
-        ${viewModel.warnings.length > 0 ? `<div class="sr-warnings">${viewModel.warnings.map((w) => `<p class="sr-warning">${escapeHtml(w)}</p>`).join('')}</div>` : ''}
-        <div class="sr-landing-brand">
-          <img
-            class="sr-wordmark"
-            src="${REPORT_BRAND.wordmarkUrl}"
-            alt="${escapeHtml(REPORT_BRAND.alt)}"
-          />
-        </div>
-      </footer>
+      <!-- Shared floating tooltip — positioned by the landing-tooltip handler
+           (see report-motion.ts). Copy is empathetic interpretation for the
+           non-technical buyer, desktop-hover only via @media (hover: hover). -->
+      <div
+        id="sr-landing-tooltip"
+        class="sr-landing-tooltip"
+        data-role="landing-tooltip"
+        role="tooltip"
+        aria-hidden="true"
+      ></div>
+
+      ${renderFooter(viewModel)}
 
       <div class="sr-deck" data-role="deck" style="--deck-current: 0;">
         <section class="sr-landing sr-slide" style="--slide-index: 0;" data-role="landing" data-slide-index="0" aria-labelledby="sr-hero-title">
           <div class="sr-landing-center">
-            <div class="sr-landing-hero" data-reveal style="--reveal-order:0">
-              <span class="sr-mood-pill sr-landing-mood" data-mood="${escapeHtml(viewModel.mood_tier)}">
+            <div class="sr-landing-hero">
+              <span class="sr-mood-pill sr-landing-mood" data-mood="${escapeHtml(viewModel.mood_tier)}" data-reveal style="--reveal-order:0">
                 <span class="sr-mood-dot" aria-hidden="true"></span>
                 <span class="sr-mono">${escapeHtml(viewModel.hero_kicker)}</span>
               </span>
-              <h1 class="sr-hero" id="sr-hero-title">${escapeHtml(viewModel.hero_title)}</h1>
-              <p class="sr-lede">${escapeHtml(viewModel.hero_lede)}</p>
+              <!-- Prelude block — domain + fact line render immediately (no data-reveal) so they
+                   appear during Stage A while particles are still drifting in. The .sr-root's
+                   data-orchestration="pending" state translates the prelude toward viewport
+                   centre; when the state flips, the prelude eases up to its natural position. -->
+              <div class="sr-landing-prelude" data-role="landing-prelude">
+                <h1 class="sr-hero" id="sr-hero-title">${escapeHtml(viewModel.hero_title)}</h1>
+                <p class="sr-landing-fact">
+                  <span
+                    class="sr-mono sr-landing-fact-number"
+                    data-count-up
+                    data-count-up-target="${viewModel.sample_size}"
+                  >${viewModel.sample_size.toLocaleString()}</span>
+                  <span class="sr-landing-fact-text">sessions measured over</span>
+                  <span class="sr-mono sr-landing-fact-number">${viewModel.period_days}</span>
+                  <span class="sr-landing-fact-text">${viewModel.period_days === 1 ? 'day' : 'days'}</span>
+                </p>
+              </div>
+              <p class="sr-lede" data-reveal style="--reveal-order:1">${escapeHtml(viewModel.hero_lede)}</p>
             </div>
 
-            <div class="sr-kpi-grid" data-reveal style="--reveal-order:1">
-              <div class="sr-kpi-card" data-tone="${escapeHtml(slowerTakeawayTone(slowerShare))}">
+            <div class="sr-kpi-grid" data-reveal style="--reveal-order:7">
+              <div
+                class="sr-kpi-card"
+                data-tone="${escapeHtml(slowerTakeawayTone(slowerShare))}"
+                data-tooltip="The share of sessions landing on a measurably weaker network or device tier than your fastest cohort. In paid-media terms, this is the portion of traffic arriving to a different post-click reality than the one your team sees."
+                tabindex="0"
+              >
                 <div class="sr-kpi-card-header">
                   <span class="sr-kpi-icon-badge" aria-hidden="true">
                     ${renderIcon('trendingUp', 'sr-icon sr-icon-sm')}
@@ -930,7 +1152,11 @@ export function renderReportMarkup(viewModel: ReportViewModel, motionMode: Repor
                 <strong class="sr-kpi-value sr-mono">${slowerShare}%</strong>
                 <span class="sr-kpi-label">slower than urban</span>
               </div>
-              <div class="sr-kpi-card">
+              <div
+                class="sr-kpi-card"
+                data-tooltip="Your measured sample. More sessions means more stable tier shares. Below about 200 sessions the shares read as indicative rather than precise."
+                tabindex="0"
+              >
                 <div class="sr-kpi-card-header">
                   <span class="sr-kpi-icon-badge" aria-hidden="true">
                     ${renderIcon('users', 'sr-icon sr-icon-sm')}
@@ -939,7 +1165,11 @@ export function renderReportMarkup(viewModel: ReportViewModel, motionMode: Repor
                 <strong class="sr-kpi-value sr-mono">${viewModel.sample_size.toLocaleString()}</strong>
                 <span class="sr-kpi-label">sessions measured</span>
               </div>
-              <div class="sr-kpi-card">
+              <div
+                class="sr-kpi-card"
+                data-tooltip="The observation window. Seven complete days is canonical — long enough to catch a weekly cycle, short enough to stay current. A single-day snapshot may not capture weekday / weekend variance."
+                tabindex="0"
+              >
                 <div class="sr-kpi-card-header">
                   <span class="sr-kpi-icon-badge" aria-hidden="true">
                     ${renderIcon('zap', 'sr-icon sr-icon-sm')}
@@ -950,7 +1180,7 @@ export function renderReportMarkup(viewModel: ReportViewModel, motionMode: Repor
               </div>
             </div>
 
-            <div class="sr-landing-tables" data-reveal style="--reveal-order:2">
+            <div class="sr-landing-tables" data-reveal style="--reveal-order:8">
               <section class="sr-rail-section" aria-labelledby="sr-rail-network">
                 <p class="sr-eyebrow sr-rail-eyebrow" id="sr-rail-network">
                   ${renderIcon('users', 'sr-icon sr-icon-sm')}
@@ -967,18 +1197,6 @@ export function renderReportMarkup(viewModel: ReportViewModel, motionMode: Repor
               </section>
             </div>
 
-            <div class="sr-evidence-rail" data-reveal style="--reveal-order:3">
-              ${viewModel.evidence_items
-                .map(
-                  (item) => `
-                    <span class="sr-evidence-pill" data-tone="${escapeHtml(item.tone)}">
-                      <span class="sr-evidence-label">${escapeHtml(item.label)}</span>
-                      <strong class="sr-evidence-value">${escapeHtml(item.value)}</strong>
-                    </span>
-                  `
-                )
-                .join('')}
-            </div>
           </div>
         </section>
 
@@ -997,6 +1215,7 @@ export function renderReportMarkup(viewModel: ReportViewModel, motionMode: Repor
           </header>
 
           ${renderPersonaCards(viewModel.persona_contrast)}
+          ${renderAct1FormFactor(viewModel.form_factor)}
         </section>
 
         <section

@@ -50,12 +50,15 @@ if (!location.search) {
 
   if (!decodeFailed && aggregate) {
     const params = new URLSearchParams(location.search);
+    const qaParam = params.get('qa');
+    const qaMode = qaParam === '1' || qaParam === 'deterministic';
+    const qaDeterministic = qaParam === 'deterministic';
     const forcedMotion = params.get('motion');
-    const motionMode: ReportMotionMode =
-      forcedMotion === 'full' || forcedMotion === 'reduced'
+    const motionMode: ReportMotionMode = qaDeterministic
+      ? 'reduced'
+      : forcedMotion === 'full' || forcedMotion === 'reduced'
         ? forcedMotion
         : selectMotionMode(window.matchMedia('(prefers-reduced-motion: reduce)').matches);
-    const qaMode = params.get('qa') === '1';
     const requestedScene = params.get('scene');
     const scene =
       requestedScene === 'act1' || requestedScene === 'act2' || requestedScene === 'act3' || requestedScene === 'act4'
@@ -63,8 +66,23 @@ if (!location.search) {
         : 'all';
     const viewModel = buildReportViewModel(aggregate);
 
-    app.className = `app-shell motion-${motionMode} mood-${viewModel.mood_tier}${qaMode ? ' qa-mode' : ''} scene-${scene}`;
+    app.className = `app-shell motion-${motionMode} mood-${viewModel.mood_tier}${qaMode ? ' qa-mode' : ''}${qaDeterministic ? ' qa-deterministic' : ''} scene-${scene}`;
     app.innerHTML = renderReportMarkup(viewModel, motionMode);
-    initReportMotion(motionMode);
+    const skipOrchestration = qaMode || motionMode === 'reduced' || scene !== 'all' || forcedMotion === 'reduced';
+    initReportMotion(motionMode, { skipOrchestration });
+
+    const shareBtn = document.querySelector<HTMLButtonElement>('[data-role="share-copy"]');
+    if (shareBtn) {
+      shareBtn.addEventListener('click', () => {
+        navigator.clipboard.writeText(location.href).then(() => {
+          shareBtn.textContent = 'Copied!';
+          shareBtn.setAttribute('data-copied', 'true');
+          setTimeout(() => {
+            shareBtn.textContent = 'Copy report link';
+            shareBtn.removeAttribute('data-copied');
+          }, 2000);
+        });
+      });
+    }
   }
 }
