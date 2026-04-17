@@ -8,6 +8,11 @@ import type {
   SignalExperienceFunnel,
   SignalExperienceStage,
   SignalFormFactorDistribution,
+  SignalInpPhase,
+  SignalInpStory,
+  SignalLcpCulpritKind,
+  SignalLcpStory,
+  SignalLcpSubpart,
   SignalNetworkSignals,
   SignalQuartiles,
   SignalRaceFallbackReason,
@@ -39,6 +44,24 @@ const VALID_RACE_FALLBACK_REASONS = new Set<SignalRaceFallbackReason>([
   'fcp_unavailable',
   'insufficient_comparable_data'
 ]);
+
+const VALID_LCP_SUBPARTS = new Set<SignalLcpSubpart>([
+  'ttfb',
+  'resource_load_delay',
+  'resource_load_time',
+  'element_render_delay'
+]);
+
+const VALID_LCP_CULPRIT_KINDS = new Set<SignalLcpCulpritKind>([
+  'hero_image',
+  'headline_text',
+  'banner_image',
+  'product_image',
+  'video_poster',
+  'unknown'
+]);
+
+const VALID_INP_PHASES = new Set<SignalInpPhase>(['input_delay', 'processing', 'presentation']);
 
 export const SIGNAL_FRESHNESS_UNKNOWN_WARNING =
   'Report generation timestamp is unknown — this link predates freshness tracking.';
@@ -206,6 +229,38 @@ function encodeNetworkSignals(params: URLSearchParams, signals: SignalNetworkSig
   }
 }
 
+function encodeLcpStory(params: URLSearchParams, story: SignalLcpStory): void {
+  if (story.subpart_distribution_pct) {
+    params.set(
+      'lss',
+      joinInts([
+        story.subpart_distribution_pct.ttfb,
+        story.subpart_distribution_pct.resource_load_delay,
+        story.subpart_distribution_pct.resource_load_time,
+        story.subpart_distribution_pct.element_render_delay
+      ])
+    );
+  }
+  if (story.dominant_subpart) params.set('lsd', story.dominant_subpart);
+  if (story.dominant_subpart_share_pct != null) params.set('lsr', String(story.dominant_subpart_share_pct));
+  if (story.dominant_culprit_kind) params.set('lsc', story.dominant_culprit_kind);
+}
+
+function encodeInpStory(params: URLSearchParams, story: SignalInpStory): void {
+  if (story.phase_distribution_pct) {
+    params.set(
+      'isp',
+      joinInts([
+        story.phase_distribution_pct.input_delay,
+        story.phase_distribution_pct.processing,
+        story.phase_distribution_pct.presentation
+      ])
+    );
+  }
+  if (story.dominant_phase) params.set('isd', story.dominant_phase);
+  if (story.dominant_phase_share_pct != null) params.set('isr', String(story.dominant_phase_share_pct));
+}
+
 function encodeEnvironment(params: URLSearchParams, env: SignalEnvironment): void {
   params.set(
     'eb',
@@ -287,6 +342,8 @@ function encodeAggregate(aggregate: SignalAggregateV1): URLSearchParams {
       ])
     );
   }
+  if (aggregate.lcp_story) encodeLcpStory(params, aggregate.lcp_story);
+  if (aggregate.inp_story) encodeInpStory(params, aggregate.inp_story);
   if (aggregate.top_page_path) params.set('v', aggregate.top_page_path);
   params.set('ga', String(aggregate.generated_at));
   return params;
@@ -478,6 +535,79 @@ function readOptionalEnvironment(params: URLSearchParams): SignalEnvironment | u
   };
 }
 
+function readOptionalLcpStory(params: URLSearchParams): SignalLcpStory | undefined {
+  const raw = params.get('lss');
+  const dominant = params.get('lsd');
+  const dominantShare = params.get('lsr');
+  const culprit = params.get('lsc');
+  if (raw == null && dominant == null && dominantShare == null && culprit == null) return undefined;
+
+  let distribution: SignalLcpStory['subpart_distribution_pct'] = null;
+  if (raw != null) {
+    const parts = parseInts(raw, 4);
+    distribution = {
+      ttfb: parts[0] ?? 0,
+      resource_load_delay: parts[1] ?? 0,
+      resource_load_time: parts[2] ?? 0,
+      element_render_delay: parts[3] ?? 0
+    };
+  }
+
+  let dominantSubpart: SignalLcpSubpart | null = null;
+  if (dominant != null) {
+    if (!VALID_LCP_SUBPARTS.has(dominant as SignalLcpSubpart)) {
+      throw new Error(`Invalid encoded enum value for "lsd": ${dominant}`);
+    }
+    dominantSubpart = dominant as SignalLcpSubpart;
+  }
+
+  let culpritKind: SignalLcpCulpritKind | null = null;
+  if (culprit != null) {
+    if (!VALID_LCP_CULPRIT_KINDS.has(culprit as SignalLcpCulpritKind)) {
+      throw new Error(`Invalid encoded enum value for "lsc": ${culprit}`);
+    }
+    culpritKind = culprit as SignalLcpCulpritKind;
+  }
+
+  return {
+    dominant_subpart: dominantSubpart,
+    dominant_subpart_share_pct: dominantShare == null ? null : readNumberParam(params, 'lsr'),
+    dominant_culprit_kind: culpritKind,
+    subpart_distribution_pct: distribution
+  };
+}
+
+function readOptionalInpStory(params: URLSearchParams): SignalInpStory | undefined {
+  const raw = params.get('isp');
+  const dominant = params.get('isd');
+  const dominantShare = params.get('isr');
+  if (raw == null && dominant == null && dominantShare == null) return undefined;
+
+  let distribution: SignalInpStory['phase_distribution_pct'] = null;
+  if (raw != null) {
+    const parts = parseInts(raw, 3);
+    distribution = {
+      input_delay: parts[0] ?? 0,
+      processing: parts[1] ?? 0,
+      presentation: parts[2] ?? 0
+    };
+  }
+
+  let dominantPhase: SignalInpPhase | null = null;
+  if (dominant != null) {
+    if (!VALID_INP_PHASES.has(dominant as SignalInpPhase)) {
+      throw new Error(`Invalid encoded enum value for "isd": ${dominant}`);
+    }
+    dominantPhase = dominant as SignalInpPhase;
+  }
+
+  return {
+    dominant_phase: dominantPhase,
+    dominant_phase_share_pct: dominantShare == null ? null : readNumberParam(params, 'isr'),
+    phase_distribution_pct: distribution
+  };
+}
+
 function readOptionalFormFactor(params: URLSearchParams): SignalFormFactorDistribution | undefined {
   if (params.get('ff') == null) return undefined;
   const shares = parseInts(params.get('ff'), 3);
@@ -586,6 +716,8 @@ export function decodeSignalReportUrl(value: string | URL): SignalAggregateV1 {
     network_signals: readOptionalNetworkSignals(params),
     environment: readOptionalEnvironment(params),
     form_factor_distribution: readOptionalFormFactor(params),
+    lcp_story: readOptionalLcpStory(params),
+    inp_story: readOptionalInpStory(params),
     top_page_path: params.get('v'),
     warnings
   };

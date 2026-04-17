@@ -60,4 +60,45 @@ describe('formatSignalSummary', () => {
       expect(output).toContain('Warnings');
     }
   });
+
+  it('renders LCP story and INP story sections when present on the aggregate', () => {
+    const enriched = {
+      ...strongLcpCoverageAggregateFixture,
+      lcp_story: {
+        dominant_subpart: 'element_render_delay' as const,
+        dominant_subpart_share_pct: 74,
+        dominant_culprit_kind: 'hero_image' as const,
+        subpart_distribution_pct: {
+          ttfb: 8,
+          resource_load_delay: 6,
+          resource_load_time: 12,
+          element_render_delay: 74
+        }
+      },
+      inp_story: {
+        dominant_phase: 'processing' as const,
+        dominant_phase_share_pct: 62,
+        phase_distribution_pct: {
+          input_delay: 14,
+          processing: 62,
+          presentation: 24
+        }
+      }
+    };
+
+    const output = formatSignalSummary(enriched);
+
+    expect(output).toContain('LCP story');
+    expect(output).toContain('Render delay');
+    expect(output).toContain('Hero image');
+    expect(output).toContain('INP story');
+    expect(output).toContain('Processing');
+  });
+
+  it('omits LCP story and INP story sections when absent on the aggregate', () => {
+    const output = formatSignalSummary(strongLcpCoverageAggregateFixture);
+
+    expect(output).not.toContain('LCP story');
+    expect(output).not.toContain('INP story');
+  });
 });

@@ -47,7 +47,12 @@ const WAREHOUSE_COLUMNS: ReadonlyArray<keyof SignalWarehouseRowV1> = [
   'interaction_time_ms',
   'input_delay_ms',
   'processing_duration_ms',
-  'presentation_delay_ms'
+  'presentation_delay_ms',
+  'lcp_breakdown_resource_load_delay_ms',
+  'lcp_breakdown_resource_load_time_ms',
+  'lcp_breakdown_element_render_delay_ms',
+  'lcp_attribution_culprit_kind',
+  'inp_attribution_dominant_phase'
 ];
 
 function escapeCsvCell(value: unknown): string {

@@ -37,6 +37,11 @@ describe('exportSignalEventsToCSV', () => {
     expect(headers).toContain('fcp_ms');
     expect(headers).toContain('browser');
     expect(headers).toContain('presentation_delay_ms');
+    expect(headers).toContain('lcp_breakdown_resource_load_delay_ms');
+    expect(headers).toContain('lcp_breakdown_resource_load_time_ms');
+    expect(headers).toContain('lcp_breakdown_element_render_delay_ms');
+    expect(headers).toContain('lcp_attribution_culprit_kind');
+    expect(headers).toContain('inp_attribution_dominant_phase');
   });
 
   it('produces correct row count', () => {

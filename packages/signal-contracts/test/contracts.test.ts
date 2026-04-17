@@ -162,7 +162,7 @@ describe('signal contracts', () => {
     const flattened = flattenSignalEventForGa4(chromeColdNavFixture);
 
     expect(flattened.event).toBe(SIGNAL_GA4_EVENT_NAME);
-    expect(Object.keys(flattened)).toHaveLength(22);
+    expect(Object.keys(flattened)).toHaveLength(25);
     expect(flattened.net_tier).toBe(chromeColdNavFixture.net_tier);
     expect(flattened.device_screen_w).toBe(chromeColdNavFixture.device_screen_w);
     expect(flattened.lcp_ms).toBe(chromeColdNavFixture.vitals.lcp_ms);
@@ -198,7 +198,7 @@ describe('signal contracts', () => {
     const flattened = flattenSignalEventForGa4(chromeColdNavFixture);
     const ga4SafeFieldCount = Object.keys(SIGNAL_GA4_FIELD_MAP_V1.fields).length;
 
-    expect(ga4SafeFieldCount).toBe(21);
+    expect(ga4SafeFieldCount).toBe(24);
     expect(ga4SafeFieldCount).toBeLessThanOrEqual(25);
     expect(Object.keys(flattened).filter((key) => key !== 'event')).toHaveLength(ga4SafeFieldCount);
   });
@@ -805,5 +805,229 @@ describe('signal contracts', () => {
     expect(explainSignalWarehouseRowIssues(invalidWarehouseRow)).toContain(
       'Expected "interaction_type" to be pointer, keyboard, or null.'
     );
+  });
+
+  it('extracts lcp_breakdown + culprit_kind + inp dominant_phase into the warehouse row', () => {
+    const enrichedEvent = {
+      ...chromeColdNavFixture,
+      vitals: {
+        ...chromeColdNavFixture.vitals,
+        lcp_breakdown: {
+          resource_load_delay_ms: 210,
+          resource_load_time_ms: 1_480,
+          element_render_delay_ms: 6_240
+        },
+        lcp_attribution: {
+          ...(chromeColdNavFixture.vitals.lcp_attribution ?? {
+            load_state: null,
+            target: null,
+            element_type: null,
+            resource_url: null
+          }),
+          culprit_kind: 'hero_image' as const
+        },
+        inp_attribution: {
+          ...(chromeColdNavFixture.vitals.inp_attribution ?? {
+            load_state: null,
+            interaction_target: null,
+            interaction_type: null,
+            interaction_time_ms: null,
+            input_delay_ms: null,
+            processing_duration_ms: null,
+            presentation_delay_ms: null
+          }),
+          dominant_phase: 'processing' as const
+        }
+      }
+    };
+    const warehouseRow = toSignalWarehouseRow(enrichedEvent);
+
+    expect(warehouseRow.lcp_breakdown_resource_load_delay_ms).toBe(210);
+    expect(warehouseRow.lcp_breakdown_resource_load_time_ms).toBe(1_480);
+    expect(warehouseRow.lcp_breakdown_element_render_delay_ms).toBe(6_240);
+    expect(warehouseRow.lcp_attribution_culprit_kind).toBe('hero_image');
+    expect(warehouseRow.inp_attribution_dominant_phase).toBe('processing');
+  });
+
+  it('leaves lcp_breakdown and enum diagnostics null in the warehouse row when capture omits them', () => {
+    const warehouseRow = toSignalWarehouseRow(chromeColdNavFixture);
+
+    expect(warehouseRow.lcp_breakdown_resource_load_delay_ms).toBeNull();
+    expect(warehouseRow.lcp_breakdown_resource_load_time_ms).toBeNull();
+    expect(warehouseRow.lcp_breakdown_element_render_delay_ms).toBeNull();
+    expect(warehouseRow.lcp_attribution_culprit_kind).toBeNull();
+    expect(warehouseRow.inp_attribution_dominant_phase).toBeNull();
+  });
+
+  it('flattens lcp_dominant_subpart + culprit + inp phase for GA4 from enriched capture', () => {
+    const enrichedEvent = {
+      ...chromeColdNavFixture,
+      vitals: {
+        ...chromeColdNavFixture.vitals,
+        ttfb_ms: 813,
+        lcp_breakdown: {
+          resource_load_delay_ms: 210,
+          resource_load_time_ms: 1_480,
+          element_render_delay_ms: 6_240
+        },
+        lcp_attribution: {
+          ...(chromeColdNavFixture.vitals.lcp_attribution ?? {
+            load_state: null,
+            target: null,
+            element_type: null,
+            resource_url: null
+          }),
+          culprit_kind: 'hero_image' as const
+        },
+        inp_attribution: {
+          ...(chromeColdNavFixture.vitals.inp_attribution ?? {
+            load_state: null,
+            interaction_target: null,
+            interaction_type: null,
+            interaction_time_ms: null,
+            input_delay_ms: null,
+            processing_duration_ms: null,
+            presentation_delay_ms: null
+          }),
+          dominant_phase: 'processing' as const
+        }
+      }
+    };
+    const flattened = flattenSignalEventForGa4(enrichedEvent);
+
+    // element_render_delay is the largest of {ttfb=813, rld=210, rlt=1480, erd=6240}
+    expect(flattened.lcp_dominant_subpart).toBe('element_render_delay');
+    expect(flattened.lcp_culprit_kind).toBe('hero_image');
+    expect(flattened.inp_dominant_phase).toBe('processing');
+  });
+
+  it('aggregates lcp_story and inp_story when observations cross the race threshold', () => {
+    const events = Array.from({ length: 30 }, (_, index) => ({
+      ...chromeColdNavFixture,
+      event_id: `enriched_${index}`,
+      ts: chromeColdNavFixture.ts + index * 1_000,
+      vitals: {
+        ...chromeColdNavFixture.vitals,
+        ttfb_ms: 400,
+        lcp_breakdown: {
+          resource_load_delay_ms: 120,
+          resource_load_time_ms: 880,
+          element_render_delay_ms: 4_600
+        },
+        lcp_attribution: {
+          ...(chromeColdNavFixture.vitals.lcp_attribution ?? {
+            load_state: null,
+            target: null,
+            element_type: null,
+            resource_url: null
+          }),
+          culprit_kind: 'hero_image' as const
+        },
+        inp_attribution: {
+          ...(chromeColdNavFixture.vitals.inp_attribution ?? {
+            load_state: null,
+            interaction_target: null,
+            interaction_type: null,
+            interaction_time_ms: null,
+            input_delay_ms: null,
+            processing_duration_ms: null,
+            presentation_delay_ms: null
+          }),
+          dominant_phase: 'processing' as const
+        }
+      }
+    }));
+
+    const aggregate = aggregateSignalEvents(events, 'production', chromeColdNavFixture.ts + 120_000);
+
+    // Distribution is a time-share across subparts: {ttfb=400, rld=120, rlt=880, erd=4600}
+    // totals 6000ms; element_render_delay dominates at 4600/6000 ≈ 77%.
+    expect(aggregate.lcp_story).toBeDefined();
+    expect(aggregate.lcp_story?.dominant_subpart).toBe('element_render_delay');
+    expect(aggregate.lcp_story?.dominant_subpart_share_pct).toBe(77);
+    expect(aggregate.lcp_story?.dominant_culprit_kind).toBe('hero_image');
+    expect(aggregate.lcp_story?.subpart_distribution_pct?.element_render_delay).toBe(77);
+    expect(aggregate.lcp_story?.subpart_distribution_pct?.resource_load_time).toBe(15);
+    expect(aggregate.lcp_story?.subpart_distribution_pct?.ttfb).toBe(7);
+    expect(aggregate.lcp_story?.subpart_distribution_pct?.resource_load_delay).toBe(2);
+
+    expect(aggregate.inp_story).toBeDefined();
+    expect(aggregate.inp_story?.dominant_phase).toBe('processing');
+    expect(aggregate.inp_story?.dominant_phase_share_pct).toBe(100);
+    expect(aggregate.inp_story?.phase_distribution_pct?.processing).toBe(100);
+  });
+
+  it('omits lcp_story / inp_story when the observation threshold is not met', () => {
+    const events = Array.from({ length: SIGNAL_MIN_RACE_OBSERVATIONS - 1 }, (_, index) => ({
+      ...chromeColdNavFixture,
+      event_id: `thin_${index}`,
+      ts: chromeColdNavFixture.ts + index * 1_000,
+      vitals: {
+        ...chromeColdNavFixture.vitals,
+        ttfb_ms: 400,
+        lcp_breakdown: {
+          resource_load_delay_ms: 100,
+          resource_load_time_ms: 200,
+          element_render_delay_ms: 2_000
+        },
+        inp_attribution: {
+          ...(chromeColdNavFixture.vitals.inp_attribution ?? {
+            load_state: null,
+            interaction_target: null,
+            interaction_type: null,
+            interaction_time_ms: null,
+            input_delay_ms: null,
+            processing_duration_ms: null,
+            presentation_delay_ms: null
+          }),
+          dominant_phase: 'input_delay' as const
+        }
+      }
+    }));
+
+    const aggregate = aggregateSignalEvents(events, 'preview', chromeColdNavFixture.ts + 60_000);
+
+    expect(aggregate.lcp_story).toBeUndefined();
+    expect(aggregate.inp_story).toBeUndefined();
+  });
+
+  it('round-trips lcp_story and inp_story through the report URL codec', () => {
+    const enriched = {
+      ...strongLcpCoverageAggregateFixture,
+      lcp_story: {
+        dominant_subpart: 'element_render_delay' as const,
+        dominant_subpart_share_pct: 74,
+        dominant_culprit_kind: 'hero_image' as const,
+        subpart_distribution_pct: {
+          ttfb: 8,
+          resource_load_delay: 6,
+          resource_load_time: 12,
+          element_render_delay: 74
+        }
+      },
+      inp_story: {
+        dominant_phase: 'processing' as const,
+        dominant_phase_share_pct: 62,
+        phase_distribution_pct: {
+          input_delay: 14,
+          processing: 62,
+          presentation: 24
+        }
+      }
+    };
+
+    const encoded = encodeSignalReportUrl(enriched);
+    const decoded = decodeSignalReportUrl(encoded.url);
+
+    expect(decoded.lcp_story).toEqual(enriched.lcp_story);
+    expect(decoded.inp_story).toEqual(enriched.inp_story);
+  });
+
+  it('leaves lcp_story and inp_story undefined when absent from the encoded URL', () => {
+    const encoded = encodeSignalReportUrl(strongLcpCoverageAggregateFixture);
+    const decoded = decodeSignalReportUrl(encoded.url);
+
+    expect(decoded.lcp_story).toBeUndefined();
+    expect(decoded.inp_story).toBeUndefined();
   });
 });

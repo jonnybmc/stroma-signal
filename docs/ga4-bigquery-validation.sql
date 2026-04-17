@@ -28,6 +28,9 @@ SELECT
   (SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'input_delay_ms') AS input_delay_ms,
   (SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'processing_duration_ms') AS processing_duration_ms,
   (SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'presentation_delay_ms') AS presentation_delay_ms,
+  (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'lcp_culprit_kind') AS lcp_culprit_kind,
+  (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'lcp_dominant_subpart') AS lcp_dominant_subpart,
+  (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'inp_dominant_phase') AS inp_dominant_phase,
   IF(
     (SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'input_delay_ms') IS NULL
       OR (SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'processing_duration_ms') IS NULL

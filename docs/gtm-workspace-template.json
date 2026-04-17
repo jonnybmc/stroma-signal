@@ -34,7 +34,10 @@
     { "name": "DLV - interaction_type", "type": "data_layer", "dataLayerName": "interaction_type", "dataLayerVersion": 2, "required": false },
     { "name": "DLV - input_delay_ms", "type": "data_layer", "dataLayerName": "input_delay_ms", "dataLayerVersion": 2, "required": false },
     { "name": "DLV - processing_duration_ms", "type": "data_layer", "dataLayerName": "processing_duration_ms", "dataLayerVersion": 2, "required": false },
-    { "name": "DLV - presentation_delay_ms", "type": "data_layer", "dataLayerName": "presentation_delay_ms", "dataLayerVersion": 2, "required": false }
+    { "name": "DLV - presentation_delay_ms", "type": "data_layer", "dataLayerName": "presentation_delay_ms", "dataLayerVersion": 2, "required": false },
+    { "name": "DLV - lcp_culprit_kind", "type": "data_layer", "dataLayerName": "lcp_culprit_kind", "dataLayerVersion": 2, "required": false },
+    { "name": "DLV - lcp_dominant_subpart", "type": "data_layer", "dataLayerName": "lcp_dominant_subpart", "dataLayerVersion": 2, "required": false },
+    { "name": "DLV - inp_dominant_phase", "type": "data_layer", "dataLayerName": "inp_dominant_phase", "dataLayerVersion": 2, "required": false }
   ],
   "recommendedDataLayerVariables": [],
   "ga4EventTag": {
@@ -63,7 +66,10 @@
       { "name": "interaction_type", "variable": "DLV - interaction_type" },
       { "name": "input_delay_ms", "variable": "DLV - input_delay_ms" },
       { "name": "processing_duration_ms", "variable": "DLV - processing_duration_ms" },
-      { "name": "presentation_delay_ms", "variable": "DLV - presentation_delay_ms" }
+      { "name": "presentation_delay_ms", "variable": "DLV - presentation_delay_ms" },
+      { "name": "lcp_culprit_kind", "variable": "DLV - lcp_culprit_kind" },
+      { "name": "lcp_dominant_subpart", "variable": "DLV - lcp_dominant_subpart" },
+      { "name": "inp_dominant_phase", "variable": "DLV - inp_dominant_phase" }
     ]
   },
   "verificationChecklist": [
