@@ -59,6 +59,7 @@ function queueEntries(type: string, entries: PerformanceEntry[]): void {
 function setupObserverTest(options?: {
   readyState?: DocumentReadyState;
   navigation?: Partial<PerformanceNavigationTiming>;
+  resources?: Partial<PerformanceResourceTiming>[];
 }) {
   vi.stubGlobal('PerformanceObserver', MockPerformanceObserver as unknown as typeof PerformanceObserver);
   vi.stubGlobal('document', {
@@ -72,18 +73,21 @@ function setupObserverTest(options?: {
     pathname: '/pricing'
   } as Location);
   vi.stubGlobal('performance', {
-    getEntriesByType: (type: string) =>
-      type === 'navigation'
-        ? [
-            {
-              startTime: 0,
-              activationStart: 0,
-              responseStart: 180,
-              requestStart: 120,
-              ...(options?.navigation ?? {})
-            }
-          ]
-        : []
+    getEntriesByType: (type: string) => {
+      if (type === 'navigation') {
+        return [
+          {
+            startTime: 0,
+            activationStart: 0,
+            responseStart: 180,
+            requestStart: 120,
+            ...(options?.navigation ?? {})
+          }
+        ];
+      }
+      if (type === 'resource') return options?.resources ?? [];
+      return [];
+    }
   } as Performance);
 }
 
@@ -139,7 +143,8 @@ describe('observeVitals', () => {
       load_state: 'interactive',
       target: 'img',
       element_type: 'image',
-      resource_url: '/assets/hero.webp'
+      resource_url: '/assets/hero.webp',
+      culprit_kind: 'hero_image'
     });
   });
 
@@ -238,5 +243,246 @@ describe('observeVitals', () => {
         presentation_delay_ms: 80
       }
     });
+  });
+
+  it('classifies LCP culprit kind by element type, URL pattern, and target hints', () => {
+    setupObserverTest();
+
+    const observer = observeVitals({
+      generateTarget: (element) =>
+        element?.tagName?.toLowerCase() === 'img' ? 'img.site-banner' : (element?.tagName?.toLowerCase() ?? null)
+    });
+
+    // Product image URL wins over default bias
+    emitEntries('largest-contentful-paint', [
+      {
+        startTime: 1_800,
+        element: { tagName: 'IMG' },
+        url: 'https://example.co.za/assets/product/sku-42.webp'
+      } as PerformanceEntry
+    ]);
+    expect(observer.snapshot().lcp_attribution?.culprit_kind).toBe('product_image');
+
+    // Banner target falls through when URL has no keyword match
+    emitEntries('largest-contentful-paint', [
+      {
+        startTime: 2_000,
+        element: { tagName: 'IMG' },
+        url: 'https://example.co.za/assets/generic.webp'
+      } as PerformanceEntry
+    ]);
+    expect(observer.snapshot().lcp_attribution?.culprit_kind).toBe('banner_image');
+
+    // Text LCP → headline_text
+    emitEntries('largest-contentful-paint', [
+      {
+        startTime: 2_200,
+        element: { tagName: 'H1' },
+        url: undefined
+      } as unknown as PerformanceEntry
+    ]);
+    expect(observer.snapshot().lcp_attribution?.culprit_kind).toBe('headline_text');
+
+    // Video poster URL → video_poster
+    emitEntries('largest-contentful-paint', [
+      {
+        startTime: 2_400,
+        element: { tagName: 'IMG' },
+        url: 'https://example.co.za/media/poster-01.jpg'
+      } as PerformanceEntry
+    ]);
+    expect(observer.snapshot().lcp_attribution?.culprit_kind).toBe('video_poster');
+  });
+
+  it('derives INP dominant phase with processing > input_delay > presentation tiebreak', () => {
+    setupObserverTest();
+
+    const observer = observeVitals();
+    emitEntries('event', [
+      {
+        duration: 300,
+        interactionId: 401,
+        startTime: 1_000,
+        processingStart: 1_060,
+        processingEnd: 1_260,
+        name: 'pointerdown',
+        target: { tagName: 'BUTTON' }
+      } as PerformanceEntry
+    ]);
+
+    expect(observer.snapshot().inp_attribution?.dominant_phase).toBe('processing');
+
+    // Tiebreak: equal input_delay and processing → processing wins
+    emitEntries('event', [
+      {
+        duration: 200,
+        interactionId: 402,
+        startTime: 2_000,
+        processingStart: 2_050,
+        processingEnd: 2_100,
+        name: 'click',
+        target: { tagName: 'A' }
+      } as PerformanceEntry
+    ]);
+    expect(observer.snapshot().inp_attribution?.dominant_phase).toBe('processing');
+  });
+
+  it('caps interactionRecords at 100 and evicts the lowest-duration entry', () => {
+    setupObserverTest();
+
+    const observer = observeVitals();
+    // Seed 100 low-duration interactions
+    const seedEntries = Array.from({ length: 100 }, (_, i) => ({
+      duration: 50 + i,
+      interactionId: 1_000 + i,
+      startTime: i * 10,
+      processingStart: i * 10 + 5,
+      processingEnd: i * 10 + 20,
+      name: 'click',
+      target: null
+    })) as unknown as PerformanceEntry[];
+    emitEntries('event', seedEntries);
+
+    // Push 100 higher-duration interactions that should evict the lowest
+    const highEntries = Array.from({ length: 100 }, (_, i) => ({
+      duration: 500 + i,
+      interactionId: 2_000 + i,
+      startTime: 10_000 + i * 10,
+      processingStart: 10_000 + i * 10 + 5,
+      processingEnd: 10_000 + i * 10 + 20,
+      name: 'click',
+      target: null
+    })) as unknown as PerformanceEntry[];
+    emitEntries('event', highEntries);
+
+    // p98 of the retained 100 must come from the high-duration cohort (>= 500)
+    const snapshot = observer.snapshot();
+    expect(snapshot.inp_ms).toBeGreaterThanOrEqual(500);
+  });
+
+  it('derives LCP breakdown for image LCP when matching resource timing is present', () => {
+    const resourceEntry = {
+      name: 'https://example.co.za/assets/hero.webp?cache=1',
+      initiatorType: 'img',
+      startTime: 200,
+      requestStart: 250,
+      responseStart: 400,
+      responseEnd: 600,
+      transferSize: 48_000,
+      encodedBodySize: 45_000,
+      duration: 400
+    } as PerformanceResourceTiming;
+
+    setupObserverTest({
+      navigation: {
+        startTime: 0,
+        activationStart: 0,
+        responseStart: 180,
+        requestStart: 120
+      },
+      resources: [resourceEntry]
+    });
+
+    const observer = observeVitals();
+    emitEntries('largest-contentful-paint', [
+      {
+        startTime: 2_400,
+        loadTime: 2_100,
+        element: { tagName: 'IMG' },
+        url: 'https://example.co.za/assets/hero.webp?cache=1'
+      } as PerformanceEntry
+    ]);
+
+    expect(observer.snapshot().lcp_breakdown).toEqual({
+      resource_load_delay_ms: 70,
+      resource_load_time_ms: 350,
+      element_render_delay_ms: 300
+    });
+  });
+
+  it('returns null lcp_breakdown when matching resource timing is missing (all-or-nothing)', () => {
+    setupObserverTest({
+      navigation: {
+        startTime: 0,
+        activationStart: 0,
+        responseStart: 180,
+        requestStart: 120
+      },
+      resources: []
+    });
+
+    const observer = observeVitals();
+    emitEntries('largest-contentful-paint', [
+      {
+        startTime: 2_400,
+        loadTime: 2_100,
+        element: { tagName: 'IMG' },
+        url: 'https://example.co.za/assets/hero.webp'
+      } as PerformanceEntry
+    ]);
+
+    expect(observer.snapshot().lcp_breakdown).toBeNull();
+  });
+
+  it('derives LCP breakdown for text LCP as element_render_delay with zero resource phases', () => {
+    setupObserverTest({
+      navigation: {
+        startTime: 0,
+        activationStart: 0,
+        responseStart: 180,
+        requestStart: 120
+      }
+    });
+
+    const observer = observeVitals();
+    emitEntries('largest-contentful-paint', [
+      {
+        startTime: 1_500,
+        element: { tagName: 'H1' },
+        url: undefined
+      } as unknown as PerformanceEntry
+    ]);
+
+    expect(observer.snapshot().lcp_breakdown).toEqual({
+      resource_load_delay_ms: 0,
+      resource_load_time_ms: 0,
+      element_render_delay_ms: 1_320
+    });
+  });
+
+  it('null-safes lcp_breakdown when opaque cross-origin resource lacks requestStart', () => {
+    const opaqueEntry = {
+      name: 'https://cdn.third.party/hero.webp',
+      initiatorType: 'img',
+      startTime: 200,
+      requestStart: 0,
+      responseStart: 0,
+      responseEnd: 0,
+      transferSize: 0,
+      encodedBodySize: 0,
+      duration: 0
+    } as PerformanceResourceTiming;
+
+    setupObserverTest({
+      navigation: {
+        startTime: 0,
+        activationStart: 0,
+        responseStart: 180,
+        requestStart: 120
+      },
+      resources: [opaqueEntry]
+    });
+
+    const observer = observeVitals();
+    emitEntries('largest-contentful-paint', [
+      {
+        startTime: 2_400,
+        loadTime: 2_100,
+        element: { tagName: 'IMG' },
+        url: 'https://cdn.third.party/hero.webp'
+      } as PerformanceEntry
+    ]);
+
+    expect(observer.snapshot().lcp_breakdown).toBeNull();
   });
 });
