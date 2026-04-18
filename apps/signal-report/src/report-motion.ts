@@ -617,8 +617,13 @@ function runAct2Race(runtime: MotionRuntime): void {
   const comparison = runtime.root.querySelector<HTMLElement>('[data-role="comparison-progress"]');
   const waitEl = runtime.root.querySelector<HTMLElement>('[data-role="wait-delta"]');
 
-  const rawUrbanMs = runtime.payload.act2.urban_ms ?? 2100;
-  const rawComparisonMs = runtime.payload.act2.comparison_ms ?? 3400;
+  const rawUrbanMs = runtime.payload.act2.urban_ms;
+  const rawComparisonMs = runtime.payload.act2.comparison_ms;
+  // If either measurement is null the race has no defensible magnitude
+  // to play against — render static. Fabricating decorative timings
+  // (prior default was 2100/3400ms) risks the reader inferring numbers
+  // from motion when none were measured.
+  if (rawUrbanMs == null || rawComparisonMs == null) return;
   const waitDeltaMs = runtime.payload.act2.wait_delta_ms ?? 0;
 
   const urbanFillMs = Math.min(RACE_PLAYBACK_CEILING_MS, rawUrbanMs);

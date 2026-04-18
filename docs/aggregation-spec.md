@@ -88,6 +88,36 @@ If a future iteration wants to add any of these back, it must first name the con
 
 All three blocks are additive. `rv=1` URLs without these blocks decode cleanly and return `undefined` for the missing fields — the report surfaces the fields only when they are present.
 
+## Background-Tab Visibility Filter (PR-6)
+
+Events where `context.visibility_hidden_at_load === true` are pre-filtered before any accumulator runs. Background-tab loads produce non-user-facing vitals (deprioritized throttling, long `hidden → visible` gaps, missing LCP) that would drag every percentile and share downward if included.
+
+**Denominator semantics (locked).** Every post-filter metric — `sample_size`, `coverage.*`, all percentiles, funnel shares, race observations, and the credibility strip number — is computed against the *post-filter* cohort. The pre-filter count is preserved separately:
+
+- `coverage.raw_sample_size` — total observed rows before the visibility filter
+- `coverage.excluded_background_sessions` — rows dropped by the filter
+
+Invariant (asserted at aggregation time): `raw_sample_size === sample_size + excluded_background_sessions`. A mismatch throws — denominator drift is a bug, not a silent degradation.
+
+When `excluded_background_sessions > 0`, the report credibility strip appends a transparent segment (e.g. *"· 187 background-tab loads excluded"*). When zero, silence is the correct signal — no segment is rendered.
+
+## Marginal-Coverage Warning (PR-6)
+
+When the LCP cohort lands within a small margin of the ship thresholds — `SIGNAL_COVERAGE_MARGINAL_THRESHOLD_PCT = 10` (i.e. 50% ≤ `lcp_coverage` < 60%) or `SIGNAL_COVERAGE_MARGINAL_THRESHOLD_OBS = 10` (i.e. 25 ≤ `lcp_observations` < 35) — aggregation appends a `coverage_marginal` warning. The report credibility strip renders *"coverage at the defensible edge"* so readers can temper their read rather than being handed a falsely confident narrative. Pure additive signal — no aggregate math changes.
+
+## Save-Data Narration Threshold (PR-6)
+
+`SIGNAL_SAVE_DATA_NARRATE_THRESHOLD_PCT = 1` controls when the Data Saver line is rendered in Act 1. Shares below 1% round to 0% and the line is omitted entirely — zero users on Data Saver is not an interesting story. The constant lives in `packages/signal-contracts/src/types.ts` and is imported wherever the narration gate applies.
+
+## Report URL Byte Budget (PR-6)
+
+`encodeSignalReportUrl` asserts the encoded URL size to prevent silent transport failures:
+
+- Soft limit: `SIGNAL_REPORT_URL_SOFT_LIMIT_BYTES = 2048`. Breach pushes `signal_report_url_exceeds_soft_limit:<bytes>` onto the returned `warnings[]` array; the URL still emits.
+- Hard limit: `SIGNAL_REPORT_URL_HARD_LIMIT_BYTES = 4096`. Breach throws — emitting a truncated or corrupted URL is strictly worse than failing loudly.
+
+Size is measured via `TextEncoder` (browser) or `Buffer.byteLength` (Node) for UTF-8 byte accuracy. The budget exists because enriching the aggregate with many optional story blocks could push structurally-valid payloads past common URL-length limits.
+
 ## Comparison Tier
 
 The comparison tier is the highest-share non-urban classified tier. If no non-urban tier has observations, `comparison_tier = "none"`.

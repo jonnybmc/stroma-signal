@@ -66,6 +66,30 @@ describe('readSignalContext', () => {
     expect(ctx.effective_type).toBeNull();
     expect(ctx.downlink_mbps).toBeNull();
   });
+
+  it('captures visibility_hidden_at_load=false when the document is visible', () => {
+    vi.stubGlobal('navigator', {});
+    vi.stubGlobal('document', { visibilityState: 'visible' });
+
+    const ctx = readSignalContext();
+    expect(ctx.visibility_hidden_at_load).toBe(false);
+  });
+
+  it('captures visibility_hidden_at_load=true when the document is hidden', () => {
+    vi.stubGlobal('navigator', {});
+    vi.stubGlobal('document', { visibilityState: 'hidden' });
+
+    const ctx = readSignalContext();
+    expect(ctx.visibility_hidden_at_load).toBe(true);
+  });
+
+  it('defaults visibility_hidden_at_load to false when document is unavailable', () => {
+    vi.stubGlobal('navigator', {});
+    vi.stubGlobal('document', undefined);
+
+    const ctx = readSignalContext();
+    expect(ctx.visibility_hidden_at_load).toBe(false);
+  });
 });
 
 // ---------------------------------------------------------------------------

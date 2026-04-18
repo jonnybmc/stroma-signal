@@ -44,6 +44,7 @@ describe('exportSignalEventsToCSV', () => {
     expect(headers).toContain('inp_attribution_dominant_phase');
     expect(headers).toContain('third_party_pre_lcp_script_share_pct');
     expect(headers).toContain('third_party_origin_count');
+    expect(headers).toContain('context_visibility_hidden_at_load');
     expect(headers).not.toContain('nav_type');
   });
 

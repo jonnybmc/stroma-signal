@@ -53,7 +53,8 @@ const WAREHOUSE_COLUMNS: ReadonlyArray<keyof SignalWarehouseRowV1> = [
   'lcp_attribution_culprit_kind',
   'inp_attribution_dominant_phase',
   'third_party_pre_lcp_script_share_pct',
-  'third_party_origin_count'
+  'third_party_origin_count',
+  'context_visibility_hidden_at_load'
 ];
 
 function escapeCsvCell(value: unknown): string {

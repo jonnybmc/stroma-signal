@@ -48,13 +48,14 @@ Recommended flat warehouse row shape for non-GA4 collection:
 | `inp_attribution_dominant_phase` | STRING | Nullable enum: `input_delay`, `processing`, `presentation` |
 | `third_party_pre_lcp_script_share_pct` | INT64 | Nullable 0–100 share of off-domain script weight before LCP |
 | `third_party_origin_count` | INT64 | Nullable count of distinct off-domain script origins before LCP (hidden when below privacy mask of 3) |
+| `context_visibility_hidden_at_load` | BOOL | `true` when `document.visibilityState === 'hidden'` at event creation. Default report aggregation pre-filters rows where this is `true` (background-tab loads) before computing sample size, percentiles, or shares. |
 
 Do not rename the canonical metric fields if you want to keep the provided aggregation and URL-builder templates usable as-is.
 
 Notes:
 
 - The legacy `nav_type` column has been removed in 0.1.x. Consumers that pinned to it should switch to `navigation_type` (identical semantics, wider coverage).
-- Default Signal URL-builder templates exclude `navigation_type = restore` and `navigation_type = prerender` before computing coverage and percentiles.
+- Default Signal URL-builder templates exclude `navigation_type = restore`, `navigation_type = prerender`, and `context_visibility_hidden_at_load = true` before computing coverage and percentiles. The excluded background-tab count is preserved separately via the `rs` (raw pre-filter sample size) and `xb` (excluded background sessions) report-URL params so the credibility strip can narrate the exclusion transparently. Invariant: `raw_sample_size === sample_size + excluded_background_sessions`.
 - Treat target/resource fields as diagnostic hints, not stable identifiers.
 - Keep raw event-table access limited to the smallest group that needs it; the table can contain operationally sensitive path/referrer/resource context even though Signal is not a user-identity system.
 - Apply warehouse retention and deletion policies intentionally, especially for `path`, `referrer`, `lcp_resource_url`, `lcp_target`, and `interaction_target`.

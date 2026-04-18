@@ -27,7 +27,10 @@ import {
   SIGNAL_FUNNEL_INP_POOR_THRESHOLD,
   SIGNAL_FUNNEL_LCP_POOR_THRESHOLD,
   SIGNAL_PREVIEW_MINIMUM_SAMPLE,
-  SIGNAL_REPORT_BASE_URL
+  SIGNAL_REPORT_BASE_URL,
+  SIGNAL_REPORT_URL_HARD_LIMIT_BYTES,
+  SIGNAL_REPORT_URL_SOFT_LIMIT_BYTES,
+  SIGNAL_REPORT_URL_SOFT_LIMIT_WARNING
 } from './types.js';
 
 const VALID_COMPARISON_TIERS = new Set<SignalComparisonTier>([
@@ -356,9 +359,21 @@ function encodeAggregate(aggregate: SignalAggregateV1): URLSearchParams {
   if (aggregate.lcp_story) encodeLcpStory(params, aggregate.lcp_story);
   if (aggregate.inp_story) encodeInpStory(params, aggregate.inp_story);
   if (aggregate.third_party_story) encodeThirdPartyStory(params, aggregate.third_party_story);
+  // Denominator bookkeeping (§1.2). Emit only when present so legacy
+  // aggregates (pre-PR-6) round-trip unchanged.
+  if (aggregate.coverage.raw_sample_size != null) {
+    params.set('rs', String(aggregate.coverage.raw_sample_size));
+  }
+  if (aggregate.coverage.excluded_background_sessions != null) {
+    params.set('xb', String(aggregate.coverage.excluded_background_sessions));
+  }
   if (aggregate.top_page_path) params.set('v', aggregate.top_page_path);
   params.set('ga', String(aggregate.generated_at));
   return params;
+}
+
+function measureByteLength(text: string): number {
+  return typeof TextEncoder !== 'undefined' ? new TextEncoder().encode(text).length : Buffer.byteLength(text, 'utf8');
 }
 
 export function encodeSignalReportUrl(
@@ -371,10 +386,25 @@ export function encodeSignalReportUrl(
 
   const params = encodeAggregate(aggregate);
   const url = `${baseUrl}?${params.toString()}`;
+
+  // §5.4 URL-size budget. Hard breach throws — a silently-truncated URL
+  // would fail at the proxy/browser layer with no useful error. Soft
+  // breach stays emittable but surfaces a warning the caller can log.
+  const urlByteLength = measureByteLength(url);
+  const warnings = [...aggregate.warnings];
+  if (urlByteLength >= SIGNAL_REPORT_URL_HARD_LIMIT_BYTES) {
+    throw new Error(
+      `encodeSignalReportUrl produced a ${urlByteLength}-byte URL exceeding the ${SIGNAL_REPORT_URL_HARD_LIMIT_BYTES}-byte hard limit.`
+    );
+  }
+  if (urlByteLength >= SIGNAL_REPORT_URL_SOFT_LIMIT_BYTES) {
+    warnings.push(`${SIGNAL_REPORT_URL_SOFT_LIMIT_WARNING}:${urlByteLength}`);
+  }
+
   return {
     url,
     aggregate,
-    warnings: [...aggregate.warnings],
+    warnings,
     sampleSize: aggregate.sample_size,
     meetsRecommendation: aggregate.sample_size >= SIGNAL_PREVIEW_MINIMUM_SAMPLE,
     mode: aggregate.mode
@@ -718,7 +748,9 @@ export function decodeSignalReportUrl(value: string | URL): SignalAggregateV1 {
       connection_reuse_share: readNumberParam(params, 'nr'),
       lcp_coverage: readNumberParam(params, 'lc'),
       selected_metric_urban_coverage: params.get('ruc') == null ? null : readNumberParam(params, 'ruc'),
-      selected_metric_comparison_coverage: params.get('rcc') == null ? null : readNumberParam(params, 'rcc')
+      selected_metric_comparison_coverage: params.get('rcc') == null ? null : readNumberParam(params, 'rcc'),
+      ...(params.get('rs') == null ? {} : { raw_sample_size: readNumberParam(params, 'rs') }),
+      ...(params.get('xb') == null ? {} : { excluded_background_sessions: readNumberParam(params, 'xb') })
     },
     vitals: {
       urban: toMetricSummary({

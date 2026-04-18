@@ -10,6 +10,27 @@ export const SIGNAL_REPORT_BASE_URL = 'https://signal.stroma.design/r';
 export const SIGNAL_BUILDER_BASE_URL = 'https://signal.stroma.design/build';
 export const SIGNAL_GA4_EVENT_NAME = 'perf_tier_report';
 
+// Marginal-coverage caveat thresholds. When the race cohort lands within
+// this slack of `SIGNAL_MIN_LCP_COVERAGE` / `SIGNAL_MIN_RACE_OBSERVATIONS`
+// the aggregate raises a tone-tempering warning so the view model can
+// swap certain claims for lighter phrasing.
+export const SIGNAL_COVERAGE_MARGINAL_THRESHOLD_PCT = 10 as const;
+export const SIGNAL_COVERAGE_MARGINAL_THRESHOLD_OBS = 10 as const;
+export const SIGNAL_COVERAGE_MARGINAL_WARNING = 'coverage_marginal';
+
+// Minimum Save-Data share narratable in Act 1. Sub-1% readings are
+// either rounding artifacts or hostile-browser noise — not surprising
+// enough to carry a narrative line.
+export const SIGNAL_SAVE_DATA_NARRATE_THRESHOLD_PCT = 1 as const;
+
+// Report URL byte budgets. GA4 DataLayer → URL transport is commonly
+// capped around 2 KB by proxies; 4 KB is the hard ceiling most CDNs
+// accept. A soft breach emits a warning; a hard breach throws so we
+// never ship a truncated / silently-broken URL.
+export const SIGNAL_REPORT_URL_SOFT_LIMIT_BYTES = 2048 as const;
+export const SIGNAL_REPORT_URL_HARD_LIMIT_BYTES = 4096 as const;
+export const SIGNAL_REPORT_URL_SOFT_LIMIT_WARNING = 'signal_report_url_exceeds_soft_limit';
+
 export type SignalNetworkTier = 'urban' | 'moderate' | 'constrained_moderate' | 'constrained';
 
 export type SignalDeviceTier = 'low' | 'mid' | 'high';

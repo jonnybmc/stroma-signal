@@ -163,6 +163,15 @@ export interface ReportCredibilityStripViewModel {
   connection_reuse_share: number;
   metric_coverage: number;
   metric_coverage_label: string;
+  // Count of background-tab loads dropped before accumulation (§1.2).
+  // Null when the aggregate pre-dates the visibility filter or no
+  // sessions were excluded — the markup hides the segment in both cases
+  // so silence stays the correct signal.
+  excluded_background_sessions: number | null;
+  // True when the LCP race cohort lands within the slack threshold of
+  // the ship gates (§5.1). The credibility strip appends a tone-tempered
+  // note, and view-model copy swaps to lighter phrasing for Act 3.
+  coverage_marginal: boolean;
 }
 
 // Form-factor visualization — mobile / tablet / desktop audience split,
@@ -1002,13 +1011,20 @@ function buildCredibilityStrip(
         );
   const rawMetricCoverage = conservativeRaceCoverage;
   const metricCoverage = Math.round(Math.max(0, Math.min(100, rawMetricCoverage)));
+  const excludedBackgroundSessions =
+    typeof coverage.excluded_background_sessions === 'number' && coverage.excluded_background_sessions > 0
+      ? coverage.excluded_background_sessions
+      : null;
+  const coverageMarginal = aggregate.warnings.includes('coverage_marginal');
   return {
     sample_size: aggregate.sample_size,
     period_days: aggregate.period_days,
     classified_share: classifiedShare,
     connection_reuse_share: connectionReuseShare,
     metric_coverage: metricCoverage,
-    metric_coverage_label: raceMetric === 'none' ? 'lcp coverage' : `${race.metric_label} coverage`.toLowerCase()
+    metric_coverage_label: raceMetric === 'none' ? 'lcp coverage' : `${race.metric_label} coverage`.toLowerCase(),
+    excluded_background_sessions: excludedBackgroundSessions,
+    coverage_marginal: coverageMarginal
   };
 }
 

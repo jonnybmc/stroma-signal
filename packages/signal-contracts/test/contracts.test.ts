@@ -1131,4 +1131,118 @@ describe('signal contracts', () => {
 
     expect(decoded.third_party_story).toBeUndefined();
   });
+
+  it('drops background-tab events before accumulators run and records the exclusion count', () => {
+    const events = Array.from({ length: 40 }, (_, index) => ({
+      ...chromeColdNavFixture,
+      event_id: `fg_${index}`,
+      ts: chromeColdNavFixture.ts + index * 1_000
+    }));
+    const backgroundEvents = Array.from({ length: 10 }, (_, index) => ({
+      ...chromeColdNavFixture,
+      event_id: `bg_${index}`,
+      ts: chromeColdNavFixture.ts + index * 1_000,
+      context: {
+        ...chromeColdNavFixture.context,
+        visibility_hidden_at_load: true
+      }
+    }));
+
+    const aggregate = aggregateSignalEvents(
+      [...events, ...backgroundEvents],
+      'production',
+      chromeColdNavFixture.ts + 120_000
+    );
+
+    expect(aggregate.sample_size).toBe(40);
+    expect(aggregate.coverage.raw_sample_size).toBe(50);
+    expect(aggregate.coverage.excluded_background_sessions).toBe(10);
+    expect(aggregate.coverage.raw_sample_size).toBe(
+      aggregate.sample_size + (aggregate.coverage.excluded_background_sessions ?? 0)
+    );
+  });
+
+  it('does not push the marginal-coverage warning when the race cohort is comfortably above thresholds', () => {
+    const aggregate = aggregateSignalEvents(
+      Array.from({ length: 40 }, (_, index) => ({
+        ...chromeColdNavFixture,
+        event_id: `comfort_${index}`,
+        ts: chromeColdNavFixture.ts + index * 1_000
+      })),
+      'production',
+      chromeColdNavFixture.ts + 120_000
+    );
+
+    expect(aggregate.warnings).not.toContain('coverage_marginal');
+  });
+
+  it('round-trips raw_sample_size and excluded_background_sessions through the report URL codec', () => {
+    const enriched = {
+      ...strongLcpCoverageAggregateFixture,
+      coverage: {
+        ...strongLcpCoverageAggregateFixture.coverage,
+        raw_sample_size: strongLcpCoverageAggregateFixture.sample_size + 7,
+        excluded_background_sessions: 7
+      }
+    };
+
+    const encoded = encodeSignalReportUrl(enriched);
+    const decoded = decodeSignalReportUrl(encoded.url);
+
+    expect(decoded.coverage.raw_sample_size).toBe(enriched.coverage.raw_sample_size);
+    expect(decoded.coverage.excluded_background_sessions).toBe(enriched.coverage.excluded_background_sessions);
+  });
+
+  it('decodes legacy report URLs without raw_sample_size / excluded_background_sessions params', () => {
+    const encoded = encodeSignalReportUrl(strongLcpCoverageAggregateFixture);
+    const url = new URL(encoded.url);
+    url.searchParams.delete('rs');
+    url.searchParams.delete('xb');
+    const decoded = decodeSignalReportUrl(url.toString());
+
+    expect(decoded.coverage.raw_sample_size).toBeUndefined();
+    expect(decoded.coverage.excluded_background_sessions).toBeUndefined();
+  });
+
+  it('surfaces a soft-limit warning when the encoded report URL exceeds 2048 bytes', () => {
+    const long = 'a'.repeat(1800);
+    const enriched = {
+      ...strongLcpCoverageAggregateFixture,
+      domain: `${long}.example.test`
+    };
+
+    const encoded = encodeSignalReportUrl(enriched);
+    const softWarning = encoded.warnings.find((warning) => warning.startsWith('signal_report_url_exceeds_soft_limit:'));
+    expect(softWarning).toBeDefined();
+  });
+
+  it('throws when the encoded report URL exceeds the 4096-byte hard limit', () => {
+    const long = 'a'.repeat(4200);
+    const enriched = {
+      ...strongLcpCoverageAggregateFixture,
+      domain: `${long}.example.test`
+    };
+
+    expect(() => encodeSignalReportUrl(enriched)).toThrow(/hard limit/);
+  });
+
+  it('keeps a realistic enriched aggregate comfortably below the soft URL limit', () => {
+    const enriched = {
+      ...strongLcpCoverageAggregateFixture,
+      third_party_story: {
+        median_share_pct: 32,
+        dominant_tier: 'moderate' as const,
+        dominant_tier_share_pct: 58,
+        median_origin_count: 6
+      },
+      coverage: {
+        ...strongLcpCoverageAggregateFixture.coverage,
+        raw_sample_size: strongLcpCoverageAggregateFixture.sample_size + 25,
+        excluded_background_sessions: 25
+      }
+    };
+    const encoded = encodeSignalReportUrl(enriched);
+    expect(encoded.url.length).toBeLessThan(2048);
+    expect(encoded.warnings).not.toContain(expect.stringContaining('signal_report_url_exceeds_soft_limit'));
+  });
 });

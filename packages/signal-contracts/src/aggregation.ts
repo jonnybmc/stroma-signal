@@ -25,6 +25,9 @@ import type {
   SignalTierMetricSummary
 } from './types.js';
 import {
+  SIGNAL_COVERAGE_MARGINAL_THRESHOLD_OBS,
+  SIGNAL_COVERAGE_MARGINAL_THRESHOLD_PCT,
+  SIGNAL_COVERAGE_MARGINAL_WARNING,
   SIGNAL_EVENT_VERSION,
   SIGNAL_FUNNEL_FCP_POOR_THRESHOLD,
   SIGNAL_FUNNEL_INP_POOR_THRESHOLD,
@@ -60,6 +63,16 @@ const POOR_STAGE_THRESHOLDS: Record<SignalExperienceStage, number> = {
 
 function isLoadShapedEvent(event: SignalEventV1): boolean {
   return event.meta.navigation_type !== 'restore' && event.meta.navigation_type !== 'prerender';
+}
+
+// Background-tab filter (§2.6). Events captured while the tab was hidden
+// have throttled timers and deprioritized paint — folding them into
+// foreground percentiles skews every narrative number. We drop them
+// before any accumulator runs so `sample_size` / coverage / p75 all share
+// one denominator. The excluded count is preserved on the aggregate
+// (`coverage.excluded_background_sessions`) for transparent narration.
+function isForegroundEvent(event: SignalEventV1): boolean {
+  return event.context.visibility_hidden_at_load !== true;
 }
 
 function asPercent(part: number, total: number): number {
@@ -417,6 +430,21 @@ export function deriveSignalAggregateWarnings(
   return warnings;
 }
 
+// §5.1 marginal-coverage caveat. Fires when the LCP race cohort lands
+// within the slack thresholds of the ship gates — the numbers are
+// defensible, but barely, and the view model uses this warning to tone
+// language down ("the measurable sessions we have" vs "measured
+// classified sessions").
+export function isCoverageMarginal(args: { lcpCoverage: number; lcpObservations: number }): boolean {
+  const pctSlack =
+    args.lcpCoverage >= SIGNAL_MIN_LCP_COVERAGE &&
+    args.lcpCoverage < SIGNAL_MIN_LCP_COVERAGE + SIGNAL_COVERAGE_MARGINAL_THRESHOLD_PCT;
+  const obsSlack =
+    args.lcpObservations >= SIGNAL_MIN_RACE_OBSERVATIONS &&
+    args.lcpObservations < SIGNAL_MIN_RACE_OBSERVATIONS + SIGNAL_COVERAGE_MARGINAL_THRESHOLD_OBS;
+  return pctSlack || obsSlack;
+}
+
 function computeTopPagePathFromCounts(counts: Map<string, number>): string | null {
   let topPath: string | null = null;
   let topCount = 0;
@@ -660,7 +688,13 @@ export function aggregateSignalEvents(
   mode: SignalAggregateV1['mode'] = 'preview',
   now = Date.now()
 ): SignalAggregateV1 {
-  const reportEvents = events.filter(isLoadShapedEvent);
+  const loadShaped = events.filter(isLoadShapedEvent);
+  // Pre-filter denominator preserved as `raw_sample_size` for the
+  // credibility strip; the post-filter `total` is canonical for every
+  // accumulator, percentile, and share in the aggregate.
+  const rawSampleSize = loadShaped.length;
+  const reportEvents = loadShaped.filter(isForegroundEvent);
+  const excludedBackgroundSessions = rawSampleSize - reportEvents.length;
   const total = reportEvents.length;
   const domain = reportEvents[0]?.host ?? events[0]?.host ?? 'unknown.local';
   let earliest = now;
@@ -816,14 +850,37 @@ export function aggregateSignalEvents(
           ? comparison.lcp_coverage
           : metricChoice.race_metric === 'fcp'
             ? comparison.fcp_coverage
-            : comparison.ttfb_coverage
+            : comparison.ttfb_coverage,
+    raw_sample_size: rawSampleSize,
+    excluded_background_sessions: excludedBackgroundSessions
   };
+
+  // Aggregation-time invariant (§1.2). Dropped-event bookkeeping must
+  // reconcile: every event either made it into the canonical denominator
+  // or was counted as a background exclusion.
+  if (coverage.raw_sample_size !== total + coverage.excluded_background_sessions) {
+    throw new Error(
+      `Aggregation invariant violated: raw_sample_size (${coverage.raw_sample_size}) !== sample_size (${total}) + excluded_background_sessions (${coverage.excluded_background_sessions}).`
+    );
+  }
 
   const warnings = deriveSignalAggregateWarnings({
     mode,
     sample_size: total,
     race_metric: metricChoice.race_metric
   });
+
+  // §5.1 marginal-coverage caveat — only fires when an LCP race actually
+  // lands (lcp race_metric) and the cohort is within the slack window.
+  if (
+    metricChoice.race_metric === 'lcp' &&
+    isCoverageMarginal({
+      lcpCoverage: urban.lcp_coverage,
+      lcpObservations: urban.lcp_observations
+    })
+  ) {
+    warnings.push(SIGNAL_COVERAGE_MARGINAL_WARNING);
+  }
 
   const deviceHardware: SignalDeviceHardware = {
     cores_hist: distributePercent(coresCounters, total) as SignalDeviceHardware['cores_hist'],

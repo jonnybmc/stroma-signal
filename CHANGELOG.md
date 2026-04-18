@@ -25,6 +25,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - GA4 enum summaries: `lcp_culprit_kind`, `lcp_dominant_subpart`, `inp_dominant_phase`, `third_party_weight_tier`
 - Aggregate stories surfaced in the hosted report: Act 2 LCP subpart narrative + micro-chart, Act 2 third-party pre-race headline (with positive narration when zero off-domain weight), Act 3 INP-phase inline caption
 - Warehouse columns for LCP breakdown, culprit kind, INP phase, third-party share/origin count
+- Background-tab visibility filter: `context.visibility_hidden_at_load` captured per event; default aggregation pre-filters background-tab loads from every percentile, share, and accumulator
+- `coverage.raw_sample_size` and `coverage.excluded_background_sessions` preserved so the report credibility strip can narrate the exclusion transparently (invariant: `raw_sample_size === sample_size + excluded_background_sessions`)
+- Marginal-coverage warning (`coverage_marginal`) emitted when the LCP cohort lands within 10% / 10 observations of the ship thresholds; credibility strip renders *"coverage at the defensible edge"* so readers temper their read
+- Report URL byte budget assertions in `encodeSignalReportUrl`: soft limit (2048 bytes) pushes `signal_report_url_exceeds_soft_limit` warning; hard limit (4096 bytes) throws
+- Named constants for threshold tuning: `SIGNAL_COVERAGE_MARGINAL_THRESHOLD_PCT`, `SIGNAL_COVERAGE_MARGINAL_THRESHOLD_OBS`, `SIGNAL_SAVE_DATA_NARRATE_THRESHOLD_PCT`, `SIGNAL_REPORT_URL_SOFT_LIMIT_BYTES`, `SIGNAL_REPORT_URL_HARD_LIMIT_BYTES`
+- Warehouse column `context_visibility_hidden_at_load` (CSV column 45)
 - Back/forward cache restore and prerender-aware lifecycle
 - Sample rate support
 - Frozen data contracts (`SignalEventV1`, `SignalAggregateV1`)
@@ -41,6 +47,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - release metadata and docs now align to the canonical `jonnybmc/stroma-signal` repository
 - npm packaging excludes sourcemaps while keeping local build sourcemaps enabled
 - contributor installs now fail fast on unsupported Node versions via root `engine-strict=true`
+- Act 2 race-bar motion no longer animates when `urban_ms` or `comparison_ms` is null — static render replaces the hardcoded `2100ms`/`3400ms` fallback so viewers cannot infer magnitude from decorative motion
+- Default report math now also excludes `context.visibility_hidden_at_load = true` rows alongside the existing `navigation_type = restore` / `navigation_type = prerender` filter; both BigQuery URL-builder recipes updated (the normalized recipe emits `rs`/`xb` params; the GA4 recipe documents the asymmetry — visibility is warehouse-only)
 
 ### Removed
 

@@ -130,6 +130,46 @@ describe('report view model', () => {
     expect(strip.metric_coverage_label).toMatch(/coverage$/i);
   });
 
+  it('surfaces excluded_background_sessions on the credibility strip when aggregation drops sessions', () => {
+    const withExclusions = {
+      ...strongLcpCoverageAggregateFixture,
+      coverage: {
+        ...strongLcpCoverageAggregateFixture.coverage,
+        raw_sample_size: strongLcpCoverageAggregateFixture.sample_size + 31,
+        excluded_background_sessions: 31
+      }
+    };
+    const viewModel = buildReportViewModel(withExclusions);
+    expect(viewModel.credibility_strip.excluded_background_sessions).toBe(31);
+  });
+
+  it('omits excluded_background_sessions when the aggregate reports zero exclusions', () => {
+    const withoutExclusions = {
+      ...strongLcpCoverageAggregateFixture,
+      coverage: {
+        ...strongLcpCoverageAggregateFixture.coverage,
+        raw_sample_size: strongLcpCoverageAggregateFixture.sample_size,
+        excluded_background_sessions: 0
+      }
+    };
+    const viewModel = buildReportViewModel(withoutExclusions);
+    expect(viewModel.credibility_strip.excluded_background_sessions).toBeNull();
+  });
+
+  it('flags coverage_marginal on the credibility strip when the aggregate warning fires', () => {
+    const marginal = {
+      ...strongLcpCoverageAggregateFixture,
+      warnings: [...strongLcpCoverageAggregateFixture.warnings, 'coverage_marginal']
+    };
+    const viewModel = buildReportViewModel(marginal);
+    expect(viewModel.credibility_strip.coverage_marginal).toBe(true);
+  });
+
+  it('leaves coverage_marginal false when the warning is absent', () => {
+    const viewModel = buildReportViewModel(strongLcpCoverageAggregateFixture);
+    expect(viewModel.credibility_strip.coverage_marginal).toBe(false);
+  });
+
   it('keeps scene budgets within the intended DOM envelope', () => {
     const viewModel = buildReportViewModel(strongLcpCoverageAggregateFixture);
     const act1Bodies = viewModel.act1_tiers.reduce((sum, tier) => sum + tier.particleCount, 0);

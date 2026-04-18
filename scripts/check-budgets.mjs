@@ -55,10 +55,14 @@ for (const file of reportFiles) {
 // → 236 KB → 244 KB → 248 KB. The +8 KB at 244 KB accommodated the
 // Round 1 enrichment narrative (aggregate-side `lcp_story` /
 // `inp_story` decoders, Act 2 LCP-subpart inline block, Act 3 INP-phase
-// caption). The latest +4 KB covers the Round 1 third-party story:
+// caption). The +4 KB at 248 KB covered the Round 1 third-party story:
 // aggregate-side `third_party_story` codec + accumulator, Act 2
 // pre-race third-party headline view-model + markup, and the
-// `sr-third-party-headline` CSS block keyed by dominant tier.
+// `sr-third-party-headline` CSS block keyed by dominant tier. PR-6
+// (visibility filter + credibility bundle) fits inside the existing
+// 248 KB envelope — the new credibility-strip segments and the
+// `coverage_marginal` warning surface are markup-side only, and the
+// URL-size guards add < 200 bytes of runtime code. No budget bump.
 assertUnderBudget('signal-report static weight', reportWeight, 248 * 1024);
 
 console.log('Bundle budgets passed.');

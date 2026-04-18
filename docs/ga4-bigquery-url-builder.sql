@@ -323,6 +323,14 @@ funnel_rollup AS (
 -- map due to the 25-param standard-property limit. Use the normalized
 -- warehouse recipe (normalized-bigquery-url-builder.sql) to produce reports
 -- with the Actionable Signals slide populated.
+--
+-- PR-6 (visibility filter): context_visibility_hidden_at_load is also
+-- warehouse-only — the GA4 recipe cannot pre-filter background-tab loads.
+-- As a consequence, the rs (raw_sample_size) and xb (excluded_background_
+-- sessions) URL params are NOT emitted from this recipe. Decoders treat
+-- their absence as "unknown" and the report's credibility strip gracefully
+-- omits the background-exclusion segment. Customers that need this
+-- transparency must use the normalized warehouse recipe.
 SELECT CONCAT(
   'https://signal.stroma.design/r?rv=1&mode=production',
   '&d=', host,

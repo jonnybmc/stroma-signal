@@ -1103,6 +1103,22 @@ function renderCredibilityStrip(viewModel: ReportViewModel): string {
           : ''
       }
       ${
+        viewModel.credibility_strip.excluded_background_sessions != null
+          ? `
+        <span class="sr-credibility-sep" aria-hidden="true">·</span>
+        <span class="sr-credibility-item" data-role="excluded-background">${viewModel.credibility_strip.excluded_background_sessions.toLocaleString()} background-tab loads excluded</span>
+      `
+          : ''
+      }
+      ${
+        viewModel.credibility_strip.coverage_marginal
+          ? `
+        <span class="sr-credibility-sep" aria-hidden="true">·</span>
+        <span class="sr-credibility-item" data-role="coverage-marginal">coverage at the defensible edge</span>
+      `
+          : ''
+      }
+      ${
         viewModel.freshness_known
           ? `
         <span class="sr-credibility-sep" aria-hidden="true">·</span>

@@ -151,6 +151,7 @@ export function toSignalWarehouseRow(event: SignalEventV1): SignalWarehouseRowV1
     lcp_attribution_culprit_kind: event.vitals.lcp_attribution?.culprit_kind ?? null,
     inp_attribution_dominant_phase: event.vitals.inp_attribution?.dominant_phase ?? null,
     third_party_pre_lcp_script_share_pct: event.vitals.third_party?.pre_lcp_script_share_pct ?? null,
-    third_party_origin_count: event.vitals.third_party?.origin_count ?? null
+    third_party_origin_count: event.vitals.third_party?.origin_count ?? null,
+    context_visibility_hidden_at_load: event.context.visibility_hidden_at_load ?? null
   };
 }
