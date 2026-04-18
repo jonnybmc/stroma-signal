@@ -1,5 +1,78 @@
 import { aggregateSignalEvents } from '../aggregation.js';
-import type { SignalAggregateV1, SignalEventV1, SignalNetTcpSource } from '../types.js';
+import type {
+  SignalAggregateV1,
+  SignalEventV1,
+  SignalInpPhase,
+  SignalLcpBreakdown,
+  SignalLcpCulpritKind,
+  SignalLcpSubpart,
+  SignalLoafCause,
+  SignalNetTcpSource,
+  SignalThirdPartyTier,
+  SignalVitalsLoaf,
+  SignalVitalsThirdParty
+} from '../types.js';
+
+// Deterministic weighted pick over a mix of keys. Expands each key into
+// `round(weight)` slots and cycles by index — so a series of length N
+// produces the intended proportions exactly when N is a multiple of the
+// total weight, and approximates them otherwise. Keeps fixture output
+// stable across runs (no randomness) while letting scenario authors shape
+// the distribution narratively.
+function pickFromMix<T extends string>(mix: Partial<Record<T, number>> | undefined, index: number): T | null {
+  if (!mix) return null;
+  const expanded: T[] = [];
+  for (const [key, weight] of Object.entries(mix) as [T, number | undefined][]) {
+    const slots = Math.max(0, Math.round(weight ?? 0));
+    for (let i = 0; i < slots; i += 1) expanded.push(key);
+  }
+  if (expanded.length === 0) return null;
+  return expanded[index % expanded.length] ?? null;
+}
+
+// Third-party tier → representative mid-range share percentage. Aggregator
+// re-classifies from the event-level share so the numbers don't have to be
+// perfect — just plausibly inside each tier's band per §2.4 of the 0.1.x
+// enrichment plan.
+const THIRD_PARTY_TIER_SHARE_CENTER: Record<SignalThirdPartyTier, number> = {
+  none: 0,
+  light: 8,
+  moderate: 28,
+  heavy: 55
+};
+
+// Build a per-event LCP breakdown whose chosen dominant subpart will pull
+// the series aggregate toward that subpart. We distribute the `lcp_ms −
+// ttfb_ms` budget across the three breakdown fields with the dominant
+// subpart taking the lion's share. Callers pass `ttfb` as the reused
+// `vitals.ttfb_ms` so the aggregator's sum math stays honest.
+function buildLcpBreakdown(lcpMs: number, ttfbMs: number, dominant: SignalLcpSubpart): SignalLcpBreakdown {
+  const budget = Math.max(lcpMs - ttfbMs, 300);
+
+  if (dominant === 'ttfb') {
+    // Shrink the non-TTFB tail so the reused ttfb_ms dominates the sum.
+    const floor = Math.max(Math.round(ttfbMs * 0.35), 120);
+    return {
+      resource_load_delay_ms: floor,
+      resource_load_time_ms: Math.round(floor * 0.9),
+      element_render_delay_ms: Math.round(floor * 0.8)
+    };
+  }
+
+  const weights: Record<Exclude<SignalLcpSubpart, 'ttfb'>, number> = {
+    resource_load_delay: 1,
+    resource_load_time: 1,
+    element_render_delay: 1
+  };
+  weights[dominant] = 4;
+  const totalWeight = weights.resource_load_delay + weights.resource_load_time + weights.element_render_delay;
+
+  return {
+    resource_load_delay_ms: Math.round((budget * weights.resource_load_delay) / totalWeight),
+    resource_load_time_ms: Math.round((budget * weights.resource_load_time) / totalWeight),
+    element_render_delay_ms: Math.round((budget * weights.element_render_delay) / totalWeight)
+  };
+}
 
 export const chromeColdNavFixture: SignalEventV1 = {
   v: 1,
@@ -225,6 +298,26 @@ function createFixtureEvent(event_id: string, ts: number, overrides: Partial<Sig
   };
 }
 
+// Per-series enrichment distribution. All fields optional; any field omitted
+// means "do not populate" for that series. Chromium-only fields (lcp_breakdown,
+// culprit_kind, inp dominant_phase, loaf) are also skipped on safari/firefox
+// events even when a mix is supplied — matches the capture-side gating so
+// fixture aggregates trace cleanly back to browser boundaries.
+interface SeriesEnrichmentOptions {
+  lcpSubpartMix?: Partial<Record<SignalLcpSubpart, number>>;
+  culpritMix?: Partial<Record<SignalLcpCulpritKind, number>>;
+  inpPhaseMix?: Partial<Record<SignalInpPhase, number>>;
+  thirdPartyTierMix?: Partial<Record<SignalThirdPartyTier, number>>;
+  thirdPartyMedianOriginCount?: number;
+  loafCauseMix?: Partial<Record<SignalLoafCause, number>>;
+  loafWorstMsBase?: number;
+  loafWorstMsStep?: number;
+  // Fraction of events with context.visibility_hidden_at_load = true.
+  // Applied before aggregation filters — produces a non-zero
+  // `coverage.excluded_background_sessions` on the aggregate.
+  visibilityHiddenShare?: number;
+}
+
 interface SeriesOptions {
   prefix: string;
   tier: SignalEventV1['net_tier'];
@@ -264,6 +357,7 @@ interface SeriesOptions {
   inpStep?: number;
   clsBase?: number;
   clsStep?: number;
+  enrichment?: SeriesEnrichmentOptions;
 }
 
 function createSeries(options: SeriesOptions): SignalEventV1[] {
@@ -290,6 +384,9 @@ function createSeries(options: SeriesOptions): SignalEventV1[] {
   const rttMs = options.rttMs ?? 200;
   const saveData = options.saveData ?? false;
 
+  const enrichment = options.enrichment;
+  const isChromium = browser === 'chrome';
+
   return Array.from({ length: options.count }, (_, index) => {
     const lcpEnabled = index < Math.round(options.count * lcpCoverage);
     const fcpEnabled = index < Math.round(options.count * fcpCoverage);
@@ -307,6 +404,69 @@ function createSeries(options: SeriesOptions): SignalEventV1[] {
         ? options.screenMix[index % options.screenMix.length]
         : undefined;
 
+    const lcpMs = isSafari || !lcpEnabled ? null : lcpBase + index * lcpStep;
+    const ttfbMs = ttfbEnabled ? ttfbBase + (index % 11) * ttfbStep : null;
+
+    // Chromium-only enrichment. Safari/Firefox events intentionally
+    // leave these undefined so fixture aggregates mirror capture-side
+    // browser gating and exercise the omission narrative paths.
+    let lcpBreakdown: SignalLcpBreakdown | undefined;
+    if (isChromium && lcpMs != null && ttfbMs != null && enrichment?.lcpSubpartMix) {
+      const dominant = pickFromMix<SignalLcpSubpart>(enrichment.lcpSubpartMix, index);
+      if (dominant) lcpBreakdown = buildLcpBreakdown(lcpMs, ttfbMs, dominant);
+    }
+
+    const culpritKind =
+      isChromium && enrichment?.culpritMix ? pickFromMix<SignalLcpCulpritKind>(enrichment.culpritMix, index) : null;
+
+    const dominantInpPhase =
+      isChromium && enrichment?.inpPhaseMix ? pickFromMix<SignalInpPhase>(enrichment.inpPhaseMix, index) : null;
+
+    let thirdParty: SignalVitalsThirdParty | undefined;
+    if (isChromium && lcpMs != null && enrichment?.thirdPartyTierMix) {
+      const tier = pickFromMix<SignalThirdPartyTier>(enrichment.thirdPartyTierMix, index);
+      if (tier) {
+        // Jitter inside the tier band by ±3 percentage points so per-event
+        // shares aren't all identical — keeps the median non-degenerate.
+        const center = THIRD_PARTY_TIER_SHARE_CENTER[tier];
+        const jitter = (index % 7) - 3;
+        const share = tier === 'none' ? 0 : Math.max(1, center + jitter);
+        const originBase =
+          enrichment.thirdPartyMedianOriginCount ??
+          (tier === 'none' ? 0 : tier === 'light' ? 3 : tier === 'moderate' ? 6 : 10);
+        thirdParty = {
+          pre_lcp_script_share_pct: share,
+          origin_count: tier === 'none' ? 0 : Math.max(0, originBase + ((index % 5) - 2))
+        };
+      }
+    }
+
+    let loaf: SignalVitalsLoaf | undefined;
+    if (isChromium && enrichment?.loafCauseMix) {
+      const cause = pickFromMix<SignalLoafCause>(enrichment.loafCauseMix, index);
+      if (cause) {
+        const worstBase = enrichment.loafWorstMsBase ?? 160;
+        const worstStep = enrichment.loafWorstMsStep ?? 6;
+        loaf = {
+          worst_duration_ms: worstBase + (index % 9) * worstStep,
+          dominant_cause: cause,
+          script_origin_count: cause === 'script' ? 2 + (index % 4) : null
+        };
+      }
+    }
+
+    const hiddenShare = enrichment?.visibilityHiddenShare ?? 0;
+    // Cycle deterministic: every ceil(1/share)-th event is hidden. Keeps
+    // the fraction stable across counts and avoids random drift across
+    // fixture rebuilds.
+    const visibilityHidden = hiddenShare > 0 ? (index + 1) % Math.max(2, Math.round(1 / hiddenShare)) === 0 : false;
+
+    // Existing lcp_attribution / inp_attribution on the base fixture stay
+    // intact; we only layer enrichment fields. Cloning spreads preserve
+    // the type-level optionality.
+    const baseLcpAttribution = chromeColdNavFixture.vitals.lcp_attribution;
+    const baseInpAttribution = chromeColdNavFixture.vitals.inp_attribution;
+
     return createFixtureEvent(`${options.prefix}_${index}`, options.startTs + index * 1_000, {
       url: options.path,
       net_tier: options.tier,
@@ -316,11 +476,20 @@ function createSeries(options: SeriesOptions): SignalEventV1[] {
       device_memory_gb: deviceMemoryGb,
       ...(screenW != null ? { device_screen_w: screenW } : {}),
       vitals: {
-        lcp_ms: isSafari || !lcpEnabled ? null : lcpBase + index * lcpStep,
+        lcp_ms: lcpMs,
         cls: isSafari ? null : Number((clsBase + index * clsStep).toFixed(3)),
         inp_ms: isSafari || !inpEnabled ? null : inpBase + (index % 8) * inpStep,
         fcp_ms: fcpEnabled ? fcpBase + index * fcpStep : null,
-        ttfb_ms: ttfbEnabled ? ttfbBase + (index % 11) * ttfbStep : null
+        ttfb_ms: ttfbMs,
+        ...(isChromium && lcpBreakdown ? { lcp_breakdown: lcpBreakdown } : {}),
+        ...(isChromium && thirdParty ? { third_party: thirdParty } : {}),
+        ...(isChromium && loaf ? { loaf } : {}),
+        ...(isChromium && baseLcpAttribution && culpritKind
+          ? { lcp_attribution: { ...baseLcpAttribution, culprit_kind: culpritKind } }
+          : {}),
+        ...(isChromium && baseInpAttribution && dominantInpPhase
+          ? { inp_attribution: { ...baseInpAttribution, dominant_phase: dominantInpPhase } }
+          : {})
       },
       context: isSafari
         ? {
@@ -328,14 +497,16 @@ function createSeries(options: SeriesOptions): SignalEventV1[] {
             downlink_mbps: null,
             rtt_ms: null,
             save_data: null,
-            connection_type: null
+            connection_type: null,
+            ...(visibilityHidden ? { visibility_hidden_at_load: true } : {})
           }
         : {
             effective_type: effectiveType,
             downlink_mbps: downlinkMbps,
             rtt_ms: rttMs,
             save_data: saveData,
-            connection_type: 'cellular'
+            connection_type: 'cellular',
+            ...(visibilityHidden ? { visibility_hidden_at_load: true } : {})
           },
       meta: {
         browser,
@@ -445,7 +616,47 @@ export const affirmingAggregateFixture: SignalAggregateV1 = aggregateSignalEvent
       ttfbBase: 160,
       ttfbStep: 5,
       inpBase: 100,
-      inpStep: 8
+      inpStep: 8,
+      // Counter-case enrichment: positive-narration paths. Third-party tier
+      // dominant `none` (clean first-party surface), no background sessions
+      // excluded, healthy LCP where `resource_load_time` leads over
+      // `element_render_delay`, INP dominated by `presentation` (cheap
+      // frame commit), LoAF rare and painted. Verifies the §4 affirming /
+      // silence branches emit clean copy rather than urgent diagnostics.
+      enrichment: {
+        lcpSubpartMix: {
+          resource_load_time: 5,
+          element_render_delay: 2,
+          resource_load_delay: 2,
+          ttfb: 1
+        },
+        culpritMix: {
+          headline_text: 5,
+          hero_image: 2,
+          unknown: 2,
+          banner_image: 1
+        },
+        inpPhaseMix: {
+          presentation: 5,
+          processing: 3,
+          input_delay: 2
+        },
+        thirdPartyTierMix: {
+          none: 7,
+          light: 2,
+          moderate: 1
+        },
+        thirdPartyMedianOriginCount: 2,
+        loafCauseMix: {
+          paint: 5,
+          style: 3,
+          layout: 1,
+          script: 1
+        },
+        loafWorstMsBase: 68,
+        loafWorstMsStep: 2,
+        visibilityHiddenShare: 0
+      }
     }),
     ...createSeries({
       prefix: 'affirming_moderate',
@@ -583,6 +794,14 @@ export const highUnclassifiedShareAggregateFixture: SignalAggregateV1 = aggregat
   Date.UTC(2026, 3, 13, 11, 30, 0)
 );
 
+// Safari-dominant cohort: verifies the Chromium-only enrichment omission
+// paths. The Safari series produce no `lcp_breakdown`, `lcp_attribution`,
+// `inp_attribution.dominant_phase`, `third_party`, or `loaf` events (the
+// capture side gates these on Chromium-only APIs). The 12-event chrome
+// slice is deliberately below `SIGNAL_MIN_RACE_OBSERVATIONS` (25), so the
+// aggregator cannot emit any story block from it either. Result: a valid
+// aggregate where every new narrative block should cleanly omit rather
+// than render empty — the negative-path twin of `fullDepthAggregateFixture`.
 export const safariHeavyAggregateFixture: SignalAggregateV1 = aggregateSignalEvents(
   [
     ...createSeries({
@@ -680,7 +899,24 @@ export const fullDepthAggregateFixture: SignalAggregateV1 = aggregateSignalEvent
       ttfbBase: 145,
       ttfbStep: 4,
       inpBase: 85,
-      inpStep: 8
+      inpStep: 8,
+      // Full-depth enrichment: element_render_delay dominant at the
+      // aggregate (hero imagery renders after bytes arrive), hero_image
+      // culprit dominant, INP dominated by processing (handler work),
+      // moderate third-party weight, LoAF worst frames led by script.
+      // visibility_hidden_share produces a handful of background-tab
+      // exclusions so the credibility strip segment renders honestly.
+      enrichment: {
+        lcpSubpartMix: { element_render_delay: 5, resource_load_delay: 2, resource_load_time: 2, ttfb: 1 },
+        culpritMix: { hero_image: 6, product_image: 2, headline_text: 1, unknown: 1 },
+        inpPhaseMix: { processing: 5, input_delay: 3, presentation: 2 },
+        thirdPartyTierMix: { moderate: 5, heavy: 2, light: 2, none: 1 },
+        thirdPartyMedianOriginCount: 7,
+        loafCauseMix: { script: 6, layout: 2, style: 1, paint: 1 },
+        loafWorstMsBase: 140,
+        loafWorstMsStep: 6,
+        visibilityHiddenShare: 0.04
+      }
     }),
     // Urban — Safari slice (no LCP/CLS/INP, but contributes FCP/TTFB).
     // Safari users lean iPad — tablet + large mobile.
@@ -722,7 +958,18 @@ export const fullDepthAggregateFixture: SignalAggregateV1 = aggregateSignalEvent
       ttfbBase: 260,
       ttfbStep: 8,
       inpBase: 180,
-      inpStep: 14
+      inpStep: 14,
+      enrichment: {
+        lcpSubpartMix: { element_render_delay: 5, resource_load_delay: 2, resource_load_time: 2, ttfb: 1 },
+        culpritMix: { hero_image: 5, product_image: 3, banner_image: 1, unknown: 1 },
+        inpPhaseMix: { processing: 5, input_delay: 3, presentation: 2 },
+        thirdPartyTierMix: { moderate: 5, heavy: 2, light: 2, none: 1 },
+        thirdPartyMedianOriginCount: 7,
+        loafCauseMix: { script: 6, layout: 2, style: 1, paint: 1 },
+        loafWorstMsBase: 180,
+        loafWorstMsStep: 7,
+        visibilityHiddenShare: 0.04
+      }
     }),
     // Moderate — Firefox slice. Mostly desktop (Firefox is rare on mobile).
     ...createSeries({
@@ -773,7 +1020,18 @@ export const fullDepthAggregateFixture: SignalAggregateV1 = aggregateSignalEvent
       ttfbBase: 380,
       ttfbStep: 10,
       inpBase: 420,
-      inpStep: 18
+      inpStep: 18,
+      enrichment: {
+        lcpSubpartMix: { element_render_delay: 5, resource_load_delay: 3, resource_load_time: 1, ttfb: 1 },
+        culpritMix: { hero_image: 6, product_image: 3, banner_image: 1 },
+        inpPhaseMix: { processing: 6, input_delay: 3, presentation: 1 },
+        thirdPartyTierMix: { moderate: 4, heavy: 4, light: 1 },
+        thirdPartyMedianOriginCount: 8,
+        loafCauseMix: { script: 7, layout: 2, style: 1 },
+        loafWorstMsBase: 240,
+        loafWorstMsStep: 9,
+        visibilityHiddenShare: 0.04
+      }
     }),
     // Constrained — severely budget Chrome. Entirely mobile.
     ...createSeries({
@@ -798,7 +1056,18 @@ export const fullDepthAggregateFixture: SignalAggregateV1 = aggregateSignalEvent
       ttfbBase: 560,
       ttfbStep: 14,
       inpBase: 740,
-      inpStep: 24
+      inpStep: 24,
+      enrichment: {
+        lcpSubpartMix: { element_render_delay: 5, resource_load_delay: 3, resource_load_time: 1, ttfb: 1 },
+        culpritMix: { hero_image: 6, product_image: 3, banner_image: 1 },
+        inpPhaseMix: { processing: 6, input_delay: 3, presentation: 1 },
+        thirdPartyTierMix: { heavy: 5, moderate: 3, light: 1 },
+        thirdPartyMedianOriginCount: 9,
+        loafCauseMix: { script: 7, layout: 2, style: 1 },
+        loafWorstMsBase: 320,
+        loafWorstMsStep: 12,
+        visibilityHiddenShare: 0.06
+      }
     }),
     // A handful of unclassified (reused connections) to populate that coverage field
     ...createSeries({

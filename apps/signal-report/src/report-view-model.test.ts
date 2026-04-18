@@ -2,8 +2,10 @@ import {
   affirmingAggregateFixture,
   decodeSignalReportUrl,
   fcpFallbackAggregateFixture,
+  fullDepthAggregateFixture,
   highUnclassifiedShareAggregateFixture,
   lowInpCoverageAggregateFixture,
+  safariHeavyAggregateFixture,
   signalReportScenarioFixtures,
   singleStageFunnelFixture,
   soberMoodAggregateFixture,
@@ -836,6 +838,90 @@ describe('report view model', () => {
       const html = renderReportMarkup(viewModel, 'full');
 
       expect(html).not.toContain('sr-act1-ctx');
+    });
+  });
+
+  // Full-enrichment scenario — `fullDepthAggregateFixture` is the
+  // demonstration fixture every new 0.1.x narrative block is expected to
+  // render on. If a future change regresses a story decoder, aggregator
+  // threshold, or narrative string, one of these assertions will catch it
+  // before `pnpm dev:report` shows an empty slide.
+  describe('full-enrichment (fullDepthAggregateFixture)', () => {
+    it('emits every round-1 story block with a confident (non-hedged) dominant signal', () => {
+      const viewModel = buildReportViewModel(fullDepthAggregateFixture);
+
+      expect(viewModel.race.lcp_story).not.toBeNull();
+      expect(viewModel.race.lcp_story?.is_hedged).toBe(false);
+      expect(viewModel.race.lcp_story?.dominant_subpart).toBe('element_render_delay');
+      expect(viewModel.race.lcp_story?.dominant_culprit_kind).toBe('hero_image');
+
+      expect(viewModel.race.third_party_story).not.toBeNull();
+      expect(viewModel.race.third_party_story?.dominant_tier).not.toBe('none');
+      expect(viewModel.race.third_party_story?.median_origin_count).toBeGreaterThan(0);
+
+      expect(viewModel.act3.inp_story).not.toBeNull();
+      expect(viewModel.act3.inp_story?.is_hedged).toBe(false);
+      expect(viewModel.act3.inp_story?.dominant_phase).toBe('processing');
+
+      expect(viewModel.act3.loaf_story).not.toBeNull();
+      expect(viewModel.act3.loaf_story?.is_hedged).toBe(false);
+      expect(viewModel.act3.loaf_story?.dominant_cause).toBe('script');
+      expect(viewModel.act3.loaf_story?.worst_frame_ms_p75).toBeGreaterThan(0);
+
+      expect(viewModel.act1_context_strip).not.toBeNull();
+      expect(viewModel.act1_context_strip?.rows.length ?? 0).toBeGreaterThan(0);
+    });
+
+    it('reports background-session exclusions on the credibility strip', () => {
+      const viewModel = buildReportViewModel(fullDepthAggregateFixture);
+      expect(viewModel.credibility_strip.excluded_background_sessions).not.toBeNull();
+      expect(viewModel.credibility_strip.excluded_background_sessions ?? 0).toBeGreaterThan(0);
+    });
+
+    it('renders every new narrative block in the full report markup', () => {
+      const viewModel = buildReportViewModel(fullDepthAggregateFixture);
+      const html = renderReportMarkup(viewModel, 'full');
+
+      expect(html).toContain('sr-lcp-story');
+      expect(html).toContain('sr-third-party-headline');
+      expect(html).toContain('sr-funnel-node-loaf');
+      expect(html).toContain('sr-act1-ctx');
+    });
+  });
+
+  // Counter-case — `affirmingAggregateFixture` proves the positive-narration
+  // paths. Third-party tier `none` must narrate as a clean-origin win, not a
+  // missing-data shrug. Visibility filter should produce zero exclusions.
+  describe('affirming counter-case (third_party none + visibility 0)', () => {
+    it('narrates the clean-origin third-party win and records zero background exclusions', () => {
+      const viewModel = buildReportViewModel(affirmingAggregateFixture);
+
+      expect(viewModel.race.third_party_story).not.toBeNull();
+      expect(viewModel.race.third_party_story?.dominant_tier).toBe('none');
+      expect(viewModel.credibility_strip.excluded_background_sessions ?? 0).toBe(0);
+    });
+  });
+
+  // Omission case — `safariHeavyAggregateFixture` has no Chromium-enrichment
+  // events above the story threshold. Every new narrative block must cleanly
+  // omit rather than render empty.
+  describe('Chromium-only omission (safariHeavyAggregateFixture)', () => {
+    it('omits every Chromium-gated narrative block when no enrichment events survive', () => {
+      const viewModel = buildReportViewModel(safariHeavyAggregateFixture);
+
+      expect(viewModel.race.lcp_story).toBeNull();
+      expect(viewModel.race.third_party_story).toBeNull();
+      expect(viewModel.act3.inp_story).toBeNull();
+      expect(viewModel.act3.loaf_story).toBeNull();
+    });
+
+    it('renders markup without the Chromium-only narrative hooks', () => {
+      const viewModel = buildReportViewModel(safariHeavyAggregateFixture);
+      const html = renderReportMarkup(viewModel, 'full');
+
+      expect(html).not.toContain('sr-lcp-story');
+      expect(html).not.toContain('sr-third-party-headline');
+      expect(html).not.toContain('sr-funnel-node-loaf');
     });
   });
 });
