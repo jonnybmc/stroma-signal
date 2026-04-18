@@ -10,6 +10,8 @@ import {
   type ReportDeviceTierVisual,
   type ReportExperienceStageViewModel,
   type ReportFormFactorViewModel,
+  type ReportInpStoryViewModel,
+  type ReportLcpStoryViewModel,
   type ReportMotionMode,
   type ReportPersonaContrast,
   type ReportPersonaProfile,
@@ -534,6 +536,55 @@ function renderLaneSampleLine(coverage: number | null, tierLabel: string): strin
   `;
 }
 
+/**
+ * Act 2 LCP-subpart story block — inline narrative plus a compact 4-row
+ * micro-chart that sits inside the `sr-wait` aside, immediately below the
+ * wait-caption. The chart's dominant row takes the mood accent; non-
+ * dominant rows stay muted so the eye lands on the single claim the
+ * narrative makes. When the story is hedged (no clear dominant), the
+ * chart renders without a tinted row and the narrative switches to the
+ * honest "spread across multiple phases" line.
+ *
+ * Returns an empty string when the aggregate carries no LCP story
+ * (Safari / Firefox / below race-observation threshold / no defensible
+ * subpart breakdown) — the wait aside retains its existing rhythm with
+ * no phantom caption or empty container (§4.1 of the enrichment plan).
+ */
+function renderAct2LcpStory(story: ReportLcpStoryViewModel | null): string {
+  if (!story) return '';
+  const chart = story.rows
+    .map(
+      (row) => `
+        <div
+          class="sr-lcp-story-row"
+          data-subpart="${escapeHtml(row.key)}"
+          data-dominant="${row.is_dominant ? 'true' : 'false'}"
+          style="--share:${row.share}"
+        >
+          <span class="sr-lcp-story-row-label">${escapeHtml(row.label)}</span>
+          <span class="sr-lcp-story-row-bar" aria-hidden="true">
+            <span class="sr-lcp-story-row-fill"></span>
+          </span>
+          <span class="sr-lcp-story-row-value sr-mono sr-mono-sm">${row.share}%</span>
+        </div>
+      `
+    )
+    .join('');
+  const ariaSummary = story.rows.map((row) => `${row.label} ${row.share}%`).join(', ');
+  return `
+    <div
+      class="sr-lcp-story"
+      data-hedged="${story.is_hedged ? 'true' : 'false'}"
+      ${story.dominant_subpart ? `data-dominant-subpart="${escapeHtml(story.dominant_subpart)}"` : ''}
+    >
+      <p class="sr-lcp-story-narrative">${escapeHtml(story.narrative)}</p>
+      <div class="sr-lcp-story-chart" role="img" aria-label="LCP subpart distribution: ${escapeHtml(ariaSummary)}">
+        ${chart}
+      </div>
+    </div>
+  `;
+}
+
 function renderAct2(viewModel: ReportViewModel): string {
   const race = viewModel.race;
 
@@ -596,6 +647,7 @@ function renderAct2(viewModel: ReportViewModel): string {
           }
         </div>
         <p class="sr-wait-caption">${escapeHtml(race.comparison_label)} users wait this much longer than urban users, every visit.</p>
+        ${renderAct2LcpStory(race.lcp_story)}
       </aside>
 
       <article class="sr-lane sr-lane-comparison" data-tone="comparison">
@@ -743,7 +795,11 @@ function renderFunnelWaterfall(act3: ReportViewModel['act3']): string {
     }
     const stage = byKey.get(key);
     if (stage) {
-      parts.push(renderFunnelNodeActive(stage, tooltip));
+      // The INP node receives an inline phase-story caption when the
+      // aggregate carries a defensible INP story (see §3.3 / §4.1).
+      // Other nodes pass `null` so the active-node renderer stays generic.
+      const inpStoryForNode = stage.key === 'inp' ? act3.inp_story : null;
+      parts.push(renderFunnelNodeActive(stage, tooltip, inpStoryForNode));
       previousActive = stage;
     } else {
       parts.push(renderFunnelNodeInactive(key, label, caption, tooltip));
@@ -758,8 +814,19 @@ function renderFunnelWaterfall(act3: ReportViewModel['act3']): string {
   `;
 }
 
-function renderFunnelNodeActive(stage: ReportExperienceStageViewModel, tooltip: string): string {
+function renderFunnelNodeActive(
+  stage: ReportExperienceStageViewModel,
+  tooltip: string,
+  inpStory: ReportInpStoryViewModel | null = null
+): string {
   const tone = stageToneForShare(stage.weighted_poor_share);
+  // Inline INP-phase caption under the threshold line. The caption stays
+  // inside the existing node card so the funnel waterfall keeps its
+  // three-column rhythm — no new box, no new section (§3.3 of the plan).
+  const inpCaption =
+    inpStory && stage.key === 'inp'
+      ? `<p class="sr-funnel-node-story" data-hedged="${inpStory.is_hedged ? 'true' : 'false'}">${escapeHtml(inpStory.narrative)}</p>`
+      : '';
   return `
     <article
       class="sr-funnel-node"
@@ -774,6 +841,7 @@ function renderFunnelNodeActive(stage: ReportExperienceStageViewModel, tooltip: 
       </header>
       <strong class="sr-funnel-node-metric sr-mono">${stage.weighted_poor_share}%</strong>
       <p class="sr-funnel-node-threshold sr-mono sr-mono-sm">${escapeHtml(stage.threshold_label)}</p>
+      ${inpCaption}
     </article>
   `;
 }

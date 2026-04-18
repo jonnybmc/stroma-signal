@@ -1,6 +1,11 @@
 import type {
   SignalAggregateV1,
   SignalExperienceStage,
+  SignalInpPhase,
+  SignalInpStory,
+  SignalLcpCulpritKind,
+  SignalLcpStory,
+  SignalLcpSubpart,
   SignalNetworkTier,
   SignalRaceFallbackReason,
   SignalRaceMetric
@@ -11,6 +16,12 @@ import {
   SIGNAL_FUNNEL_INP_POOR_THRESHOLD,
   SIGNAL_FUNNEL_LCP_POOR_THRESHOLD
 } from '@stroma-labs/signal-contracts';
+
+// Dominance share threshold below which the LCP / INP story narratives
+// fall back to hedged copy instead of claiming a single dominant cause.
+// Kept as a named constant per plan §10.7 so future buyer-research feedback
+// can tune the aggressiveness of single-cause claims in one place.
+export const SIGNAL_STORY_HEDGED_THRESHOLD_PCT = 35;
 
 export type ReportMotionMode = 'full' | 'reduced';
 export type ReportAct3Mode = 'full' | 'reduced' | 'legacy';
@@ -46,6 +57,40 @@ export interface ReportDeviceTierVisual {
   share: number;
 }
 
+// LCP subpart row in the compact 4-row micro-chart that sits below the
+// wait-delta aside in Act 2. `is_dominant` flags the row that owns the
+// dominant share so the renderer can tint it with the mood accent without
+// recomputing argmax.
+export interface ReportLcpSubpartRow {
+  key: SignalLcpSubpart;
+  label: string;
+  share: number;
+  is_dominant: boolean;
+}
+
+// Act 2 LCP story — inline narrative under the wait-delta aside plus a
+// 4-row micro-chart of the subpart distribution. `is_hedged` is true when
+// no single subpart carries enough share to make a confident single-cause
+// claim (see SIGNAL_STORY_HEDGED_THRESHOLD_PCT). When hedged, the
+// narrative falls back to the honest "spread across multiple phases"
+// line and the chart omits the dominant-row tint.
+export interface ReportLcpStoryViewModel {
+  narrative: string;
+  is_hedged: boolean;
+  dominant_subpart: SignalLcpSubpart | null;
+  dominant_culprit_kind: SignalLcpCulpritKind | null;
+  rows: ReportLcpSubpartRow[];
+}
+
+// Act 3 INP story — inline line inside the INP funnel node. No new card;
+// the narrative sits under the existing `sr-funnel-node-threshold` line.
+// `is_hedged` uses the same threshold rule as the LCP story.
+export interface ReportInpStoryViewModel {
+  narrative: string;
+  is_hedged: boolean;
+  dominant_phase: SignalInpPhase | null;
+}
+
 export interface ReportRaceViewModel {
   metric: SignalRaceMetric;
   metric_label: string;
@@ -62,6 +107,7 @@ export interface ReportRaceViewModel {
   comparison_coverage: number | null;
   schematic_path_hint: string | null;
   race_story: string;
+  lcp_story: ReportLcpStoryViewModel | null;
 }
 
 export interface ReportStageEvidenceChip {
@@ -92,6 +138,7 @@ export interface ReportAct3ViewModel {
   narrative_line: string;
   stages: ReportExperienceStageViewModel[];
   legacy_message: string | null;
+  inp_story: ReportInpStoryViewModel | null;
 }
 
 export interface ReportCredibilityStripViewModel {
@@ -335,6 +382,114 @@ function buildAct1Tiers(aggregate: SignalAggregateV1): ReportTierVisual[] {
   }));
 }
 
+// Short labels for the 4-bar LCP subpart chart. Kept terse so each row
+// comfortably fits the 80px-tall compact chart that sits beside the
+// wait-delta hero number without competing for visual weight.
+const LCP_SUBPART_SHORT_LABELS: Record<SignalLcpSubpart, string> = {
+  ttfb: 'TTFB',
+  resource_load_delay: 'Load delay',
+  resource_load_time: 'Load time',
+  element_render_delay: 'Render delay'
+};
+
+// Narrative copy per dominant subpart. Matches §3.4 of the enrichment
+// plan — honest, temporal, measured, no prescription. Each sentence names
+// what is happening, not what to fix.
+const LCP_SUBPART_NARRATIVES: Record<SignalLcpSubpart, string> = {
+  element_render_delay:
+    'The bytes arrive in time, but render is blocked afterwards. Element render delay dominates the largest paint.',
+  resource_load_delay:
+    'The largest element is discovered too late. Most of the paint delay comes from waiting to start loading the hero resource.',
+  resource_load_time: 'The largest element is discovered and ready — it just takes too long to travel the wire.',
+  ttfb: "The server's first byte lands slowly. The hero can't load until the document starts."
+};
+
+// Culprit-clause copy appended after the subpart narrative when the
+// aggregate carries a confident culprit kind. `unknown` is deliberately
+// absent — the clause is omitted entirely when the classifier falls
+// through, rather than narrating a guess.
+const LCP_CULPRIT_CLAUSES: Record<Exclude<SignalLcpCulpritKind, 'unknown'>, string> = {
+  hero_image: 'Usually a hero image.',
+  headline_text: 'Usually the headline text.',
+  banner_image: 'Usually a banner image.',
+  product_image: 'Usually a product image.',
+  video_poster: 'Usually a video poster.'
+};
+
+const INP_PHASE_NARRATIVES: Record<SignalInpPhase, string> = {
+  processing: 'Interaction lag is dominated by handler work after the click.',
+  input_delay: 'The page is busy before clicks can start — input waits on other work.',
+  presentation: 'Handlers finish fast, but visual completion lags.'
+};
+
+const LCP_HEDGED_NARRATIVE = 'Paint delay is spread across multiple phases — no single cause dominates.';
+const INP_HEDGED_NARRATIVE = 'Interaction lag is spread across multiple phases — no single cause dominates.';
+
+function buildLcpStoryViewModel(story: SignalLcpStory | undefined): ReportLcpStoryViewModel | null {
+  if (!story) return null;
+  if (!story.subpart_distribution_pct) return null;
+
+  const distribution = story.subpart_distribution_pct;
+  const isHedged =
+    story.dominant_subpart == null ||
+    story.dominant_subpart_share_pct == null ||
+    story.dominant_subpart_share_pct < SIGNAL_STORY_HEDGED_THRESHOLD_PCT;
+
+  const dominantSubpart = isHedged ? null : story.dominant_subpart;
+  const culprit =
+    isHedged || !story.dominant_culprit_kind || story.dominant_culprit_kind === 'unknown'
+      ? null
+      : story.dominant_culprit_kind;
+
+  // Narrative composition: subpart clause + optional culprit clause.
+  // When hedged, the fixed "spread across multiple phases" line owns the
+  // whole narrative so we never imply a single-cause claim we can't back.
+  let narrative: string;
+  if (isHedged || !dominantSubpart) {
+    narrative = LCP_HEDGED_NARRATIVE;
+  } else {
+    narrative = LCP_SUBPART_NARRATIVES[dominantSubpart];
+    if (culprit) {
+      narrative = `${narrative} ${LCP_CULPRIT_CLAUSES[culprit]}`;
+    }
+  }
+
+  const rows: ReportLcpSubpartRow[] = (
+    ['ttfb', 'resource_load_delay', 'resource_load_time', 'element_render_delay'] as const
+  ).map((key) => ({
+    key,
+    label: LCP_SUBPART_SHORT_LABELS[key],
+    share: distribution[key],
+    is_dominant: dominantSubpart === key
+  }));
+
+  return {
+    narrative,
+    is_hedged: isHedged,
+    dominant_subpart: dominantSubpart,
+    dominant_culprit_kind: culprit,
+    rows
+  };
+}
+
+function buildInpStoryViewModel(story: SignalInpStory | undefined): ReportInpStoryViewModel | null {
+  if (!story) return null;
+
+  const isHedged =
+    story.dominant_phase == null ||
+    story.dominant_phase_share_pct == null ||
+    story.dominant_phase_share_pct < SIGNAL_STORY_HEDGED_THRESHOLD_PCT;
+
+  const dominantPhase = isHedged ? null : story.dominant_phase;
+  const narrative = isHedged || !dominantPhase ? INP_HEDGED_NARRATIVE : INP_PHASE_NARRATIVES[dominantPhase];
+
+  return {
+    narrative,
+    is_hedged: isHedged,
+    dominant_phase: dominantPhase
+  };
+}
+
 function buildRaceStory(comparisonLabel: string, waitDeltaMs: number | null, metric: SignalRaceMetric): string {
   if (metric === 'none' || waitDeltaMs == null) {
     return 'The current sample does not yet support a defensible race, so the report keeps the comparison honest instead of inventing certainty.';
@@ -376,7 +531,8 @@ function buildRaceViewModel(aggregate: SignalAggregateV1): ReportRaceViewModel {
     urban_coverage: aggregate.coverage.selected_metric_urban_coverage,
     comparison_coverage: aggregate.coverage.selected_metric_comparison_coverage,
     schematic_path_hint: aggregate.top_page_path,
-    race_story: buildRaceStory(comparisonLabel, waitDeltaMs, metric)
+    race_story: buildRaceStory(comparisonLabel, waitDeltaMs, metric),
+    lcp_story: buildLcpStoryViewModel(aggregate.lcp_story)
   };
 }
 
@@ -525,6 +681,14 @@ function buildAct3Narrative(activeStages: SignalExperienceStage[], mood: ReportM
 
 function buildAct3ViewModel(aggregate: SignalAggregateV1, moodHint: ReportMoodTier = 'sober'): ReportAct3ViewModel {
   const funnel = aggregate.experience_funnel;
+  // INP story is tied to the INP funnel node. Only surface the story
+  // when the funnel has an active INP stage — otherwise we would be
+  // claiming a phase diagnosis for a stage the funnel itself could not
+  // defend. Legacy / reduced / coverage-thin funnels cleanly omit the
+  // inline line (§4.1 of the enrichment plan).
+  const inpStage = funnel?.active_stages.includes('inp') ? aggregate.inp_story : undefined;
+  const inpStory = buildInpStoryViewModel(inpStage);
+
   if (!funnel) {
     return {
       mode: 'legacy',
@@ -536,7 +700,8 @@ function buildAct3ViewModel(aggregate: SignalAggregateV1, moodHint: ReportMoodTi
         'This report link predates the measured experience funnel. Regenerate it to see the new performance-cliff layer.',
       stages: [],
       legacy_message:
-        'Acts 1 and 2 remain trustworthy, but this URL was generated before the measured funnel block existed.'
+        'Acts 1 and 2 remain trustworthy, but this URL was generated before the measured funnel block existed.',
+      inp_story: null
     };
   }
 
@@ -550,7 +715,8 @@ function buildAct3ViewModel(aggregate: SignalAggregateV1, moodHint: ReportMoodTi
       narrative_line:
         'The current sample does not contain enough classified and measured sessions to build a defensible performance funnel.',
       stages: [],
-      legacy_message: null
+      legacy_message: null,
+      inp_story: null
     };
   }
 
@@ -562,7 +728,8 @@ function buildAct3ViewModel(aggregate: SignalAggregateV1, moodHint: ReportMoodTi
     threshold_basis: thresholdBasis(funnel.active_stages, false),
     narrative_line: buildAct3Narrative(funnel.active_stages, moodHint),
     stages: buildExperienceStages(aggregate, moodHint),
-    legacy_message: null
+    legacy_message: null,
+    inp_story: inpStory
   };
 }
 

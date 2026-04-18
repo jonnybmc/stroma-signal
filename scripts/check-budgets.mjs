@@ -25,8 +25,15 @@ async function walk(dir) {
 }
 
 const baseSource = await readFile(baseBundle);
-assertUnderBudget('@stroma-labs/signal gzip', gzipSync(baseSource).byteLength, 4096);
-assertUnderBudget('@stroma-labs/signal brotli', brotliCompressSync(baseSource).byteLength, 4096);
+// Signal runtime budget. Pre-enrichment baseline was ~3980 bytes gzip.
+// Plan §9a.9 caps the full Round 1+ enrichment delta (LCP subparts,
+// culprit classifier, INP dominant phase, third-party, LoAF, visibility)
+// at 1.5 KB gzipped. 5632 bytes = baseline + 1.5 KB with single-byte
+// headroom. Tightening further risks false-positive failures on
+// incremental changes; loosening defeats the point of the budget as a
+// regression tripwire for capture-code weight.
+assertUnderBudget('@stroma-labs/signal gzip', gzipSync(baseSource).byteLength, 5632);
+assertUnderBudget('@stroma-labs/signal brotli', brotliCompressSync(baseSource).byteLength, 5632);
 
 const reportFiles = await walk(reportDist);
 let reportWeight = 0;
@@ -45,9 +52,10 @@ for (const file of reportFiles) {
 // the Actionable Signals slide. Iteration 7 added evidence rail,
 // credibility strip, guard range validation, strict decode, and
 // freshness provenance. Bumped from 192 KB → 224 KB → 228 KB → 232 KB
-// → 236 KB. The latest +4 KB accommodates the share button, refactored
-// footer / credibility-strip extraction, and summary/export subpath in
-// the contracts build output.
-assertUnderBudget('signal-report static weight', reportWeight, 236 * 1024);
+// → 236 KB → 244 KB. The latest +8 KB accommodates the Round 1
+// enrichment narrative: aggregate-side `lcp_story` / `inp_story`
+// decoders, Act 2 LCP-subpart inline block (narrative + 4-row
+// micro-chart), and Act 3 INP-phase caption inside the INP funnel node.
+assertUnderBudget('signal-report static weight', reportWeight, 244 * 1024);
 
 console.log('Bundle budgets passed.');

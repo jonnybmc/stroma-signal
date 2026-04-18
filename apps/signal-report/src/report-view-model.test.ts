@@ -375,4 +375,204 @@ describe('report view model', () => {
       expect(html).toMatch(/data-mood="(urgent|sober|affirming)"/);
     }
   });
+
+  describe('round 1 enrichment stories', () => {
+    const confidentLcpStoryAggregate = {
+      ...strongLcpCoverageAggregateFixture,
+      lcp_story: {
+        dominant_subpart: 'element_render_delay',
+        dominant_subpart_share_pct: 52,
+        dominant_culprit_kind: 'hero_image',
+        subpart_distribution_pct: {
+          ttfb: 18,
+          resource_load_delay: 12,
+          resource_load_time: 18,
+          element_render_delay: 52
+        }
+      }
+    } as const;
+
+    const hedgedLcpStoryAggregate = {
+      ...strongLcpCoverageAggregateFixture,
+      lcp_story: {
+        dominant_subpart: 'ttfb',
+        dominant_subpart_share_pct: 28,
+        dominant_culprit_kind: 'hero_image',
+        subpart_distribution_pct: {
+          ttfb: 28,
+          resource_load_delay: 24,
+          resource_load_time: 26,
+          element_render_delay: 22
+        }
+      }
+    } as const;
+
+    const unknownCulpritAggregate = {
+      ...strongLcpCoverageAggregateFixture,
+      lcp_story: {
+        dominant_subpart: 'resource_load_time',
+        dominant_subpart_share_pct: 48,
+        dominant_culprit_kind: 'unknown',
+        subpart_distribution_pct: {
+          ttfb: 18,
+          resource_load_delay: 14,
+          resource_load_time: 48,
+          element_render_delay: 20
+        }
+      }
+    } as const;
+
+    const confidentInpStoryAggregate = {
+      ...strongLcpCoverageAggregateFixture,
+      inp_story: {
+        dominant_phase: 'processing',
+        dominant_phase_share_pct: 61,
+        phase_distribution_pct: {
+          input_delay: 18,
+          processing: 61,
+          presentation: 21
+        }
+      }
+    } as const;
+
+    const hedgedInpStoryAggregate = {
+      ...strongLcpCoverageAggregateFixture,
+      inp_story: {
+        dominant_phase: 'processing',
+        dominant_phase_share_pct: 32,
+        phase_distribution_pct: {
+          input_delay: 34,
+          processing: 32,
+          presentation: 34
+        }
+      }
+    } as const;
+
+    it('builds a confident LCP story view-model with dominant row tinted and culprit clause appended', () => {
+      const viewModel = buildReportViewModel(confidentLcpStoryAggregate);
+      const story = viewModel.race.lcp_story;
+
+      expect(story).not.toBeNull();
+      expect(story?.is_hedged).toBe(false);
+      expect(story?.dominant_subpart).toBe('element_render_delay');
+      expect(story?.dominant_culprit_kind).toBe('hero_image');
+      expect(story?.narrative).toContain('Element render delay dominates');
+      expect(story?.narrative).toContain('Usually a hero image.');
+      expect(story?.rows).toHaveLength(4);
+      const dominant = story?.rows.find((row) => row.is_dominant);
+      expect(dominant?.key).toBe('element_render_delay');
+      expect(dominant?.share).toBe(52);
+      expect(story?.rows.filter((row) => row.is_dominant)).toHaveLength(1);
+    });
+
+    it('falls back to the hedged narrative when no subpart clears the dominance threshold', () => {
+      const viewModel = buildReportViewModel(hedgedLcpStoryAggregate);
+      const story = viewModel.race.lcp_story;
+
+      expect(story?.is_hedged).toBe(true);
+      expect(story?.dominant_subpart).toBeNull();
+      expect(story?.dominant_culprit_kind).toBeNull();
+      expect(story?.narrative).toBe('Paint delay is spread across multiple phases — no single cause dominates.');
+      expect(story?.rows.every((row) => row.is_dominant === false)).toBe(true);
+    });
+
+    it('omits the culprit clause when the classifier returns unknown', () => {
+      const viewModel = buildReportViewModel(unknownCulpritAggregate);
+      const story = viewModel.race.lcp_story;
+
+      expect(story?.is_hedged).toBe(false);
+      expect(story?.dominant_subpart).toBe('resource_load_time');
+      expect(story?.dominant_culprit_kind).toBeNull();
+      expect(story?.narrative).toContain('takes too long to travel the wire');
+      expect(story?.narrative).not.toMatch(/Usually a|Usually the/);
+    });
+
+    it('returns race.lcp_story === null when the aggregate carries no lcp_story (Safari/FF/legacy)', () => {
+      const viewModel = buildReportViewModel(strongLcpCoverageAggregateFixture);
+      expect(viewModel.race.lcp_story).toBeNull();
+    });
+
+    it('builds a confident INP story view-model gated on the INP funnel stage being active', () => {
+      const viewModel = buildReportViewModel(confidentInpStoryAggregate);
+      const story = viewModel.act3.inp_story;
+
+      expect(viewModel.act3.active_stage_keys).toContain('inp');
+      expect(story).not.toBeNull();
+      expect(story?.is_hedged).toBe(false);
+      expect(story?.dominant_phase).toBe('processing');
+      expect(story?.narrative).toContain('handler work after the click');
+    });
+
+    it('falls back to the hedged INP narrative when no phase clears the dominance threshold', () => {
+      const viewModel = buildReportViewModel(hedgedInpStoryAggregate);
+      const story = viewModel.act3.inp_story;
+
+      expect(story?.is_hedged).toBe(true);
+      expect(story?.dominant_phase).toBeNull();
+      expect(story?.narrative).toBe('Interaction lag is spread across multiple phases — no single cause dominates.');
+    });
+
+    it('returns act3.inp_story === null when the INP funnel stage is not active (coverage-thin)', () => {
+      const viewModel = buildReportViewModel({
+        ...lowInpCoverageAggregateFixture,
+        inp_story: {
+          dominant_phase: 'processing',
+          dominant_phase_share_pct: 61,
+          phase_distribution_pct: {
+            input_delay: 18,
+            processing: 61,
+            presentation: 21
+          }
+        }
+      });
+
+      expect(viewModel.act3.active_stage_keys).not.toContain('inp');
+      expect(viewModel.act3.inp_story).toBeNull();
+    });
+
+    it('returns act3.inp_story === null on legacy aggregates that have no experience funnel', () => {
+      const legacyAggregate = decodeSignalReportUrl(
+        'https://signal.stroma.design/r?mode=production&d=example.co.za&nt=25,25,25,25,0&dt=34,33,33&lu=2100&lt=4200&fu=1100&ft=1900&tu=220&tt=380&ulc=100&ufc=100&utc=100&clc=100&cfc=100&ctc=100&s=100&p=7&nc=100&nu=0&nr=0&lc=100&ct=moderate&rm=lcp'
+      );
+      const viewModel = buildReportViewModel(legacyAggregate);
+
+      expect(viewModel.act3.mode).toBe('legacy');
+      expect(viewModel.act3.inp_story).toBeNull();
+    });
+
+    it('renders the Act 2 LCP narrative + micro-chart and the Act 3 INP caption in the markup', () => {
+      const aggregate = {
+        ...confidentLcpStoryAggregate,
+        inp_story: confidentInpStoryAggregate.inp_story
+      };
+      const viewModel = buildReportViewModel(aggregate);
+      const html = renderReportMarkup(viewModel, 'full');
+
+      expect(html).toContain('sr-lcp-story');
+      expect(html).toContain('Element render delay dominates');
+      expect(html).toContain('Usually a hero image.');
+      expect(html).toContain('data-dominant-subpart="element_render_delay"');
+      expect(html).toContain('data-subpart="element_render_delay"');
+      expect(html).toContain('data-hedged="false"');
+
+      expect(html).toContain('sr-funnel-node-story');
+      expect(html).toContain('handler work after the click');
+    });
+
+    it('omits the Act 2 LCP story block entirely when race.lcp_story is null', () => {
+      const viewModel = buildReportViewModel(strongLcpCoverageAggregateFixture);
+      const html = renderReportMarkup(viewModel, 'full');
+
+      expect(viewModel.race.lcp_story).toBeNull();
+      expect(html).not.toContain('sr-lcp-story');
+    });
+
+    it('omits the Act 3 INP caption when act3.inp_story is null', () => {
+      const viewModel = buildReportViewModel(strongLcpCoverageAggregateFixture);
+      const html = renderReportMarkup(viewModel, 'full');
+
+      expect(viewModel.act3.inp_story).toBeNull();
+      expect(html).not.toContain('sr-funnel-node-story');
+    });
+  });
 });

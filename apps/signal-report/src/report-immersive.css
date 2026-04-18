@@ -3747,3 +3747,121 @@ body:has(.sr-root) {
   border-color: var(--sr-tier-moderate);
   color: var(--sr-tier-moderate);
 }
+
+/* --------------------------------------------------------------------- */
+/* Act 2 LCP-subpart story                                               */
+/*                                                                       */
+/* Inline narrative + compact 4-row micro-chart that sits below the      */
+/* wait-caption inside the `sr-wait` aside. Reuses mood accent tokens so */
+/* the dominant row telegraphs the Act 2 narrative tone (urgent red,    */
+/* sober amber, affirming teal) without introducing new colours. Chart  */
+/* height is capped at 80px per the enrichment plan §3.3 so the whole    */
+/* block reads as supporting evidence to the hero wait-delta, not a new  */
+/* section competing for visual weight.                                  */
+/* --------------------------------------------------------------------- */
+.sr-lcp-story {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: 100%;
+  max-width: 26rem;
+  margin-top: 0.5rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--sr-border);
+}
+
+.sr-lcp-story-narrative {
+  margin: 0;
+  font-size: var(--sr-type-01);
+  line-height: 1.45;
+  color: var(--sr-fg);
+  text-align: center;
+  max-width: 34ch;
+  margin-inline: auto;
+}
+
+.sr-lcp-story[data-hedged="true"] .sr-lcp-story-narrative {
+  color: var(--sr-fg-muted);
+  font-style: italic;
+}
+
+.sr-lcp-story-chart {
+  display: grid;
+  grid-template-rows: repeat(4, auto);
+  row-gap: 0.25rem;
+  width: 100%;
+  max-height: 5rem;
+}
+
+.sr-lcp-story-row {
+  display: grid;
+  grid-template-columns: 4.75rem 1fr 2.25rem;
+  align-items: center;
+  column-gap: 0.5rem;
+  min-height: 0.9rem;
+}
+
+.sr-lcp-story-row-label {
+  font-size: var(--sr-type-mono-sm);
+  color: var(--sr-fg-muted);
+  letter-spacing: 0.02em;
+  text-align: right;
+}
+
+.sr-lcp-story-row[data-dominant="true"] .sr-lcp-story-row-label {
+  color: var(--sr-fg);
+}
+
+.sr-lcp-story-row-bar {
+  position: relative;
+  display: block;
+  height: 0.375rem;
+  border-radius: 999px;
+  background: rgba(232, 230, 223, 0.08);
+  overflow: hidden;
+}
+
+.sr-lcp-story-row-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: calc(var(--share, 0) * 1%);
+  background: var(--sr-fg-muted);
+  border-radius: inherit;
+  transition: width var(--sr-motion-complex) var(--sr-ease-out);
+}
+
+.sr-lcp-story-row[data-dominant="true"] .sr-lcp-story-row-fill {
+  background: var(--sr-accent);
+  box-shadow: 0 0 10px var(--sr-accent-soft);
+}
+
+.sr-lcp-story-row-value {
+  color: var(--sr-fg-muted);
+  text-align: right;
+}
+
+.sr-lcp-story-row[data-dominant="true"] .sr-lcp-story-row-value {
+  color: var(--sr-fg);
+}
+
+/* --------------------------------------------------------------------- */
+/* Act 3 INP-phase story                                                 */
+/*                                                                       */
+/* Inline caption inside the INP funnel node. Sits below the threshold   */
+/* line, shares the node's glassmorphic card — no new container. The    */
+/* hedged variant dims the colour + italicises so readers can tell the  */
+/* system is withholding a single-cause claim rather than asserting one. */
+/* --------------------------------------------------------------------- */
+.sr-funnel-node-story {
+  margin: 0;
+  font-size: var(--sr-type-01);
+  line-height: 1.45;
+  color: var(--sr-fg);
+  border-top: 1px solid var(--sr-border);
+  padding-top: 0.5rem;
+}
+
+.sr-funnel-node-story[data-hedged="true"] {
+  color: var(--sr-fg-muted);
+  font-style: italic;
+}
