@@ -574,5 +574,128 @@ describe('report view model', () => {
       expect(viewModel.act3.inp_story).toBeNull();
       expect(html).not.toContain('sr-funnel-node-story');
     });
+
+    it('builds a heavy third-party pre-race headline with median share in the copy', () => {
+      const aggregate = {
+        ...strongLcpCoverageAggregateFixture,
+        third_party_story: {
+          median_share_pct: 38,
+          dominant_tier: 'heavy' as const,
+          dominant_tier_share_pct: 54,
+          median_origin_count: 8
+        }
+      };
+      const viewModel = buildReportViewModel(aggregate);
+      const story = viewModel.race.third_party_story;
+
+      expect(story).not.toBeNull();
+      expect(story?.dominant_tier).toBe('heavy');
+      expect(story?.median_share_pct).toBe(38);
+      expect(story?.median_origin_count).toBe(8);
+      expect(story?.narrative).toContain('38%');
+      expect(story?.narrative).toContain('off-domain tags');
+    });
+
+    it('narrates a none-tier third-party story positively (absence is a feature)', () => {
+      const aggregate = {
+        ...strongLcpCoverageAggregateFixture,
+        third_party_story: {
+          median_share_pct: 0,
+          dominant_tier: 'none' as const,
+          dominant_tier_share_pct: 82,
+          median_origin_count: null
+        }
+      };
+      const viewModel = buildReportViewModel(aggregate);
+      const story = viewModel.race.third_party_story;
+
+      expect(story?.dominant_tier).toBe('none');
+      expect(story?.narrative).toBe('The pre-paint is served entirely from your own origins.');
+      expect(story?.median_origin_count).toBeNull();
+    });
+
+    it('uses the light and moderate tier copy without naming a percent when tier is the dominant fact', () => {
+      const lightAggregate = {
+        ...strongLcpCoverageAggregateFixture,
+        third_party_story: {
+          median_share_pct: 8,
+          dominant_tier: 'light' as const,
+          dominant_tier_share_pct: 71,
+          median_origin_count: 4
+        }
+      };
+      const moderateAggregate = {
+        ...strongLcpCoverageAggregateFixture,
+        third_party_story: {
+          median_share_pct: 22,
+          dominant_tier: 'moderate' as const,
+          dominant_tier_share_pct: 63,
+          median_origin_count: 5
+        }
+      };
+
+      const lightStory = buildReportViewModel(lightAggregate).race.third_party_story;
+      const moderateStory = buildReportViewModel(moderateAggregate).race.third_party_story;
+
+      expect(lightStory?.narrative).toBe('Third-party script weight is modest before first paint.');
+      expect(moderateStory?.narrative).toContain('22%');
+      expect(moderateStory?.narrative).toContain('third-party');
+    });
+
+    it('returns race.third_party_story === null when the aggregate carries no third_party_story', () => {
+      const viewModel = buildReportViewModel(strongLcpCoverageAggregateFixture);
+      expect(viewModel.race.third_party_story).toBeNull();
+    });
+
+    it('renders the third-party pre-race headline before the race grid with tier data-attr', () => {
+      const aggregate = {
+        ...strongLcpCoverageAggregateFixture,
+        third_party_story: {
+          median_share_pct: 38,
+          dominant_tier: 'heavy' as const,
+          dominant_tier_share_pct: 54,
+          median_origin_count: 8
+        }
+      };
+      const viewModel = buildReportViewModel(aggregate);
+      const html = renderReportMarkup(viewModel, 'full');
+
+      expect(html).toContain('sr-third-party-headline');
+      expect(html).toContain('data-third-party-tier="heavy"');
+      expect(html).toContain('38%');
+      expect(html).toContain('8 off-domain origins');
+
+      // Pre-race positioning: headline must appear before the sr-race grid in source order.
+      const headlineIndex = html.indexOf('sr-third-party-headline');
+      const raceIndex = html.indexOf('class="sr-race"');
+      expect(headlineIndex).toBeGreaterThan(-1);
+      expect(raceIndex).toBeGreaterThan(-1);
+      expect(headlineIndex).toBeLessThan(raceIndex);
+    });
+
+    it('omits the third-party headline entirely when race.third_party_story is null', () => {
+      const viewModel = buildReportViewModel(strongLcpCoverageAggregateFixture);
+      const html = renderReportMarkup(viewModel, 'full');
+
+      expect(viewModel.race.third_party_story).toBeNull();
+      expect(html).not.toContain('sr-third-party-headline');
+    });
+
+    it('hides the origin count from the headline when median_origin_count is null (privacy mask)', () => {
+      const aggregate = {
+        ...strongLcpCoverageAggregateFixture,
+        third_party_story: {
+          median_share_pct: 24,
+          dominant_tier: 'moderate' as const,
+          dominant_tier_share_pct: 58,
+          median_origin_count: null
+        }
+      };
+      const viewModel = buildReportViewModel(aggregate);
+      const html = renderReportMarkup(viewModel, 'full');
+
+      expect(html).toContain('sr-third-party-headline');
+      expect(html).not.toContain('off-domain origins');
+    });
   });
 });

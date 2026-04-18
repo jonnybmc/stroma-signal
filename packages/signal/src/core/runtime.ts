@@ -30,6 +30,9 @@ export interface SignalInitConfig {
   networkTierThresholds?: SignalNetworkTierThresholds;
   deviceTierOverride?: (cores: number, memory: number | null, screenWidth: number) => SignalDeviceTier;
   generateTarget?: (element: Element | null) => string | null;
+  // Opt-in first-party aliasing for customers with exotic infrastructure
+  // whose CDN origins can't be captured by strict-host + eTLD+1 matching.
+  firstPartyOriginsAllowlist?: readonly string[];
   debug?: boolean;
   packageVersion?: string;
 }
@@ -105,7 +108,9 @@ function createLoadScopedVitals(
     lcp_ms: null,
     fcp_ms: null,
     ttfb_ms: null,
-    lcp_attribution: undefined
+    lcp_attribution: undefined,
+    lcp_breakdown: null,
+    third_party: null
   };
 }
 
@@ -133,7 +138,10 @@ function createRuntime(config: SignalInitConfig): RuntimeInternals {
 
   const startVitalObserver = (): void => {
     vitalObserver?.disconnect();
-    vitalObserver = observeVitals({ generateTarget: config.generateTarget });
+    vitalObserver = observeVitals({
+      generateTarget: config.generateTarget,
+      firstPartyOriginsAllowlist: config.firstPartyOriginsAllowlist
+    });
   };
 
   const logDebugPayload = (reason: FinalizeReason, vitals: SignalEventV1['vitals'], event: SignalEventV1): void => {
@@ -178,7 +186,6 @@ function createRuntime(config: SignalInitConfig): RuntimeInternals {
       meta: {
         pkg_version: config.packageVersion ?? '0.1.0',
         browser: detectBrowser(),
-        nav_type: navigation?.type ?? 'navigate',
         navigation_type: navigationType
       }
     };

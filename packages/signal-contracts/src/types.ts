@@ -163,7 +163,6 @@ export interface SignalContext {
 export interface SignalMeta {
   pkg_version: string;
   browser: string;
-  nav_type: string;
   navigation_type?: SignalNavigationType;
 }
 
@@ -213,7 +212,6 @@ export interface SignalWarehouseRowV1 {
   save_data: boolean | null;
   connection_type: string | null;
   browser: string;
-  nav_type: string;
   navigation_type: SignalNavigationType | null;
   lcp_load_state: SignalLoadState | null;
   lcp_target: string | null;

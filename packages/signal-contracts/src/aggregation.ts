@@ -19,6 +19,8 @@ import type {
   SignalNetworkSignals,
   SignalNetworkTier,
   SignalQuartiles,
+  SignalThirdPartyStory,
+  SignalThirdPartyTier,
   SignalTierDistribution,
   SignalTierMetricSummary
 } from './types.js';
@@ -478,6 +480,86 @@ function createInpStoryAccumulator(): InpStoryAccumulator {
   };
 }
 
+// Third-party pre-paint script weight story. Tier assignment mirrors the
+// capture-side bucketing so aggregation and GA4 label the same span of
+// shares the same way.
+const THIRD_PARTY_TIERS = ['none', 'light', 'moderate', 'heavy'] as const satisfies readonly SignalThirdPartyTier[];
+const ZERO_THIRD_PARTY_TIER_COUNTS: Record<SignalThirdPartyTier, number> = {
+  none: 0,
+  light: 0,
+  moderate: 0,
+  heavy: 0
+};
+
+export function classifyThirdPartyShareTier(share: number | null | undefined): SignalThirdPartyTier | null {
+  if (share == null || Number.isNaN(share) || share < 0) return null;
+  if (share === 0) return 'none';
+  if (share <= 15) return 'light';
+  if (share <= 40) return 'moderate';
+  return 'heavy';
+}
+
+interface ThirdPartyStoryAccumulator {
+  shareSamples: number[];
+  originSamples: number[];
+  tierCounts: Record<SignalThirdPartyTier, number>;
+  observations: number;
+}
+
+function createThirdPartyStoryAccumulator(): ThirdPartyStoryAccumulator {
+  return {
+    shareSamples: [],
+    originSamples: [],
+    tierCounts: { ...ZERO_THIRD_PARTY_TIER_COUNTS },
+    observations: 0
+  };
+}
+
+function ingestThirdPartyStoryEvent(acc: ThirdPartyStoryAccumulator, event: SignalEventV1): void {
+  const tp = event.vitals.third_party;
+  if (!tp) return;
+  const share = tp.pre_lcp_script_share_pct;
+  if (share == null) return;
+  const tier = classifyThirdPartyShareTier(share);
+  if (tier == null) return;
+
+  acc.observations += 1;
+  acc.shareSamples.push(share);
+  acc.tierCounts[tier] += 1;
+  if (tp.origin_count != null && tp.origin_count >= 0) {
+    acc.originSamples.push(tp.origin_count);
+  }
+}
+
+function median(values: readonly number[]): number | null {
+  if (values.length === 0) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  const upper = sorted[mid] ?? 0;
+  const raw = sorted.length % 2 === 0 ? ((sorted[mid - 1] ?? upper) + upper) / 2 : upper;
+  return Math.round(raw);
+}
+
+function finalizeThirdPartyStory(acc: ThirdPartyStoryAccumulator): SignalThirdPartyStory | undefined {
+  if (acc.observations < SIGNAL_MIN_RACE_OBSERVATIONS) return undefined;
+
+  let dominantTier: SignalThirdPartyTier = THIRD_PARTY_TIERS[0];
+  let dominantCount = acc.tierCounts[THIRD_PARTY_TIERS[0]];
+  for (const tier of THIRD_PARTY_TIERS) {
+    if (acc.tierCounts[tier] > dominantCount) {
+      dominantTier = tier;
+      dominantCount = acc.tierCounts[tier];
+    }
+  }
+
+  return {
+    median_share_pct: median(acc.shareSamples),
+    dominant_tier: dominantCount > 0 ? dominantTier : null,
+    dominant_tier_share_pct: asPercent(dominantCount, acc.observations),
+    median_origin_count: median(acc.originSamples)
+  };
+}
+
 function ingestLcpStoryEvent(acc: LcpStoryAccumulator, event: SignalEventV1): void {
   const culprit = event.vitals.lcp_attribution?.culprit_kind;
   if (culprit && culprit in acc.culpritCounts) {
@@ -627,6 +709,7 @@ export function aggregateSignalEvents(
   const classifiedEvents: SignalEventV1[] = [];
   const lcpStoryAcc = createLcpStoryAccumulator();
   const inpStoryAcc = createInpStoryAccumulator();
+  const thirdPartyStoryAcc = createThirdPartyStoryAccumulator();
 
   for (const event of reportEvents) {
     if (!hasTimestamp) {
@@ -699,6 +782,7 @@ export function aggregateSignalEvents(
 
     ingestLcpStoryEvent(lcpStoryAcc, event);
     ingestInpStoryEvent(inpStoryAcc, event);
+    ingestThirdPartyStoryEvent(thirdPartyStoryAcc, event);
   }
 
   const classifiedSampleSize = total - networkDistribution.unknown;
@@ -806,6 +890,7 @@ export function aggregateSignalEvents(
     form_factor_distribution: formFactorDistribution,
     lcp_story: finalizeLcpStory(lcpStoryAcc),
     inp_story: finalizeInpStory(inpStoryAcc),
+    third_party_story: finalizeThirdPartyStory(thirdPartyStoryAcc),
     top_page_path: computeTopPagePathFromCounts(topPathCounts),
     warnings
   };

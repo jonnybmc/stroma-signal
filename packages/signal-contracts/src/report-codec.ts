@@ -18,6 +18,8 @@ import type {
   SignalRaceFallbackReason,
   SignalRaceMetric,
   SignalReportUrlResult,
+  SignalThirdPartyStory,
+  SignalThirdPartyTier,
   SignalTierMetricSummary
 } from './types.js';
 import {
@@ -62,6 +64,8 @@ const VALID_LCP_CULPRIT_KINDS = new Set<SignalLcpCulpritKind>([
 ]);
 
 const VALID_INP_PHASES = new Set<SignalInpPhase>(['input_delay', 'processing', 'presentation']);
+
+const VALID_THIRD_PARTY_TIERS = new Set<SignalThirdPartyTier>(['none', 'light', 'moderate', 'heavy']);
 
 export const SIGNAL_FRESHNESS_UNKNOWN_WARNING =
   'Report generation timestamp is unknown — this link predates freshness tracking.';
@@ -261,6 +265,13 @@ function encodeInpStory(params: URLSearchParams, story: SignalInpStory): void {
   if (story.dominant_phase_share_pct != null) params.set('isr', String(story.dominant_phase_share_pct));
 }
 
+function encodeThirdPartyStory(params: URLSearchParams, story: SignalThirdPartyStory): void {
+  if (story.median_share_pct != null) params.set('tps', String(story.median_share_pct));
+  if (story.dominant_tier) params.set('tpt', story.dominant_tier);
+  if (story.dominant_tier_share_pct != null) params.set('tpr', String(story.dominant_tier_share_pct));
+  if (story.median_origin_count != null) params.set('tpo', String(story.median_origin_count));
+}
+
 function encodeEnvironment(params: URLSearchParams, env: SignalEnvironment): void {
   params.set(
     'eb',
@@ -344,6 +355,7 @@ function encodeAggregate(aggregate: SignalAggregateV1): URLSearchParams {
   }
   if (aggregate.lcp_story) encodeLcpStory(params, aggregate.lcp_story);
   if (aggregate.inp_story) encodeInpStory(params, aggregate.inp_story);
+  if (aggregate.third_party_story) encodeThirdPartyStory(params, aggregate.third_party_story);
   if (aggregate.top_page_path) params.set('v', aggregate.top_page_path);
   params.set('ga', String(aggregate.generated_at));
   return params;
@@ -608,6 +620,29 @@ function readOptionalInpStory(params: URLSearchParams): SignalInpStory | undefin
   };
 }
 
+function readOptionalThirdPartyStory(params: URLSearchParams): SignalThirdPartyStory | undefined {
+  const shareRaw = params.get('tps');
+  const tierRaw = params.get('tpt');
+  const tierShareRaw = params.get('tpr');
+  const originRaw = params.get('tpo');
+  if (shareRaw == null && tierRaw == null && tierShareRaw == null && originRaw == null) return undefined;
+
+  let dominantTier: SignalThirdPartyTier | null = null;
+  if (tierRaw != null) {
+    if (!VALID_THIRD_PARTY_TIERS.has(tierRaw as SignalThirdPartyTier)) {
+      throw new Error(`Invalid encoded enum value for "tpt": ${tierRaw}`);
+    }
+    dominantTier = tierRaw as SignalThirdPartyTier;
+  }
+
+  return {
+    median_share_pct: shareRaw == null ? null : readNumberParam(params, 'tps'),
+    dominant_tier: dominantTier,
+    dominant_tier_share_pct: tierShareRaw == null ? null : readNumberParam(params, 'tpr'),
+    median_origin_count: originRaw == null ? null : readNumberParam(params, 'tpo')
+  };
+}
+
 function readOptionalFormFactor(params: URLSearchParams): SignalFormFactorDistribution | undefined {
   if (params.get('ff') == null) return undefined;
   const shares = parseInts(params.get('ff'), 3);
@@ -718,6 +753,7 @@ export function decodeSignalReportUrl(value: string | URL): SignalAggregateV1 {
     form_factor_distribution: readOptionalFormFactor(params),
     lcp_story: readOptionalLcpStory(params),
     inp_story: readOptionalInpStory(params),
+    third_party_story: readOptionalThirdPartyStory(params),
     top_page_path: params.get('v'),
     warnings
   };

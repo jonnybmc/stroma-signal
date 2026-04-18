@@ -80,7 +80,7 @@ The following fields were considered and **cut** because they fail the usefulnes
 - `navigator.userAgentData.mobile` — Chromium-only boolean. Would give a slightly more accurate form-factor signal on Chromium (catches iPad Pro 12.9" landscape) but at the cost of an additional SDK capture field. Rejected for 0.1 because `device_screen_w` is universal and gives a strong-enough signal; the edge cases are below the noise floor.
 - `navigator.connection.type` (wifi / cellular) — redundant with `effective_type`.
 - TCP handshake quartiles — already abstracted into `net_tier`.
-- `nav_type` histogram — interesting but does not unlock a specific product action.
+- Navigation-type histogram — interesting but does not unlock a specific product action. (`meta.nav_type` was removed in 0.1.x; `meta.navigation_type` remains for per-event filtering but is not aggregated.)
 
 If a future iteration wants to add any of these back, it must first name the concrete product-team decision the field unlocks, prove the decision isn't already actionable from existing analytics, and prove it isn't derivable at runtime.
 

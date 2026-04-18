@@ -15,6 +15,7 @@ import {
   type ReportMotionMode,
   type ReportPersonaContrast,
   type ReportPersonaProfile,
+  type ReportThirdPartyStoryViewModel,
   type ReportTierVisual,
   type ReportViewModel
 } from './report-view-model';
@@ -585,6 +586,36 @@ function renderAct2LcpStory(story: ReportLcpStoryViewModel | null): string {
   `;
 }
 
+/**
+ * Act 2 third-party pre-race headline — a single inline line that frames
+ * the external cause *before* the race gauge quantifies its effect. When
+ * `dominant_tier === 'none'` the copy narrates absence positively ("the
+ * pre-paint is served entirely from your own origins") rather than
+ * omitting the line — zero third-party weight is a feature of the page,
+ * not missing data.
+ *
+ * Returns an empty string when the aggregate carries no third-party
+ * story (Safari / Firefox / no LCP anchor) so the pre-race rhythm is
+ * unchanged on browsers without resource-timing coverage.
+ */
+function renderAct2ThirdPartyHeadline(story: ReportThirdPartyStoryViewModel | null): string {
+  if (!story) return '';
+  const originSuffix =
+    story.median_origin_count != null && story.dominant_tier !== 'none'
+      ? ` <span class="sr-third-party-headline-origins sr-mono sr-mono-sm">· ${story.median_origin_count} off-domain origins</span>`
+      : '';
+  return `
+    <p
+      class="sr-third-party-headline"
+      data-third-party-tier="${escapeHtml(story.dominant_tier)}"
+      data-reveal
+      style="--reveal-order:1"
+    >
+      <span class="sr-third-party-headline-body">${escapeHtml(story.narrative)}</span>${originSuffix}
+    </p>
+  `;
+}
+
 function renderAct2(viewModel: ReportViewModel): string {
   const race = viewModel.race;
 
@@ -595,6 +626,7 @@ function renderAct2(viewModel: ReportViewModel): string {
         <h2 class="sr-act-title">How far apart are their experiences?</h2>
         <p class="sr-act-lede">${escapeHtml(race.race_story)}</p>
       </header>
+      ${renderAct2ThirdPartyHeadline(race.third_party_story)}
       <div class="sr-race-fallback" data-reveal style="--reveal-order:2">
         <p class="sr-eyebrow">Not enough data yet</p>
         <h3 class="sr-fallback-title">There isn't enough comparable data for a defensible race.</h3>
@@ -617,6 +649,8 @@ function renderAct2(viewModel: ReportViewModel): string {
       <h2 class="sr-act-title">How far apart are their experiences?</h2>
       <p class="sr-act-lede">${escapeHtml(race.race_story)}</p>
     </header>
+
+    ${renderAct2ThirdPartyHeadline(race.third_party_story)}
 
     <div class="sr-race" data-reveal style="--reveal-order:2">
       <article class="sr-lane sr-lane-urban" data-tone="urban">

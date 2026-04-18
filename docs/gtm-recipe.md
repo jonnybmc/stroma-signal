@@ -47,11 +47,10 @@ At minimum, create Data Layer Variables for:
 - `fcp_ms`
 - `ttfb_ms`
 - `browser`
-- `nav_type`
+- `navigation_type`
 
 Recommended additional variables:
 
-- `navigation_type`
 - `lcp_load_state`
 - `lcp_element_type`
 - `inp_load_state`
@@ -59,6 +58,12 @@ Recommended additional variables:
 - `input_delay_ms`
 - `processing_duration_ms`
 - `presentation_delay_ms`
+- `lcp_culprit_kind`
+- `lcp_dominant_subpart`
+- `inp_dominant_phase`
+- `third_party_weight_tier`
+
+> **Deprecated in 0.1.x:** the legacy `nav_type` DLV has been removed. Use `navigation_type` (same semantics, wider coverage). If you are upgrading from 0.0.x, delete the `DLV - nav_type` variable and the corresponding GA4 parameter mapping.
 
 ## 4. Create The GA4 Event Tag
 
@@ -82,7 +87,6 @@ Map the GA4 event params from the matching Data Layer Variables. Example:
 - `fcp_ms` -> `{{DLV - fcp_ms}}`
 - `ttfb_ms` -> `{{DLV - ttfb_ms}}`
 - `browser` -> `{{DLV - browser}}`
-- `nav_type` -> `{{DLV - nav_type}}`
 - `navigation_type` -> `{{DLV - navigation_type}}`
 - `lcp_load_state` -> `{{DLV - lcp_load_state}}`
 - `lcp_element_type` -> `{{DLV - lcp_element_type}}`
@@ -91,6 +95,10 @@ Map the GA4 event params from the matching Data Layer Variables. Example:
 - `input_delay_ms` -> `{{DLV - input_delay_ms}}`
 - `processing_duration_ms` -> `{{DLV - processing_duration_ms}}`
 - `presentation_delay_ms` -> `{{DLV - presentation_delay_ms}}`
+- `lcp_culprit_kind` -> `{{DLV - lcp_culprit_kind}}`
+- `lcp_dominant_subpart` -> `{{DLV - lcp_dominant_subpart}}`
+- `inp_dominant_phase` -> `{{DLV - inp_dominant_phase}}`
+- `third_party_weight_tier` -> `{{DLV - third_party_weight_tier}}`
 
 These diagnostic fields are intentionally compact enough for the GTM/GA4 path. Signal does not send `lcp_target`, `lcp_resource_url`, `interaction_target`, or `interaction_time_ms` through GA4 in v0.1.
 
@@ -121,7 +129,6 @@ Usually keep these for DebugView or BigQuery rather than GA4 custom definitions:
 - `url`
 - `net_tcp_ms`
 - `net_tcp_source`
-- `nav_type`
 - `input_delay_ms`
 - `processing_duration_ms`
 - `presentation_delay_ms`

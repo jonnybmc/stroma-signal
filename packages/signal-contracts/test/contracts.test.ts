@@ -5,8 +5,10 @@ import {
   aggregateSignalEvents,
   chooseRaceMetric,
   chromeColdNavFixture,
+  classifyThirdPartyShareTier,
   decodeSignalReportUrl,
   deriveSignalAggregateWarnings,
+  deriveThirdPartyWeightTier,
   encodeSignalReportUrl,
   explainSignalAggregateIssues,
   explainSignalEventIssues,
@@ -198,8 +200,12 @@ describe('signal contracts', () => {
     const flattened = flattenSignalEventForGa4(chromeColdNavFixture);
     const ga4SafeFieldCount = Object.keys(SIGNAL_GA4_FIELD_MAP_V1.fields).length;
 
+    // Hard-equality: post-PR-5 the field map settled at exactly 24 (25
+    // flatten keys including `event`), with one slot of headroom against
+    // GA4's 25-custom-parameter cap. Any 26th param added in future would
+    // fail here at test time rather than at Google's ingestion boundary.
     expect(ga4SafeFieldCount).toBe(24);
-    expect(ga4SafeFieldCount).toBeLessThanOrEqual(25);
+    expect(Object.keys(flattened)).toHaveLength(25);
     expect(Object.keys(flattened).filter((key) => key !== 'event')).toHaveLength(ga4SafeFieldCount);
   });
 
@@ -797,7 +803,7 @@ describe('signal contracts', () => {
     };
 
     expect(explainSignalEventIssues(invalidEvent)).toContain(
-      'Expected "meta" to include pkg_version, browser, nav_type, and a valid optional navigation_type.'
+      'Expected "meta" to include pkg_version, browser, and a valid optional navigation_type.'
     );
     expect(explainSignalWarehouseRowIssues(invalidWarehouseRow)).toContain(
       'Expected "lcp_element_type" to be image, text, or null.'
@@ -1029,5 +1035,100 @@ describe('signal contracts', () => {
 
     expect(decoded.lcp_story).toBeUndefined();
     expect(decoded.inp_story).toBeUndefined();
+  });
+
+  it('classifies third-party weight tiers by pre-LCP script share (§2.4)', () => {
+    expect(classifyThirdPartyShareTier(null)).toBeNull();
+    expect(classifyThirdPartyShareTier(-1)).toBeNull();
+    expect(classifyThirdPartyShareTier(0)).toBe('none');
+    expect(classifyThirdPartyShareTier(1)).toBe('light');
+    expect(classifyThirdPartyShareTier(15)).toBe('light');
+    expect(classifyThirdPartyShareTier(16)).toBe('moderate');
+    expect(classifyThirdPartyShareTier(40)).toBe('moderate');
+    expect(classifyThirdPartyShareTier(41)).toBe('heavy');
+    expect(classifyThirdPartyShareTier(100)).toBe('heavy');
+  });
+
+  it('derives the GA4 third_party_weight_tier enum from the event payload', () => {
+    const heavyEvent = {
+      ...chromeColdNavFixture,
+      vitals: {
+        ...chromeColdNavFixture.vitals,
+        third_party: { pre_lcp_script_share_pct: 62, origin_count: 7 }
+      }
+    };
+    const bareEvent = {
+      ...chromeColdNavFixture,
+      vitals: { ...chromeColdNavFixture.vitals, third_party: null }
+    };
+
+    expect(deriveThirdPartyWeightTier(heavyEvent)).toBe('heavy');
+    expect(deriveThirdPartyWeightTier(bareEvent)).toBeNull();
+
+    const flattened = flattenSignalEventForGa4(heavyEvent);
+    expect(flattened.third_party_weight_tier).toBe('heavy');
+  });
+
+  it('aggregates third_party_story when observations cross the race threshold', () => {
+    const events = Array.from({ length: 30 }, (_, index) => ({
+      ...chromeColdNavFixture,
+      event_id: `tp_${index}`,
+      ts: chromeColdNavFixture.ts + index * 1_000,
+      vitals: {
+        ...chromeColdNavFixture.vitals,
+        third_party: {
+          pre_lcp_script_share_pct: 55,
+          origin_count: 8
+        }
+      }
+    }));
+
+    const aggregate = aggregateSignalEvents(events, 'production', chromeColdNavFixture.ts + 120_000);
+
+    expect(aggregate.third_party_story).toBeDefined();
+    expect(aggregate.third_party_story?.dominant_tier).toBe('heavy');
+    expect(aggregate.third_party_story?.dominant_tier_share_pct).toBe(100);
+    expect(aggregate.third_party_story?.median_share_pct).toBe(55);
+    expect(aggregate.third_party_story?.median_origin_count).toBe(8);
+  });
+
+  it('omits third_party_story when the observation threshold is not met', () => {
+    const events = Array.from({ length: SIGNAL_MIN_RACE_OBSERVATIONS - 1 }, (_, index) => ({
+      ...chromeColdNavFixture,
+      event_id: `tp_thin_${index}`,
+      ts: chromeColdNavFixture.ts + index * 1_000,
+      vitals: {
+        ...chromeColdNavFixture.vitals,
+        third_party: { pre_lcp_script_share_pct: 20, origin_count: 4 }
+      }
+    }));
+
+    const aggregate = aggregateSignalEvents(events, 'preview', chromeColdNavFixture.ts + 60_000);
+
+    expect(aggregate.third_party_story).toBeUndefined();
+  });
+
+  it('round-trips third_party_story through the report URL codec', () => {
+    const enriched = {
+      ...strongLcpCoverageAggregateFixture,
+      third_party_story: {
+        median_share_pct: 32,
+        dominant_tier: 'moderate' as const,
+        dominant_tier_share_pct: 58,
+        median_origin_count: 6
+      }
+    };
+
+    const encoded = encodeSignalReportUrl(enriched);
+    const decoded = decodeSignalReportUrl(encoded.url);
+
+    expect(decoded.third_party_story).toEqual(enriched.third_party_story);
+  });
+
+  it('leaves third_party_story undefined when absent from the encoded URL', () => {
+    const encoded = encodeSignalReportUrl(strongLcpCoverageAggregateFixture);
+    const decoded = decodeSignalReportUrl(encoded.url);
+
+    expect(decoded.third_party_story).toBeUndefined();
   });
 });

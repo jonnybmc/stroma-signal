@@ -29,8 +29,7 @@ Recommended flat warehouse row shape for non-GA4 collection:
 | `save_data` | BOOL | Nullable |
 | `connection_type` | STRING | Nullable |
 | `browser` | STRING | Lowercase family name |
-| `nav_type` | STRING | `navigate`, `reload`, `back_forward` |
-| `navigation_type` | STRING | Nullable normalized value: `navigate`, `reload`, `back-forward`, `prerender`, `restore` |
+| `navigation_type` | STRING | Nullable normalized value: `navigate`, `reload`, `back-forward`, `prerender`, `restore`. Replaces the legacy `nav_type` column (removed in 0.1.x). |
 | `lcp_load_state` | STRING | Nullable: `loading`, `interactive`, `complete` |
 | `lcp_target` | STRING | Nullable safe label from `generateTarget()` or default tag name |
 | `lcp_element_type` | STRING | Nullable: `image` or `text` |
@@ -42,13 +41,19 @@ Recommended flat warehouse row shape for non-GA4 collection:
 | `input_delay_ms` | INT64 | Nullable INP timing split |
 | `processing_duration_ms` | INT64 | Nullable INP timing split |
 | `presentation_delay_ms` | INT64 | Nullable INP timing split |
+| `lcp_breakdown_resource_load_delay_ms` | INT64 | Nullable Chromium-only LCP subpart (all-or-nothing — see collector contract) |
+| `lcp_breakdown_resource_load_time_ms` | INT64 | Nullable Chromium-only LCP subpart (all-or-nothing) |
+| `lcp_breakdown_element_render_delay_ms` | INT64 | Nullable Chromium-only LCP subpart (all-or-nothing) |
+| `lcp_attribution_culprit_kind` | STRING | Nullable enum: `hero_image`, `headline_text`, `banner_image`, `product_image`, `video_poster`, `unknown` |
+| `inp_attribution_dominant_phase` | STRING | Nullable enum: `input_delay`, `processing`, `presentation` |
+| `third_party_pre_lcp_script_share_pct` | INT64 | Nullable 0–100 share of off-domain script weight before LCP |
+| `third_party_origin_count` | INT64 | Nullable count of distinct off-domain script origins before LCP (hidden when below privacy mask of 3) |
 
 Do not rename the canonical metric fields if you want to keep the provided aggregation and URL-builder templates usable as-is.
 
 Notes:
 
-- `nav_type` remains the legacy raw navigation timing value for backward compatibility.
-- Prefer `navigation_type` in new warehouse models and analysis.
+- The legacy `nav_type` column has been removed in 0.1.x. Consumers that pinned to it should switch to `navigation_type` (identical semantics, wider coverage).
 - Default Signal URL-builder templates exclude `navigation_type = restore` and `navigation_type = prerender` before computing coverage and percentiles.
 - Treat target/resource fields as diagnostic hints, not stable identifiers.
 - Keep raw event-table access limited to the smallest group that needs it; the table can contain operationally sensitive path/referrer/resource context even though Signal is not a user-identity system.

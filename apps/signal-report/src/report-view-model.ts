@@ -8,7 +8,9 @@ import type {
   SignalLcpSubpart,
   SignalNetworkTier,
   SignalRaceFallbackReason,
-  SignalRaceMetric
+  SignalRaceMetric,
+  SignalThirdPartyStory,
+  SignalThirdPartyTier
 } from '@stroma-labs/signal-contracts';
 import {
   SIGNAL_FRESHNESS_UNKNOWN_WARNING,
@@ -91,6 +93,18 @@ export interface ReportInpStoryViewModel {
   dominant_phase: SignalInpPhase | null;
 }
 
+// Act 2 third-party pre-race headline — sits *above* the race gauge as a
+// pre-framing line. Names the external cause ("off-domain script weight
+// before first paint") that the race subsequently quantifies. 0% is
+// narrated positively ("served entirely from your own origins") — absence
+// of third-party is a feature, not missing data.
+export interface ReportThirdPartyStoryViewModel {
+  narrative: string;
+  dominant_tier: SignalThirdPartyTier;
+  median_share_pct: number | null;
+  median_origin_count: number | null;
+}
+
 export interface ReportRaceViewModel {
   metric: SignalRaceMetric;
   metric_label: string;
@@ -108,6 +122,7 @@ export interface ReportRaceViewModel {
   schematic_path_hint: string | null;
   race_story: string;
   lcp_story: ReportLcpStoryViewModel | null;
+  third_party_story: ReportThirdPartyStoryViewModel | null;
 }
 
 export interface ReportStageEvidenceChip {
@@ -425,6 +440,23 @@ const INP_PHASE_NARRATIVES: Record<SignalInpPhase, string> = {
 const LCP_HEDGED_NARRATIVE = 'Paint delay is spread across multiple phases — no single cause dominates.';
 const INP_HEDGED_NARRATIVE = 'Interaction lag is spread across multiple phases — no single cause dominates.';
 
+// Third-party pre-race headlines. `none` is narrated *positively* —
+// absence of third-party weight is a feature of the page, not missing
+// data. `heavy` / `moderate` / `light` read as honest observations of an
+// external cause the race subsequently quantifies.
+const THIRD_PARTY_TIER_NARRATIVES: Record<SignalThirdPartyTier, (sharePct: number | null) => string> = {
+  heavy: (share) =>
+    share != null
+      ? `${share}% of the pre-paint script weight comes from off-domain tags.`
+      : 'Off-domain scripts dominate the pre-paint window.',
+  moderate: (share) =>
+    share != null
+      ? `${share}% of the pre-paint script weight is third-party.`
+      : 'Third-party scripts carry meaningful weight before first paint.',
+  light: () => 'Third-party script weight is modest before first paint.',
+  none: () => 'The pre-paint is served entirely from your own origins.'
+};
+
 function buildLcpStoryViewModel(story: SignalLcpStory | undefined): ReportLcpStoryViewModel | null {
   if (!story) return null;
   if (!story.subpart_distribution_pct) return null;
@@ -490,6 +522,25 @@ function buildInpStoryViewModel(story: SignalInpStory | undefined): ReportInpSto
   };
 }
 
+function buildThirdPartyStoryViewModel(
+  story: SignalThirdPartyStory | undefined
+): ReportThirdPartyStoryViewModel | null {
+  if (!story) return null;
+  const tier = story.dominant_tier;
+  if (!tier) return null;
+
+  const share = story.median_share_pct;
+  const originCount = story.median_origin_count;
+  const narrative = THIRD_PARTY_TIER_NARRATIVES[tier](share);
+
+  return {
+    narrative,
+    dominant_tier: tier,
+    median_share_pct: share,
+    median_origin_count: originCount
+  };
+}
+
 function buildRaceStory(comparisonLabel: string, waitDeltaMs: number | null, metric: SignalRaceMetric): string {
   if (metric === 'none' || waitDeltaMs == null) {
     return 'The current sample does not yet support a defensible race, so the report keeps the comparison honest instead of inventing certainty.';
@@ -532,7 +583,8 @@ function buildRaceViewModel(aggregate: SignalAggregateV1): ReportRaceViewModel {
     comparison_coverage: aggregate.coverage.selected_metric_comparison_coverage,
     schematic_path_hint: aggregate.top_page_path,
     race_story: buildRaceStory(comparisonLabel, waitDeltaMs, metric),
-    lcp_story: buildLcpStoryViewModel(aggregate.lcp_story)
+    lcp_story: buildLcpStoryViewModel(aggregate.lcp_story),
+    third_party_story: buildThirdPartyStoryViewModel(aggregate.third_party_story)
   };
 }
 

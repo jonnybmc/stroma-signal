@@ -42,7 +42,7 @@ for (const file of reportFiles) {
   reportWeight += fileStat.size;
 }
 
-// 224 KB envelope. Current report includes a 6-slide horizontal deck
+// 248 KB envelope. Current report includes a 6-slide horizontal deck
 // (landing + Act 1 audience + Act 2 race + Act 3 funnel waterfall +
 // Act 4 handoff), Lucide icon set, severity gauges, horizontal
 // stacked-bar signal visualisations, persistent footer with credibility
@@ -52,10 +52,13 @@ for (const file of reportFiles) {
 // the Actionable Signals slide. Iteration 7 added evidence rail,
 // credibility strip, guard range validation, strict decode, and
 // freshness provenance. Bumped from 192 KB → 224 KB → 228 KB → 232 KB
-// → 236 KB → 244 KB. The latest +8 KB accommodates the Round 1
-// enrichment narrative: aggregate-side `lcp_story` / `inp_story`
-// decoders, Act 2 LCP-subpart inline block (narrative + 4-row
-// micro-chart), and Act 3 INP-phase caption inside the INP funnel node.
-assertUnderBudget('signal-report static weight', reportWeight, 244 * 1024);
+// → 236 KB → 244 KB → 248 KB. The +8 KB at 244 KB accommodated the
+// Round 1 enrichment narrative (aggregate-side `lcp_story` /
+// `inp_story` decoders, Act 2 LCP-subpart inline block, Act 3 INP-phase
+// caption). The latest +4 KB covers the Round 1 third-party story:
+// aggregate-side `third_party_story` codec + accumulator, Act 2
+// pre-race third-party headline view-model + markup, and the
+// `sr-third-party-headline` CSS block keyed by dominant tier.
+assertUnderBudget('signal-report static weight', reportWeight, 248 * 1024);
 
 console.log('Bundle budgets passed.');

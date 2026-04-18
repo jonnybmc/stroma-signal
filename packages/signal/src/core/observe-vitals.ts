@@ -7,7 +7,8 @@ import type {
   SignalLcpCulpritKind,
   SignalLcpElementType,
   SignalLoadState,
-  SignalVitals
+  SignalVitals,
+  SignalVitalsThirdParty
 } from '@stroma-labs/signal-contracts';
 
 // Culprit-kind regex patterns — compiled once at module load (§9a.3).
@@ -21,8 +22,47 @@ const LCP_BANNER_TARGET_PATTERN = /banner/i;
 // with lowest-duration eviction preserves the p98 INP selection.
 const INP_INTERACTION_RECORDS_CAP = 100;
 
+// Inline public-suffix list for eTLD+1 extraction (§2.4). Keeps the
+// zero-dependency posture — unmatched hosts fall back to "last two labels",
+// an acceptable approximation for the buyer cohort.
+const MULTI_PART_PUBLIC_SUFFIXES = new Set<string>([
+  'co.uk',
+  'org.uk',
+  'ac.uk',
+  'gov.uk',
+  'me.uk',
+  'com.au',
+  'net.au',
+  'org.au',
+  'co.jp',
+  'ne.jp',
+  'or.jp',
+  'ac.jp',
+  'co.nz',
+  'net.nz',
+  'org.nz',
+  'co.za',
+  'co.kr',
+  'co.in',
+  'co.id',
+  'co.il',
+  'com.br',
+  'com.mx',
+  'com.ar',
+  'com.cn',
+  'net.cn',
+  'org.cn',
+  'com.tw',
+  'com.hk',
+  'com.sg',
+  'com.tr'
+]);
+
 export interface ObserveVitalsOptions {
   generateTarget?: (element: Element | null) => string | null;
+  // §2.4 — opt-in first-party aliasing for exotic infrastructure.
+  // Entries are treated as first-party after strict-host + eTLD+1 checks.
+  firstPartyOriginsAllowlist?: readonly string[];
 }
 
 interface RawPaintDebugEntry {
@@ -213,6 +253,76 @@ function deriveInpDominantPhase(
   return 'presentation';
 }
 
+function getRegistrableDomain(host: string): string {
+  const normalized = host.toLowerCase();
+  const labels = normalized.split('.');
+  if (labels.length < 2) return normalized;
+  const lastTwo = labels.slice(-2).join('.');
+  if (labels.length >= 3 && MULTI_PART_PUBLIC_SUFFIXES.has(lastTwo)) {
+    return labels.slice(-3).join('.');
+  }
+  return lastTwo;
+}
+
+// §2.4 first-party policy: strict host → eTLD+1 → optional allowlist.
+function isFirstPartyHost(host: string, currentHost: string, allowlist: readonly string[]): boolean {
+  if (!host || !currentHost) return false;
+  const normalized = host.toLowerCase();
+  const current = currentHost.toLowerCase();
+  if (normalized === current) return true;
+  const currentDomain = getRegistrableDomain(current);
+  if (getRegistrableDomain(normalized) === currentDomain) return true;
+  for (const entry of allowlist) {
+    const allowedHost = entry.toLowerCase();
+    if (normalized === allowedHost) return true;
+    if (getRegistrableDomain(normalized) === getRegistrableDomain(allowedHost)) return true;
+  }
+  return false;
+}
+
+function deriveThirdPartyShare(
+  resourceEntries: readonly PerformanceResourceTiming[],
+  lcpStartTime: number | null,
+  currentHost: string | null,
+  allowlist: readonly string[]
+): SignalVitalsThirdParty | null {
+  if (lcpStartTime == null || !Number.isFinite(lcpStartTime) || lcpStartTime <= 0) return null;
+  if (!currentHost) return null;
+
+  let totalBytes = 0;
+  let thirdPartyBytes = 0;
+  const thirdPartyHosts = new Set<string>();
+
+  for (const entry of resourceEntries) {
+    if (entry.initiatorType !== 'script') continue;
+    if (entry.startTime >= lcpStartTime) continue;
+    const bytes = entry.transferSize || entry.encodedBodySize || 0;
+    if (bytes <= 0) continue;
+    totalBytes += bytes;
+    let entryHost: string;
+    try {
+      entryHost = new URL(entry.name).host;
+    } catch {
+      continue;
+    }
+    if (!isFirstPartyHost(entryHost, currentHost, allowlist)) {
+      thirdPartyBytes += bytes;
+      thirdPartyHosts.add(entryHost.toLowerCase());
+    }
+  }
+
+  if (totalBytes <= 0) return null;
+
+  const sharePct = Math.max(0, Math.min(100, Math.round((thirdPartyBytes / totalBytes) * 100)));
+  // Privacy mask: small-site third-party origin counts below 3 are hidden.
+  const originCount = thirdPartyHosts.size >= 3 ? thirdPartyHosts.size : null;
+
+  return {
+    pre_lcp_script_share_pct: sharePct,
+    origin_count: originCount
+  };
+}
+
 // All-or-nothing per §2.1. Any missing input → whole breakdown is null.
 function deriveLcpBreakdown(
   rawStartTime: number | undefined,
@@ -285,6 +395,7 @@ function createInpAttribution(
 
 export function observeVitals(options: ObserveVitalsOptions = {}): VitalObserverController {
   const generateTarget = options.generateTarget ?? defaultGenerateTarget;
+  const firstPartyAllowlist = options.firstPartyOriginsAllowlist ?? [];
   let largestContentfulPaint: number | null = null;
   let lcpAttribution: SignalLcpAttribution | undefined;
   let lcpRawStartTime: number | undefined;
@@ -442,6 +553,12 @@ export function observeVitals(options: ObserveVitalsOptions = {}): VitalObserver
               resourceEntries
             )
           : null;
+      const thirdParty = deriveThirdPartyShare(
+        resourceEntries,
+        lcpRawStartTime ?? null,
+        globalThis.location?.host ?? null,
+        firstPartyAllowlist
+      );
 
       return {
         lcp_ms: largestContentfulPaint,
@@ -451,7 +568,8 @@ export function observeVitals(options: ObserveVitalsOptions = {}): VitalObserver
         ttfb_ms: ttfb,
         lcp_attribution: largestContentfulPaint != null ? lcpAttribution : undefined,
         inp_attribution: inpRecord?.attribution,
-        lcp_breakdown: lcpBreakdown
+        lcp_breakdown: lcpBreakdown,
+        third_party: thirdParty
       };
     },
     debugSnapshot() {

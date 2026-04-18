@@ -35,7 +35,6 @@ const WAREHOUSE_COLUMNS: ReadonlyArray<keyof SignalWarehouseRowV1> = [
   'save_data',
   'connection_type',
   'browser',
-  'nav_type',
   'navigation_type',
   'lcp_load_state',
   'lcp_target',
@@ -52,7 +51,9 @@ const WAREHOUSE_COLUMNS: ReadonlyArray<keyof SignalWarehouseRowV1> = [
   'lcp_breakdown_resource_load_time_ms',
   'lcp_breakdown_element_render_delay_ms',
   'lcp_attribution_culprit_kind',
-  'inp_attribution_dominant_phase'
+  'inp_attribution_dominant_phase',
+  'third_party_pre_lcp_script_share_pct',
+  'third_party_origin_count'
 ];
 
 function escapeCsvCell(value: unknown): string {

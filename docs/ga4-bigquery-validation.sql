@@ -10,7 +10,6 @@ SELECT
   (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'event_id') AS event_id,
   (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'host') AS host,
   (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'url') AS url,
-  (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'nav_type') AS nav_type,
   (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'navigation_type') AS navigation_type,
   (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'net_tier') AS net_tier,
   (SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'net_tcp_ms') AS net_tcp_ms,
@@ -31,6 +30,7 @@ SELECT
   (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'lcp_culprit_kind') AS lcp_culprit_kind,
   (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'lcp_dominant_subpart') AS lcp_dominant_subpart,
   (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'inp_dominant_phase') AS inp_dominant_phase,
+  (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'third_party_weight_tier') AS third_party_weight_tier,
   IF(
     (SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'input_delay_ms') IS NULL
       OR (SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'processing_duration_ms') IS NULL

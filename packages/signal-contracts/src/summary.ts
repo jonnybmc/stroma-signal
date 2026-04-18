@@ -5,7 +5,8 @@ import type {
   SignalLcpCulpritKind,
   SignalLcpSubpart,
   SignalNetworkTier,
-  SignalRaceMetric
+  SignalRaceMetric,
+  SignalThirdPartyTier
 } from './types.js';
 
 const TIER_LABELS: Record<SignalNetworkTier | 'unknown', string> = {
@@ -55,6 +56,13 @@ const INP_PHASE_LABELS: Record<SignalInpPhase, string> = {
   input_delay: 'Input delay',
   processing: 'Processing',
   presentation: 'Presentation'
+};
+
+const THIRD_PARTY_TIER_LABELS: Record<SignalThirdPartyTier, string> = {
+  none: 'None',
+  light: 'Light',
+  moderate: 'Moderate',
+  heavy: 'Heavy'
 };
 
 function bar(share: number, width: number = 20): string {
@@ -197,6 +205,23 @@ export function formatSignalSummary(aggregate: SignalAggregateV1): string {
       for (const [key, share] of rows) {
         lines.push(`  ${pad(INP_PHASE_LABELS[key], 13)} ${pad(pct(share), 5)} ${bar(share)}`);
       }
+    }
+  }
+
+  // Third-party story
+  if (aggregate.third_party_story) {
+    const story = aggregate.third_party_story;
+    lines.push(section('Third-party'));
+    if (story.dominant_tier) {
+      const tierLabel = THIRD_PARTY_TIER_LABELS[story.dominant_tier];
+      const share = story.dominant_tier_share_pct != null ? ` (${pct(story.dominant_tier_share_pct)} of sessions)` : '';
+      lines.push(`  Dominant:       ${tierLabel}${share}`);
+    }
+    if (story.median_share_pct != null) {
+      lines.push(`  Median share:   ${pct(story.median_share_pct)}`);
+    }
+    if (story.median_origin_count != null) {
+      lines.push(`  Median origins: ${story.median_origin_count}`);
     }
   }
 

@@ -485,4 +485,170 @@ describe('observeVitals', () => {
 
     expect(observer.snapshot().lcp_breakdown).toBeNull();
   });
+
+  it('computes third-party pre-LCP script share with eTLD+1 first-party rule (§2.4)', () => {
+    const resources = [
+      {
+        name: 'https://example.co.za/bundle.js',
+        initiatorType: 'script',
+        startTime: 200,
+        transferSize: 80_000,
+        encodedBodySize: 80_000
+      },
+      {
+        name: 'https://cdn.example.co.za/vendor.js',
+        initiatorType: 'script',
+        startTime: 250,
+        transferSize: 40_000,
+        encodedBodySize: 40_000
+      },
+      {
+        name: 'https://analytics.thirdparty.com/tag.js',
+        initiatorType: 'script',
+        startTime: 300,
+        transferSize: 60_000,
+        encodedBodySize: 60_000
+      },
+      {
+        name: 'https://ads.othercdn.net/tag.js',
+        initiatorType: 'script',
+        startTime: 350,
+        transferSize: 40_000,
+        encodedBodySize: 40_000
+      },
+      {
+        name: 'https://late.thirdparty.com/tag.js',
+        initiatorType: 'script',
+        startTime: 2_500, // post-LCP, ignored
+        transferSize: 500_000,
+        encodedBodySize: 500_000
+      }
+    ] as Partial<PerformanceResourceTiming>[];
+
+    setupObserverTest({
+      navigation: { startTime: 0, activationStart: 0, responseStart: 180, requestStart: 120 },
+      resources
+    });
+
+    const observer = observeVitals();
+    emitEntries('largest-contentful-paint', [
+      {
+        startTime: 2_400,
+        loadTime: 2_100,
+        element: { tagName: 'IMG' },
+        url: 'https://example.co.za/assets/hero.webp'
+      } as PerformanceEntry
+    ]);
+
+    const thirdParty = observer.snapshot().third_party;
+    // Total pre-LCP script bytes: 220_000; third-party: 100_000 (45%).
+    // `cdn.example.co.za` matches first-party via eTLD+1 suffix rule.
+    expect(thirdParty).not.toBeNull();
+    expect(thirdParty?.pre_lcp_script_share_pct).toBe(45);
+    expect(thirdParty?.origin_count).toBeNull(); // 2 origins < 3 privacy threshold
+  });
+
+  it('exposes third-party origin count when ≥3 distinct pre-LCP third-party hosts are observed', () => {
+    const resources = [
+      {
+        name: 'https://example.com/bundle.js',
+        initiatorType: 'script',
+        startTime: 100,
+        transferSize: 100_000,
+        encodedBodySize: 100_000
+      },
+      ...['a', 'b', 'c'].map((label) => ({
+        name: `https://${label}.thirdparty.com/tag.js`,
+        initiatorType: 'script',
+        startTime: 200,
+        transferSize: 30_000,
+        encodedBodySize: 30_000
+      }))
+    ] as Partial<PerformanceResourceTiming>[];
+
+    setupObserverTest({
+      navigation: { startTime: 0, activationStart: 0, responseStart: 180, requestStart: 120 },
+      resources
+    });
+    vi.stubGlobal('location', {
+      origin: 'https://example.com',
+      protocol: 'https:',
+      host: 'example.com',
+      href: 'https://example.com/',
+      pathname: '/'
+    } as Location);
+
+    const observer = observeVitals();
+    emitEntries('largest-contentful-paint', [
+      {
+        startTime: 1_500,
+        element: { tagName: 'H1' },
+        url: undefined
+      } as unknown as PerformanceEntry
+    ]);
+
+    const thirdParty = observer.snapshot().third_party;
+    expect(thirdParty?.origin_count).toBe(3);
+  });
+
+  it('treats allowlisted origins as first-party when classifying pre-LCP scripts', () => {
+    const resources = [
+      {
+        name: 'https://example.com/bundle.js',
+        initiatorType: 'script',
+        startTime: 100,
+        transferSize: 100_000,
+        encodedBodySize: 100_000
+      },
+      {
+        name: 'https://static.exotic-cdn.net/vendor.js',
+        initiatorType: 'script',
+        startTime: 200,
+        transferSize: 60_000,
+        encodedBodySize: 60_000
+      }
+    ] as Partial<PerformanceResourceTiming>[];
+
+    setupObserverTest({
+      navigation: { startTime: 0, activationStart: 0, responseStart: 180, requestStart: 120 },
+      resources
+    });
+    vi.stubGlobal('location', {
+      origin: 'https://example.com',
+      protocol: 'https:',
+      host: 'example.com',
+      href: 'https://example.com/',
+      pathname: '/'
+    } as Location);
+
+    const observer = observeVitals({ firstPartyOriginsAllowlist: ['exotic-cdn.net'] });
+    emitEntries('largest-contentful-paint', [
+      {
+        startTime: 1_500,
+        element: { tagName: 'H1' },
+        url: undefined
+      } as unknown as PerformanceEntry
+    ]);
+
+    expect(observer.snapshot().third_party?.pre_lcp_script_share_pct).toBe(0);
+  });
+
+  it('returns null third_party when LCP never fires (Safari/Firefox boundary)', () => {
+    setupObserverTest({
+      navigation: { startTime: 0, activationStart: 0, responseStart: 180, requestStart: 120 },
+      resources: [
+        {
+          name: 'https://cdn.third.party/tag.js',
+          initiatorType: 'script',
+          startTime: 100,
+          transferSize: 50_000,
+          encodedBodySize: 50_000
+        }
+      ] as Partial<PerformanceResourceTiming>[]
+    });
+
+    const observer = observeVitals();
+    // No LCP emitted.
+    expect(observer.snapshot().third_party).toBeNull();
+  });
 });

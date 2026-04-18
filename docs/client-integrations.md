@@ -168,7 +168,7 @@ Validation queries prove the raw rows are landing. The provided URL-builder quer
 - GTM is optional. Teams without GTM should prefer `beacon` or `callback`.
 - Direct `gtag` transport exists only in the local spike lab for Gate 2 validation.
 - Preview aggregation is a sanity-check path only. Production truth comes from warehouse aggregation.
-- `meta.nav_type` remains for backward compatibility. Prefer `meta.navigation_type` in new warehouse work.
+- `meta.nav_type` has been removed in 0.1.x. Use `meta.navigation_type` (identical semantics, wider browser coverage). Consumers pinned to the legacy column must migrate before upgrading.
 - `restore` and `prerender` stay in raw events, but default load-performance reporting excludes them in v0.1.
 - Keep `generateTarget()` conservative: return a safe label, not raw text or user content.
 

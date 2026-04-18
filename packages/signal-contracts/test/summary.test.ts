@@ -100,5 +100,24 @@ describe('formatSignalSummary', () => {
 
     expect(output).not.toContain('LCP story');
     expect(output).not.toContain('INP story');
+    expect(output).not.toContain('Third-party');
+  });
+
+  it('renders Third-party section when third_party_story is present', () => {
+    const enriched = {
+      ...strongLcpCoverageAggregateFixture,
+      third_party_story: {
+        median_share_pct: 32,
+        dominant_tier: 'moderate' as const,
+        dominant_tier_share_pct: 58,
+        median_origin_count: 6
+      }
+    };
+
+    const output = formatSignalSummary(enriched);
+
+    expect(output).toContain('Third-party');
+    expect(output).toContain('Moderate');
+    expect(output).toContain('32%');
   });
 });

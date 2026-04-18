@@ -3865,3 +3865,40 @@ body:has(.sr-root) {
   color: var(--sr-fg-muted);
   font-style: italic;
 }
+
+/* --------------------------------------------------------------------- */
+/* Act 2 third-party pre-race headline                                   */
+/*                                                                       */
+/* Single inline line that sits between the Act 2 lede and the race      */
+/* grid, naming the external cause ("off-domain script weight before     */
+/* first paint") that the race subsequently quantifies. `data-third-     */
+/* party-tier` drives the accent weight: `heavy` gets the mood accent,   */
+/* `moderate` stays neutral-bright, `light` dims slightly, `none` is     */
+/* affirming via the steady tone so zero third-party reads as a feature. */
+/* --------------------------------------------------------------------- */
+.sr-third-party-headline {
+  margin: 0 auto;
+  padding: 0.375rem 0 0;
+  font-size: var(--sr-type-01);
+  line-height: 1.5;
+  color: var(--sr-fg);
+  text-align: center;
+  max-width: 56ch;
+}
+
+.sr-third-party-headline[data-third-party-tier="light"] {
+  color: var(--sr-fg-muted);
+}
+
+.sr-third-party-headline[data-third-party-tier="none"] {
+  color: var(--sr-tone-steady-fg);
+}
+
+.sr-third-party-headline[data-third-party-tier="heavy"] .sr-third-party-headline-body {
+  color: var(--sr-accent);
+}
+
+.sr-third-party-headline-origins {
+  color: var(--sr-fg-muted);
+  margin-inline-start: 0.25rem;
+}

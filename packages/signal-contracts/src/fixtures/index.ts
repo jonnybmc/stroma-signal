@@ -48,7 +48,6 @@ export const chromeColdNavFixture: SignalEventV1 = {
   meta: {
     pkg_version: '0.1.0',
     browser: 'chrome',
-    nav_type: 'navigate',
     navigation_type: 'navigate'
   }
 };
@@ -77,7 +76,6 @@ export const safariFallbackFixture: SignalEventV1 = {
   meta: {
     pkg_version: '0.1.0',
     browser: 'safari',
-    nav_type: 'navigate',
     navigation_type: 'navigate'
   }
 };
@@ -156,7 +154,6 @@ export const restoreLifecycleFixture: SignalEventV1 = {
   },
   meta: {
     ...chromeColdNavFixture.meta,
-    nav_type: 'back_forward',
     navigation_type: 'restore'
   }
 };
@@ -177,7 +174,6 @@ export const prerenderLifecycleFixture: SignalEventV1 = {
   },
   meta: {
     ...chromeColdNavFixture.meta,
-    nav_type: 'navigate',
     navigation_type: 'prerender'
   }
 };
@@ -343,7 +339,6 @@ function createSeries(options: SeriesOptions): SignalEventV1[] {
           },
       meta: {
         browser,
-        nav_type: 'navigate',
         navigation_type: 'navigate',
         pkg_version: '0.1.0'
       }
