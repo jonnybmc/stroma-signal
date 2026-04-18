@@ -1,8 +1,10 @@
 import type {
   SignalAggregateV1,
   SignalComparisonTier,
+  SignalContextStory,
   SignalDeviceDistribution,
   SignalDeviceHardware,
+  SignalEffectiveTypeDominant,
   SignalEnvironment,
   SignalEventV1,
   SignalExperienceFunnel,
@@ -636,6 +638,51 @@ function percentile(values: readonly number[], ratio: number): number | null {
   return value == null ? null : Math.round(value);
 }
 
+// Act 1 context story — surfaces four already-captured signals
+// (save-data share, median RTT, cellular share, dominant effective_type)
+// as narrative audience reality. Does not gate on SIGNAL_MIN_RACE_OBSERVATIONS
+// because it piggybacks on the same per-session context already used to
+// compute `network_signals`; the view-model layer applies the narrate/omit
+// thresholds per field (see SIGNAL_SAVE_DATA_NARRATE_THRESHOLD_PCT and
+// SIGNAL_CELLULAR_NARRATE_THRESHOLD_PCT). Returns undefined only when the
+// sample carried zero contributing rows — below that every downstream
+// omission is enforced by line-level nullability, not block-level absence.
+function finalizeContextStory(input: {
+  total: number;
+  saveDataCount: number;
+  cellularCount: number;
+  rttMedianMs: number | null;
+  effectiveTypeCounters: SignalNetworkSignals['effective_type_hist'];
+}): SignalContextStory | undefined {
+  if (input.total <= 0) return undefined;
+
+  const { effectiveTypeCounters } = input;
+  const effectiveKeys: SignalEffectiveTypeDominant[] = ['4g', '3g', '2g', 'slow-2g', 'unknown'];
+  const counterByKey: Record<SignalEffectiveTypeDominant, number> = {
+    '4g': effectiveTypeCounters['4g'],
+    '3g': effectiveTypeCounters['3g'],
+    '2g': effectiveTypeCounters['2g'],
+    'slow-2g': effectiveTypeCounters.slow_2g,
+    unknown: effectiveTypeCounters.unknown
+  };
+
+  let dominantEffective: SignalEffectiveTypeDominant | null = null;
+  let dominantCount = 0;
+  for (const key of effectiveKeys) {
+    if (counterByKey[key] > dominantCount) {
+      dominantEffective = key;
+      dominantCount = counterByKey[key];
+    }
+  }
+
+  return {
+    save_data_share_pct: asPercent(input.saveDataCount, input.total),
+    median_rtt_ms: input.rttMedianMs,
+    cellular_share_pct: asPercent(input.cellularCount, input.total),
+    effective_type_dominant: dominantEffective
+  };
+}
+
 function finalizeLoafStory(acc: LoafStoryAccumulator): SignalLoafStory | undefined {
   if (acc.observations < SIGNAL_MIN_RACE_OBSERVATIONS) return undefined;
 
@@ -782,6 +829,10 @@ export function aggregateSignalEvents(
   const effectiveTypeCounters = { ...ZERO_EFFECTIVE_TYPE_HIST };
   let effectiveTypeAvailableCount = 0;
   let saveDataCount = 0;
+  // `connection_type === 'cellular'` counter. Chromium-only NetworkInformation
+  // field; Safari / Firefox land as null and don't contribute either way.
+  // Feeds `context_story.cellular_share_pct`.
+  let cellularCount = 0;
   const downlinkSamples: number[] = [];
   const rttSamples: number[] = [];
   const browserCounters = { ...ZERO_BROWSER_HIST };
@@ -866,6 +917,7 @@ export function aggregateSignalEvents(
     effectiveTypeCounters[effectiveTypeBucket(event.context.effective_type)] += 1;
     if (event.context.effective_type != null) effectiveTypeAvailableCount += 1;
     if (event.context.save_data === true) saveDataCount += 1;
+    if (event.context.connection_type === 'cellular') cellularCount += 1;
     if (event.context.downlink_mbps != null) downlinkSamples.push(event.context.downlink_mbps);
     if (event.context.rtt_ms != null) rttSamples.push(event.context.rtt_ms);
 
@@ -965,6 +1017,18 @@ export function aggregateSignalEvents(
     rtt_ms: quartiles(rttSamples)
   };
 
+  // `context_story` reuses the same samples the network_signals block
+  // summarises, but in editorial shape for Act 1. Median RTT rounds to
+  // integer ms (quartiles() returns tenth-ms precision — surplus for a
+  // narrated "median round-trip time is 180 milliseconds" line).
+  const contextStory = finalizeContextStory({
+    total,
+    saveDataCount,
+    cellularCount,
+    rttMedianMs: networkSignals.rtt_ms ? Math.round(networkSignals.rtt_ms.p50) : null,
+    effectiveTypeCounters
+  });
+
   const environment: SignalEnvironment = {
     browser_hist: distributePercent(browserCounters, total) as SignalEnvironment['browser_hist']
   };
@@ -1018,6 +1082,7 @@ export function aggregateSignalEvents(
     inp_story: finalizeInpStory(inpStoryAcc),
     third_party_story: finalizeThirdPartyStory(thirdPartyStoryAcc),
     loaf_story: finalizeLoafStory(loafStoryAcc),
+    context_story: contextStory,
     top_page_path: computeTopPagePathFromCounts(topPathCounts),
     warnings
   };

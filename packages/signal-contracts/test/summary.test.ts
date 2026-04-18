@@ -120,4 +120,39 @@ describe('formatSignalSummary', () => {
     expect(output).toContain('Moderate');
     expect(output).toContain('32%');
   });
+
+  it('renders Audience context section when context_story carries narratable values', () => {
+    const enriched = {
+      ...strongLcpCoverageAggregateFixture,
+      context_story: {
+        save_data_share_pct: 18,
+        median_rtt_ms: 180,
+        cellular_share_pct: 42,
+        effective_type_dominant: '3g' as const
+      }
+    };
+
+    const output = formatSignalSummary(enriched);
+
+    expect(output).toContain('Audience context');
+    expect(output).toContain('18%');
+    expect(output).toContain('180ms');
+    expect(output).toContain('3G dominant');
+  });
+
+  it('omits Audience context section when context_story has no narratable values', () => {
+    const enriched = {
+      ...strongLcpCoverageAggregateFixture,
+      context_story: {
+        save_data_share_pct: 0,
+        median_rtt_ms: null,
+        cellular_share_pct: 0,
+        effective_type_dominant: 'unknown' as const
+      }
+    };
+
+    const output = formatSignalSummary(enriched);
+
+    expect(output).not.toContain('Audience context');
+  });
 });

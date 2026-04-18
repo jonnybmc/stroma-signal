@@ -23,6 +23,12 @@ export const SIGNAL_COVERAGE_MARGINAL_WARNING = 'coverage_marginal';
 // enough to carry a narrative line.
 export const SIGNAL_SAVE_DATA_NARRATE_THRESHOLD_PCT = 1 as const;
 
+// Minimum cellular-network share narratable in Act 1. Chromium-only
+// `connection_type` means Safari/Firefox cohorts are systematically
+// `null`; a small non-zero share on Chromium-Android slices isn't
+// surprising enough to frame in editorial voice. Hard-gate at 10%.
+export const SIGNAL_CELLULAR_NARRATE_THRESHOLD_PCT = 10 as const;
+
 // Report URL byte budgets. GA4 DataLayer → URL transport is commonly
 // capped around 2 KB by proxies; 4 KB is the hard ceiling most CDNs
 // accept. A soft breach emits a warning; a hard breach throws so we

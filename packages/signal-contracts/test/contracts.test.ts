@@ -1345,4 +1345,92 @@ describe('signal contracts', () => {
     expect(encoded.url.length).toBeLessThan(2048);
     expect(encoded.warnings).not.toContain(expect.stringContaining('signal_report_url_exceeds_soft_limit'));
   });
+
+  it('aggregates context_story from audience signals and counts cellular sessions', () => {
+    const events = Array.from({ length: 40 }, (_, index) => ({
+      ...chromeColdNavFixture,
+      event_id: `ctx_${index}`,
+      ts: chromeColdNavFixture.ts + index * 1_000,
+      context: {
+        ...chromeColdNavFixture.context,
+        save_data: index % 5 === 0,
+        connection_type: 'cellular' as const,
+        rtt_ms: 180 + (index % 3) * 10,
+        effective_type: '3g'
+      }
+    }));
+
+    const aggregate = aggregateSignalEvents(events, 'production', chromeColdNavFixture.ts + 120_000);
+
+    expect(aggregate.context_story).toBeDefined();
+    expect(aggregate.context_story?.save_data_share_pct).toBe(20);
+    expect(aggregate.context_story?.cellular_share_pct).toBe(100);
+    expect(aggregate.context_story?.effective_type_dominant).toBe('3g');
+    expect(aggregate.context_story?.median_rtt_ms).toBeGreaterThan(0);
+  });
+
+  it('returns context_story with null median_rtt when sample is below quartile minimum', () => {
+    const events = Array.from({ length: 5 }, (_, index) => ({
+      ...chromeColdNavFixture,
+      event_id: `ctx_thin_${index}`,
+      ts: chromeColdNavFixture.ts + index * 1_000,
+      context: {
+        ...chromeColdNavFixture.context,
+        save_data: false,
+        connection_type: null,
+        rtt_ms: 120,
+        effective_type: '4g'
+      }
+    }));
+
+    const aggregate = aggregateSignalEvents(events, 'preview', chromeColdNavFixture.ts + 60_000);
+
+    expect(aggregate.context_story?.median_rtt_ms).toBeNull();
+    expect(aggregate.context_story?.save_data_share_pct).toBe(0);
+    expect(aggregate.context_story?.cellular_share_pct).toBe(0);
+  });
+
+  it('round-trips context_story through the report URL codec', () => {
+    const enriched = {
+      ...strongLcpCoverageAggregateFixture,
+      context_story: {
+        save_data_share_pct: 12,
+        median_rtt_ms: 180,
+        cellular_share_pct: 35,
+        effective_type_dominant: '3g' as const
+      }
+    };
+
+    const encoded = encodeSignalReportUrl(enriched);
+    const decoded = decodeSignalReportUrl(encoded.url);
+
+    expect(decoded.context_story).toEqual(enriched.context_story);
+  });
+
+  it('leaves context_story undefined when absent from the encoded URL', () => {
+    const encoded = encodeSignalReportUrl(strongLcpCoverageAggregateFixture);
+    const url = new URL(encoded.url);
+    url.searchParams.delete('csd');
+    url.searchParams.delete('cmr');
+    url.searchParams.delete('ccs');
+    url.searchParams.delete('cet');
+    const decoded = decodeSignalReportUrl(url.toString());
+
+    expect(decoded.context_story).toBeUndefined();
+  });
+
+  it('rejects malformed context_story effective_type enum on decode', () => {
+    const encoded = encodeSignalReportUrl({
+      ...strongLcpCoverageAggregateFixture,
+      context_story: {
+        save_data_share_pct: 4,
+        median_rtt_ms: 150,
+        cellular_share_pct: 20,
+        effective_type_dominant: '3g'
+      }
+    });
+    const tampered = encoded.url.replace('cet=3g', 'cet=bogus');
+
+    expect(() => decodeSignalReportUrl(tampered)).toThrow(/Invalid encoded enum value for "cet"/);
+  });
 });

@@ -1,5 +1,7 @@
 import type {
   SignalAggregateV1,
+  SignalContextStory,
+  SignalEffectiveTypeDominant,
   SignalExperienceStage,
   SignalInpPhase,
   SignalInpStory,
@@ -15,10 +17,12 @@ import type {
   SignalThirdPartyTier
 } from '@stroma-labs/signal-contracts';
 import {
+  SIGNAL_CELLULAR_NARRATE_THRESHOLD_PCT,
   SIGNAL_FRESHNESS_UNKNOWN_WARNING,
   SIGNAL_FUNNEL_FCP_POOR_THRESHOLD,
   SIGNAL_FUNNEL_INP_POOR_THRESHOLD,
-  SIGNAL_FUNNEL_LCP_POOR_THRESHOLD
+  SIGNAL_FUNNEL_LCP_POOR_THRESHOLD,
+  SIGNAL_SAVE_DATA_NARRATE_THRESHOLD_PCT
 } from '@stroma-labs/signal-contracts';
 
 // Dominance share threshold below which the LCP / INP story narratives
@@ -105,6 +109,25 @@ export interface ReportLoafStoryViewModel {
   is_hedged: boolean;
   dominant_cause: SignalLoafCause | null;
   worst_frame_ms_p75: number | null;
+}
+
+// Act 1 context lines — editorial narration of already-captured
+// audience signals (save-data, median RTT, cellular share, dominant
+// effective_type). Each field renders as its own inline strip row and
+// every row carries a `tooltip` string translating the technical
+// number into the "what it means for you" read for non-technical
+// buyers. Any row can be null independently — the strip surfaces only
+// the ones that crossed their narration threshold, and the whole block
+// hides when nothing meaningful survived.
+export interface ReportContextStripRow {
+  key: 'save_data' | 'median_rtt' | 'cellular' | 'effective_type';
+  label: string;
+  narrative: string;
+  tooltip: string;
+}
+
+export interface ReportContextStripViewModel {
+  rows: ReportContextStripRow[];
 }
 
 // Act 2 third-party pre-race headline — sits *above* the race gauge as a
@@ -275,6 +298,9 @@ export interface ReportViewModel {
   act1_tiers: ReportTierVisual[];
   act1_device_tiers: ReportDeviceTierVisual[];
   persona_contrast: ReportPersonaContrast;
+  // Null when the aggregate carried no context_story or none of the
+  // rows crossed their narration threshold — renderer hides the strip.
+  act1_context_strip: ReportContextStripViewModel | null;
   actionable_signals: ReportActionableSignalsViewModel;
   race: ReportRaceViewModel;
   act3: ReportAct3ViewModel;
@@ -488,6 +514,89 @@ const THIRD_PARTY_TIER_NARRATIVES: Record<SignalThirdPartyTier, (sharePct: numbe
   light: () => 'Third-party script weight is modest before first paint.',
   none: () => 'The pre-paint is served entirely from your own origins.'
 };
+
+// Act 1 context strip tooltips — paired with each narrated row. The
+// narrative line names the number; the tooltip translates the number
+// into the "what this means for you" read that non-technical buyers
+// (CRO / paid media / SEO / product) can act on. Kept intentionally
+// short so they fit inside the slide's 100vh envelope without wrapping.
+const CONTEXT_TOOLTIPS = {
+  save_data:
+    'These users have told their browser to minimise data use. Heavy pages, autoplay video, and preloaded assets will feel punishing to them — test the experience you ship with Save-Data on.',
+  median_rtt:
+    'Round-trip time is how long one request takes to reach your server and back. Every request the page needs compounds this delay, so a high median explains sluggish perceived loading even on fast links.',
+  cellular:
+    'A meaningful share of this audience is on a mobile network. Mobile links lose bandwidth and gain latency under load, so mobile-heavy cohorts amplify any page weight or redirect cost.',
+  effective_type:
+    "Effective connection type is the browser's own read of perceived network speed. When the dominant bucket drops below 4G, expect visible lag on hero media, fonts, and anything that blocks first paint."
+} satisfies Record<ReportContextStripRow['key'], string>;
+
+// Effective-type narration. Only 3g / 2g / slow-2g trigger a line —
+// a 4g-dominant cohort reads as unremarkable baseline and renders as
+// silence. Unknown-dominant cohorts (Safari / Firefox without the
+// NetworkInformation API) likewise omit — we do not narrate absence of
+// data as absence of quality.
+const EFFECTIVE_TYPE_NARRATIVES: Partial<Record<SignalEffectiveTypeDominant, string>> = {
+  '3g': 'The dominant connection reported by this audience is 3G.',
+  '2g': 'The dominant connection reported by this audience is 2G.',
+  'slow-2g': 'The dominant connection reported by this audience is slow-2G.'
+};
+
+// Builds the Act 1 context strip. Each field applies its own gate:
+//  - save_data: SIGNAL_SAVE_DATA_NARRATE_THRESHOLD_PCT (sub-1% is
+//    rounding noise, not audience reality).
+//  - median_rtt: only narrate when the aggregate has a non-null median
+//    (quartiles() returns null below QUARTILE_MIN_SAMPLE).
+//  - cellular: SIGNAL_CELLULAR_NARRATE_THRESHOLD_PCT (below 10% is
+//    not surprising enough to frame editorially).
+//  - effective_type: only 3g / 2g / slow-2g dominant cohorts trigger
+//    the micro-fact; 4g / unknown fall through.
+// When no rows survive the gates, returns null so the renderer hides
+// the whole block.
+function buildContextStripViewModel(story: SignalContextStory | undefined): ReportContextStripViewModel | null {
+  if (!story) return null;
+
+  const rows: ReportContextStripRow[] = [];
+
+  if (story.save_data_share_pct != null && story.save_data_share_pct >= SIGNAL_SAVE_DATA_NARRATE_THRESHOLD_PCT) {
+    rows.push({
+      key: 'save_data',
+      label: 'Save-Data',
+      narrative: `${story.save_data_share_pct}% of this audience browses with Data Saver on.`,
+      tooltip: CONTEXT_TOOLTIPS.save_data
+    });
+  }
+
+  if (story.median_rtt_ms != null) {
+    rows.push({
+      key: 'median_rtt',
+      label: 'Median RTT',
+      narrative: `Median round-trip time is ${story.median_rtt_ms} milliseconds.`,
+      tooltip: CONTEXT_TOOLTIPS.median_rtt
+    });
+  }
+
+  if (story.cellular_share_pct != null && story.cellular_share_pct >= SIGNAL_CELLULAR_NARRATE_THRESHOLD_PCT) {
+    rows.push({
+      key: 'cellular',
+      label: 'Cellular share',
+      narrative: `${story.cellular_share_pct}% of measured sessions are on cellular networks.`,
+      tooltip: CONTEXT_TOOLTIPS.cellular
+    });
+  }
+
+  if (story.effective_type_dominant && EFFECTIVE_TYPE_NARRATIVES[story.effective_type_dominant]) {
+    rows.push({
+      key: 'effective_type',
+      label: 'Connection class',
+      narrative: EFFECTIVE_TYPE_NARRATIVES[story.effective_type_dominant] as string,
+      tooltip: CONTEXT_TOOLTIPS.effective_type
+    });
+  }
+
+  if (rows.length === 0) return null;
+  return { rows };
+}
 
 function buildLcpStoryViewModel(story: SignalLcpStory | undefined): ReportLcpStoryViewModel | null {
   if (!story) return null;
@@ -1467,6 +1576,7 @@ export function buildReportViewModel(aggregate: SignalAggregateV1): ReportViewMo
     act1_tiers: buildAct1Tiers(aggregate),
     act1_device_tiers: buildAct1DeviceTiers(aggregate),
     persona_contrast: buildPersonaContrast(aggregate),
+    act1_context_strip: buildContextStripViewModel(aggregate.context_story),
     actionable_signals: buildActionableSignals(aggregate),
     race,
     act3,

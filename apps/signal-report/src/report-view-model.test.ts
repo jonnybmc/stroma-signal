@@ -738,4 +738,104 @@ describe('report view model', () => {
       expect(html).not.toContain('off-domain origins');
     });
   });
+
+  describe('Act 1 context strip', () => {
+    it('emits save-data, cellular, and rtt rows when the gates are crossed', () => {
+      const aggregate = {
+        ...strongLcpCoverageAggregateFixture,
+        context_story: {
+          save_data_share_pct: 12,
+          median_rtt_ms: 180,
+          cellular_share_pct: 35,
+          effective_type_dominant: '3g' as const
+        }
+      };
+      const viewModel = buildReportViewModel(aggregate);
+      const strip = viewModel.act1_context_strip;
+
+      expect(strip).not.toBeNull();
+      expect(strip?.rows.map((row) => row.key)).toEqual(['save_data', 'median_rtt', 'cellular', 'effective_type']);
+      expect(strip?.rows.find((row) => row.key === 'save_data')?.narrative).toContain('12%');
+      expect(strip?.rows.find((row) => row.key === 'median_rtt')?.narrative).toContain('180 milliseconds');
+      expect(strip?.rows.find((row) => row.key === 'cellular')?.narrative).toContain('35%');
+      expect(strip?.rows.find((row) => row.key === 'effective_type')?.narrative).toContain('3G');
+      for (const row of strip?.rows ?? []) {
+        expect(row.tooltip.length).toBeGreaterThan(0);
+      }
+    });
+
+    it('omits sub-1% save-data and sub-10% cellular rows so silence stays the correct signal', () => {
+      const aggregate = {
+        ...strongLcpCoverageAggregateFixture,
+        context_story: {
+          save_data_share_pct: 0,
+          median_rtt_ms: 90,
+          cellular_share_pct: 4,
+          effective_type_dominant: '4g' as const
+        }
+      };
+      const viewModel = buildReportViewModel(aggregate);
+      const strip = viewModel.act1_context_strip;
+
+      expect(strip).not.toBeNull();
+      expect(strip?.rows.map((row) => row.key)).toEqual(['median_rtt']);
+    });
+
+    it('returns null when no row survives the narration gates', () => {
+      const aggregate = {
+        ...strongLcpCoverageAggregateFixture,
+        context_story: {
+          save_data_share_pct: 0,
+          median_rtt_ms: null,
+          cellular_share_pct: 2,
+          effective_type_dominant: '4g' as const
+        }
+      };
+      const viewModel = buildReportViewModel(aggregate);
+
+      expect(viewModel.act1_context_strip).toBeNull();
+    });
+
+    it('returns null when the aggregate carries no context_story at all (legacy URL)', () => {
+      const { context_story: _discarded, ...legacy } = strongLcpCoverageAggregateFixture;
+      const viewModel = buildReportViewModel(legacy);
+      expect(viewModel.act1_context_strip).toBeNull();
+    });
+
+    it('renders the strip markup with tooltips when at least one row is present', () => {
+      const aggregate = {
+        ...strongLcpCoverageAggregateFixture,
+        context_story: {
+          save_data_share_pct: 12,
+          median_rtt_ms: 180,
+          cellular_share_pct: 5,
+          effective_type_dominant: '4g' as const
+        }
+      };
+      const viewModel = buildReportViewModel(aggregate);
+      const html = renderReportMarkup(viewModel, 'full');
+
+      expect(html).toContain('sr-act1-ctx');
+      expect(html).toContain('data-key="save_data"');
+      expect(html).toContain('data-key="median_rtt"');
+      expect(html).not.toContain('data-key="cellular"');
+      expect(html).toMatch(/data-tooltip="[^"]+Save-Data/);
+    });
+
+    it('omits the strip markup entirely when no rows survive', () => {
+      const aggregate = {
+        ...strongLcpCoverageAggregateFixture,
+        context_story: {
+          save_data_share_pct: 0,
+          median_rtt_ms: null,
+          cellular_share_pct: 0,
+          effective_type_dominant: '4g' as const
+        }
+      };
+      const viewModel = buildReportViewModel(aggregate);
+      const html = renderReportMarkup(viewModel, 'full');
+
+      expect(html).not.toContain('sr-act1-ctx');
+    });
+  });
 });

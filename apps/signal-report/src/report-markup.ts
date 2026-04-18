@@ -7,6 +7,7 @@ import {
   extractMotionPayload,
   formatMetricDuration,
   type ReportActionableSignalsViewModel,
+  type ReportContextStripViewModel,
   type ReportDeviceTierVisual,
   type ReportExperienceStageViewModel,
   type ReportFormFactorViewModel,
@@ -406,6 +407,44 @@ function renderPersonaCards(contrast: ReportPersonaContrast): string {
       ${renderPersonaCard(contrast.best)}
       ${renderPersonaCard(contrast.constrained)}
     </div>
+  `;
+}
+
+/**
+ * Act 1 context strip — narrative sentences (not data rows) derived from
+ * already-captured NetworkInformation signals. Each row carries a tooltip
+ * that translates the number into the "what this means for you" read for
+ * non-technical buyers. Hidden entirely when no rows crossed the narration
+ * gates (see buildContextStripViewModel). Laid out as a single vertical
+ * column with a leading eyebrow rule so it reads as editorial voice
+ * rather than a KPI tile.
+ */
+function renderAct1ContextStrip(strip: ReportContextStripViewModel | null): string {
+  if (!strip || strip.rows.length === 0) return '';
+  const rowsMarkup = strip.rows
+    .map(
+      (row, index) => `
+        <li class="sr-act1-ctx-row" data-key="${row.key}" data-reveal style="--reveal-order:${index + 2}">
+          <p class="sr-act1-ctx-row-body">
+            <span class="sr-act1-ctx-row-narrative" aria-label="${escapeHtml(row.label)}">${escapeHtml(row.narrative)}</span>
+            <button
+              type="button"
+              class="sr-act1-ctx-row-hint"
+              aria-label="What this means for you"
+              data-tooltip="${escapeHtml(row.tooltip)}"
+            >?</button>
+          </p>
+        </li>
+      `
+    )
+    .join('');
+  return `
+    <aside class="sr-act1-ctx" aria-label="Audience context" data-reveal style="--reveal-order:1">
+      <p class="sr-eyebrow sr-act1-ctx-eyebrow">This audience</p>
+      <ul class="sr-act1-ctx-list">
+        ${rowsMarkup}
+      </ul>
+    </aside>
   `;
 }
 
@@ -1345,6 +1384,7 @@ function renderFullReport(viewModel: ReportViewModel, motionMode: ReportMotionMo
           </header>
 
           ${renderPersonaCards(viewModel.persona_contrast)}
+          ${renderAct1ContextStrip(viewModel.act1_context_strip)}
           ${renderAct1FormFactor(viewModel.form_factor)}
         </section>
 

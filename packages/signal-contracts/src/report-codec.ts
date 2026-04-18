@@ -3,7 +3,9 @@ import { explainSignalAggregateIssues, isSignalAggregateV1 } from './guards.js';
 import type {
   SignalAggregateV1,
   SignalComparisonTier,
+  SignalContextStory,
   SignalDeviceHardware,
+  SignalEffectiveTypeDominant,
   SignalEnvironment,
   SignalExperienceFunnel,
   SignalExperienceStage,
@@ -73,6 +75,8 @@ const VALID_INP_PHASES = new Set<SignalInpPhase>(['input_delay', 'processing', '
 const VALID_THIRD_PARTY_TIERS = new Set<SignalThirdPartyTier>(['none', 'light', 'moderate', 'heavy']);
 
 const VALID_LOAF_CAUSES = new Set<SignalLoafCause>(['script', 'layout', 'style', 'paint']);
+
+const VALID_EFFECTIVE_TYPE_DOMINANT = new Set<SignalEffectiveTypeDominant>(['4g', '3g', '2g', 'slow-2g', 'unknown']);
 
 export const SIGNAL_FRESHNESS_UNKNOWN_WARNING =
   'Report generation timestamp is unknown — this link predates freshness tracking.';
@@ -285,6 +289,13 @@ function encodeLoafStory(params: URLSearchParams, story: SignalLoafStory): void 
   if (story.worst_frame_ms_p75 != null) params.set('lfw', String(story.worst_frame_ms_p75));
 }
 
+function encodeContextStory(params: URLSearchParams, story: SignalContextStory): void {
+  if (story.save_data_share_pct != null) params.set('csd', String(story.save_data_share_pct));
+  if (story.median_rtt_ms != null) params.set('cmr', String(story.median_rtt_ms));
+  if (story.cellular_share_pct != null) params.set('ccs', String(story.cellular_share_pct));
+  if (story.effective_type_dominant) params.set('cet', story.effective_type_dominant);
+}
+
 function encodeEnvironment(params: URLSearchParams, env: SignalEnvironment): void {
   params.set(
     'eb',
@@ -370,6 +381,7 @@ function encodeAggregate(aggregate: SignalAggregateV1): URLSearchParams {
   if (aggregate.inp_story) encodeInpStory(params, aggregate.inp_story);
   if (aggregate.third_party_story) encodeThirdPartyStory(params, aggregate.third_party_story);
   if (aggregate.loaf_story) encodeLoafStory(params, aggregate.loaf_story);
+  if (aggregate.context_story) encodeContextStory(params, aggregate.context_story);
   // Denominator bookkeeping (§1.2). Emit only when present so legacy
   // aggregates (pre-PR-6) round-trip unchanged.
   if (aggregate.coverage.raw_sample_size != null) {
@@ -705,6 +717,29 @@ function readOptionalLoafStory(params: URLSearchParams): SignalLoafStory | undef
   };
 }
 
+function readOptionalContextStory(params: URLSearchParams): SignalContextStory | undefined {
+  const saveRaw = params.get('csd');
+  const rttRaw = params.get('cmr');
+  const cellRaw = params.get('ccs');
+  const effRaw = params.get('cet');
+  if (saveRaw == null && rttRaw == null && cellRaw == null && effRaw == null) return undefined;
+
+  let effectiveDominant: SignalEffectiveTypeDominant | null = null;
+  if (effRaw != null) {
+    if (!VALID_EFFECTIVE_TYPE_DOMINANT.has(effRaw as SignalEffectiveTypeDominant)) {
+      throw new Error(`Invalid encoded enum value for "cet": ${effRaw}`);
+    }
+    effectiveDominant = effRaw as SignalEffectiveTypeDominant;
+  }
+
+  return {
+    save_data_share_pct: saveRaw == null ? null : readNumberParam(params, 'csd'),
+    median_rtt_ms: rttRaw == null ? null : readNumberParam(params, 'cmr'),
+    cellular_share_pct: cellRaw == null ? null : readNumberParam(params, 'ccs'),
+    effective_type_dominant: effectiveDominant
+  };
+}
+
 function readOptionalFormFactor(params: URLSearchParams): SignalFormFactorDistribution | undefined {
   if (params.get('ff') == null) return undefined;
   const shares = parseInts(params.get('ff'), 3);
@@ -819,6 +854,7 @@ export function decodeSignalReportUrl(value: string | URL): SignalAggregateV1 {
     inp_story: readOptionalInpStory(params),
     third_party_story: readOptionalThirdPartyStory(params),
     loaf_story: readOptionalLoafStory(params),
+    context_story: readOptionalContextStory(params),
     top_page_path: params.get('v'),
     warnings
   };

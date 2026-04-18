@@ -1,5 +1,6 @@
 import type {
   SignalAggregateV1,
+  SignalEffectiveTypeDominant,
   SignalExperienceStage,
   SignalInpPhase,
   SignalLcpCulpritKind,
@@ -63,6 +64,14 @@ const THIRD_PARTY_TIER_LABELS: Record<SignalThirdPartyTier, string> = {
   light: 'Light',
   moderate: 'Moderate',
   heavy: 'Heavy'
+};
+
+const EFFECTIVE_TYPE_LABELS: Record<SignalEffectiveTypeDominant, string> = {
+  '4g': '4G',
+  '3g': '3G',
+  '2g': '2G',
+  'slow-2g': 'slow-2G',
+  unknown: 'Unknown'
 };
 
 function bar(share: number, width: number = 20): string {
@@ -222,6 +231,31 @@ export function formatSignalSummary(aggregate: SignalAggregateV1): string {
     }
     if (story.median_origin_count != null) {
       lines.push(`  Median origins: ${story.median_origin_count}`);
+    }
+  }
+
+  // Audience context story
+  if (aggregate.context_story) {
+    const story = aggregate.context_story;
+    const hasNarratable =
+      (story.save_data_share_pct != null && story.save_data_share_pct > 0) ||
+      story.median_rtt_ms != null ||
+      (story.cellular_share_pct != null && story.cellular_share_pct > 0) ||
+      (story.effective_type_dominant != null && story.effective_type_dominant !== 'unknown');
+    if (hasNarratable) {
+      lines.push(section('Audience context'));
+      if (story.save_data_share_pct != null && story.save_data_share_pct > 0) {
+        lines.push(`  Save-Data:      ${pct(story.save_data_share_pct)} of sessions`);
+      }
+      if (story.median_rtt_ms != null) {
+        lines.push(`  Median RTT:     ${story.median_rtt_ms}ms`);
+      }
+      if (story.cellular_share_pct != null && story.cellular_share_pct > 0) {
+        lines.push(`  Cellular:       ${pct(story.cellular_share_pct)} of sessions`);
+      }
+      if (story.effective_type_dominant != null && story.effective_type_dominant !== 'unknown') {
+        lines.push(`  Conn. class:    ${EFFECTIVE_TYPE_LABELS[story.effective_type_dominant]} dominant`);
+      }
     }
   }
 

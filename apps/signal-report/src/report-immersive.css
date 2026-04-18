@@ -911,6 +911,131 @@ body:has(.sr-root) {
   }
 }
 
+/* -------- Act 1 context strip -------------------------------------------
+ * Sits between the persona grid and the form-factor surface. Editorial
+ * voice, not a KPI tile: a thin left-rule carries the eyebrow, each row
+ * renders as narrative prose. The "?" hint is a keyboard-accessible
+ * tooltip that translates the technical number into the "what this means
+ * for you" read for non-technical buyers (CRO / paid-media / SEO). Uses
+ * existing tokens only; no new palette entries.
+ */
+.sr-act1-ctx {
+  margin-top: var(--sr-space-1);
+  width: 100%;
+  max-width: 72rem;
+  padding: 0 0 0 var(--sr-space-2);
+  border-left: 2px solid var(--sr-accent, var(--sr-fg-muted));
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px var(--sr-space-2);
+}
+
+.sr-act1-ctx-eyebrow {
+  margin: 0;
+  color: var(--sr-fg-muted);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-size: var(--sr-type-00);
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.sr-act1-ctx-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px var(--sr-space-2);
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.sr-act1-ctx-row {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.sr-act1-ctx-row + .sr-act1-ctx-row::before {
+  content: '·';
+  margin-right: 4px;
+  color: var(--sr-fg-muted);
+  opacity: 0.5;
+}
+
+.sr-act1-ctx-row-body {
+  margin: 0;
+  font-size: var(--sr-type-00);
+  line-height: 1.35;
+  color: var(--sr-fg);
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.sr-act1-ctx-row-narrative {
+  color: var(--sr-fg);
+}
+
+.sr-act1-ctx-row-hint {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 0.875rem;
+  height: 0.875rem;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--sr-fg-muted);
+  font-size: 0.625rem;
+  line-height: 1;
+  cursor: help;
+  position: relative;
+  transition: border-color 200ms, color 200ms, background 200ms;
+}
+
+.sr-act1-ctx-row-hint:hover,
+.sr-act1-ctx-row-hint:focus-visible {
+  color: var(--sr-fg);
+  border-color: var(--sr-accent, rgba(255, 255, 255, 0.45));
+  background: rgba(255, 255, 255, 0.08);
+  outline: none;
+}
+
+.sr-act1-ctx-row-hint::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 0.5rem);
+  transform: translateX(-50%);
+  min-width: 18rem;
+  max-width: 26rem;
+  padding: var(--sr-space-2);
+  background: rgba(12, 12, 14, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  color: var(--sr-fg);
+  font-size: var(--sr-type-00);
+  line-height: 1.5;
+  letter-spacing: 0;
+  text-transform: none;
+  text-align: left;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 180ms ease;
+  z-index: 20;
+  white-space: normal;
+}
+
+.sr-act1-ctx-row-hint:hover::after,
+.sr-act1-ctx-row-hint:focus-visible::after {
+  opacity: 1;
+}
+
 /* -------- Act 1 form-factor block ---------------------------------------
  * Sits below the persona grid as a sibling surface in Act 1. Inherits the
  * persona-card glass-surface tokens (background, border, radius, blur,
