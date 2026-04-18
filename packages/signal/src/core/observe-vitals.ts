@@ -7,7 +7,9 @@ import type {
   SignalLcpCulpritKind,
   SignalLcpElementType,
   SignalLoadState,
+  SignalLoafCause,
   SignalVitals,
+  SignalVitalsLoaf,
   SignalVitalsThirdParty
 } from '@stroma-labs/signal-contracts';
 
@@ -119,6 +121,21 @@ type EventTimingEntry = PerformanceEntry & {
   processingEnd?: number;
   name?: string;
   target?: Element | null;
+};
+
+type LoafScriptEntry = {
+  duration?: number;
+  sourceURL?: string;
+};
+
+type LongAnimationFrameEntry = PerformanceEntry & {
+  duration: number;
+  startTime: number;
+  renderStart?: number;
+  styleAndLayoutStart?: number;
+  styleAndLayoutDuration?: number;
+  forcedStyleAndLayoutDuration?: number;
+  scripts?: readonly LoafScriptEntry[];
 };
 
 interface ObservedPerformanceStream {
@@ -251,6 +268,81 @@ function deriveInpDominantPhase(
   if (processing >= inputDelay && processing >= presentation) return 'processing';
   if (inputDelay >= presentation) return 'input_delay';
   return 'presentation';
+}
+
+// §2.5 — LoAF dominant-cause: argmax across the four substages. Any
+// substage with missing inputs is excluded from the argmax; if every
+// candidate is null, dominant_cause returns null rather than guessing.
+// Null-safe against the partial entries early Chrome 123 betas produced.
+function deriveLoafAttribution(entry: LongAnimationFrameEntry): SignalVitalsLoaf {
+  const duration = Number.isFinite(entry.duration) ? Math.max(0, entry.duration) : null;
+  const worstDurationMs = duration != null ? Math.round(duration) : null;
+
+  const styleAndLayoutDuration = Number.isFinite(entry.styleAndLayoutDuration ?? Number.NaN)
+    ? (entry.styleAndLayoutDuration as number)
+    : null;
+  const forcedStyleAndLayoutDuration = Number.isFinite(entry.forcedStyleAndLayoutDuration ?? Number.NaN)
+    ? (entry.forcedStyleAndLayoutDuration as number)
+    : null;
+
+  let scriptTime: number | null = null;
+  const scriptHosts = new Set<string>();
+  if (entry.scripts && entry.scripts.length > 0) {
+    let scriptTotal = 0;
+    for (const script of entry.scripts) {
+      if (Number.isFinite(script.duration ?? Number.NaN)) {
+        scriptTotal += Math.max(0, script.duration as number);
+      }
+      if (typeof script.sourceURL === 'string' && script.sourceURL.length > 0) {
+        try {
+          scriptHosts.add(new URL(script.sourceURL).host.toLowerCase());
+        } catch {
+          // Unparseable sourceURL (inline script, blob:, etc.) contributes
+          // no origin. Silently skip — do not inflate the origin count.
+        }
+      }
+    }
+    scriptTime = scriptTotal;
+  }
+
+  const layoutTime =
+    styleAndLayoutDuration != null && forcedStyleAndLayoutDuration != null
+      ? Math.max(0, styleAndLayoutDuration - forcedStyleAndLayoutDuration)
+      : null;
+  const styleTime = forcedStyleAndLayoutDuration != null ? Math.max(0, forcedStyleAndLayoutDuration) : null;
+  const paintTime =
+    duration != null &&
+    Number.isFinite(entry.renderStart ?? Number.NaN) &&
+    (entry.renderStart as number) > 0 &&
+    Number.isFinite(entry.startTime)
+      ? Math.max(0, duration - ((entry.renderStart as number) - entry.startTime))
+      : null;
+
+  const candidates: Array<{ cause: SignalLoafCause; value: number }> = [];
+  if (scriptTime != null) candidates.push({ cause: 'script', value: scriptTime });
+  if (layoutTime != null) candidates.push({ cause: 'layout', value: layoutTime });
+  if (styleTime != null) candidates.push({ cause: 'style', value: styleTime });
+  if (paintTime != null) candidates.push({ cause: 'paint', value: paintTime });
+
+  let dominantCause: SignalLoafCause | null = null;
+  if (candidates.length > 0) {
+    let best = candidates[0];
+    if (!best) {
+      dominantCause = null;
+    } else {
+      for (let index = 1; index < candidates.length; index += 1) {
+        const candidate = candidates[index];
+        if (candidate && candidate.value > best.value) best = candidate;
+      }
+      dominantCause = best.cause;
+    }
+  }
+
+  return {
+    worst_duration_ms: worstDurationMs,
+    dominant_cause: dominantCause,
+    script_origin_count: scriptHosts.size > 0 ? scriptHosts.size : null
+  };
 }
 
 function getRegistrableDomain(host: string): string {
@@ -407,6 +499,10 @@ export function observeVitals(options: ObserveVitalsOptions = {}): VitalObserver
   let firstContentfulPaint: number | null = null;
   let rawFcpEntry: RawPaintDebugEntry | null = null;
   let rawLcpEntry: RawLcpDebugEntry | null = null;
+  // LoAF worst-duration running max. Only the highest-duration frame is
+  // retained (bounded memory per §9a.7); the rest are discarded as they
+  // arrive. Safe on long-lived SPA sessions with many janky frames.
+  let worstLoaf: LongAnimationFrameEntry | null = null;
 
   const observers: ObservedPerformanceStream[] = [];
 
@@ -489,6 +585,14 @@ export function observeVitals(options: ObserveVitalsOptions = {}): VitalObserver
     });
   };
 
+  const handleLoafEntry = (entry: PerformanceEntry): void => {
+    const loafEntry = entry as LongAnimationFrameEntry;
+    if (!Number.isFinite(loafEntry.duration)) return;
+    if (worstLoaf == null || loafEntry.duration > worstLoaf.duration) {
+      worstLoaf = loafEntry;
+    }
+  };
+
   const drainPendingRecords = (): void => {
     for (const { observer, handle } of observers) {
       const records = typeof observer.takeRecords === 'function' ? observer.takeRecords() : [];
@@ -522,6 +626,11 @@ export function observeVitals(options: ObserveVitalsOptions = {}): VitalObserver
     buffered: true,
     durationThreshold: 40
   } as PerformanceObserverInit);
+
+  createObserver('long-animation-frame', handleLoafEntry, {
+    type: 'long-animation-frame',
+    buffered: true
+  });
 
   return {
     disconnect() {
@@ -559,6 +668,7 @@ export function observeVitals(options: ObserveVitalsOptions = {}): VitalObserver
         globalThis.location?.host ?? null,
         firstPartyAllowlist
       );
+      const loaf = worstLoaf ? deriveLoafAttribution(worstLoaf) : null;
 
       return {
         lcp_ms: largestContentfulPaint,
@@ -569,7 +679,8 @@ export function observeVitals(options: ObserveVitalsOptions = {}): VitalObserver
         lcp_attribution: largestContentfulPaint != null ? lcpAttribution : undefined,
         inp_attribution: inpRecord?.attribution,
         lcp_breakdown: lcpBreakdown,
-        third_party: thirdParty
+        third_party: thirdParty,
+        loaf
       };
     },
     debugSnapshot() {

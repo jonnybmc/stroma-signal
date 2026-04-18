@@ -25,12 +25,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - GA4 enum summaries: `lcp_culprit_kind`, `lcp_dominant_subpart`, `inp_dominant_phase`, `third_party_weight_tier`
 - Aggregate stories surfaced in the hosted report: Act 2 LCP subpart narrative + micro-chart, Act 2 third-party pre-race headline (with positive narration when zero off-domain weight), Act 3 INP-phase inline caption
 - Warehouse columns for LCP breakdown, culprit kind, INP phase, third-party share/origin count
+- Chromium 123+ Long Animation Frame capture (`vitals.loaf.worst_duration_ms`, `dominant_cause`, `script_origin_count`) using `PerformanceObserver('long-animation-frame')`; retains only the worst-duration frame per session (running max) for bounded memory
+- Aggregate `loaf_story` with dominant-cause share, p75 worst-frame duration, and observation-threshold gating (25 observations minimum, 35% dominance hedge)
+- Act 3 inline LoAF narrative line beneath the INP funnel caption — never claimed when the INP funnel stage itself could not be defended
+- Warehouse column `loaf_dominant_cause` (CSV column 45, positional lock: immediately before `context_visibility_hidden_at_load`)
 - Background-tab visibility filter: `context.visibility_hidden_at_load` captured per event; default aggregation pre-filters background-tab loads from every percentile, share, and accumulator
 - `coverage.raw_sample_size` and `coverage.excluded_background_sessions` preserved so the report credibility strip can narrate the exclusion transparently (invariant: `raw_sample_size === sample_size + excluded_background_sessions`)
 - Marginal-coverage warning (`coverage_marginal`) emitted when the LCP cohort lands within 10% / 10 observations of the ship thresholds; credibility strip renders *"coverage at the defensible edge"* so readers temper their read
 - Report URL byte budget assertions in `encodeSignalReportUrl`: soft limit (2048 bytes) pushes `signal_report_url_exceeds_soft_limit` warning; hard limit (4096 bytes) throws
 - Named constants for threshold tuning: `SIGNAL_COVERAGE_MARGINAL_THRESHOLD_PCT`, `SIGNAL_COVERAGE_MARGINAL_THRESHOLD_OBS`, `SIGNAL_SAVE_DATA_NARRATE_THRESHOLD_PCT`, `SIGNAL_REPORT_URL_SOFT_LIMIT_BYTES`, `SIGNAL_REPORT_URL_HARD_LIMIT_BYTES`
-- Warehouse column `context_visibility_hidden_at_load` (CSV column 45)
+- Warehouse column `context_visibility_hidden_at_load` (CSV column 46)
 - Back/forward cache restore and prerender-aware lifecycle
 - Sample rate support
 - Frozen data contracts (`SignalEventV1`, `SignalAggregateV1`)

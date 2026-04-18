@@ -118,6 +118,27 @@ When the LCP cohort lands within a small margin of the ship thresholds — `SIGN
 
 Size is measured via `TextEncoder` (browser) or `Buffer.byteLength` (Node) for UTF-8 byte accuracy. The budget exists because enriching the aggregate with many optional story blocks could push structurally-valid payloads past common URL-length limits.
 
+## LoAF Story (PR-7)
+
+Chromium 123+ emits `PerformanceObserver` entries of type `long-animation-frame`. Each frame carries a `duration`, `scripts[]` with per-script timing and `sourceURL`, `styleAndLayoutDuration`, `forcedStyleAndLayoutDuration`, and a `renderStart` boundary. Signal retains only the **worst-duration frame per session** (running max) — unbounded accumulation would be a memory regression on janky pages. The stored event carries `vitals.loaf = { worst_duration_ms, dominant_cause, script_origin_count }`.
+
+`dominant_cause` is the argmax across four substages derived per §2.5 of the 0.1.x plan:
+
+- `script_time = Σ scripts[].duration`
+- `layout_time = styleAndLayoutDuration − forcedStyleAndLayoutDuration`
+- `style_time = forcedStyleAndLayoutDuration`
+- `paint_time = duration − (renderStart − startTime)` when `renderStart > 0`
+
+Any substage missing its inputs is excluded from the argmax. If every candidate is null (partial early-beta Chrome 123 entries), `dominant_cause = null` rather than guessing.
+
+`script_origin_count` is the number of distinct hosts appearing in `scripts[].sourceURL`. Inline scripts, `blob:` URLs, and unparseable URLs are silently skipped — they contribute no origin count rather than inflating it.
+
+Aggregation gates the `loaf_story` block on `SIGNAL_MIN_RACE_OBSERVATIONS = 25`. When fewer than 25 sessions carry a non-null `dominant_cause`, the story is `undefined` — the report omits the line entirely. When ≥25 sessions land and a single cause exceeds `SIGNAL_STORY_HEDGED_THRESHOLD_PCT = 35`, the narrative names it; otherwise the line is hedged (*"no single cause dominates the slowest frame"*). `worst_frame_ms_p75` is the p75 of per-session `worst_duration_ms` values — used only for internal sanity; not surfaced in copy.
+
+Safari and Firefox sessions carry `vitals.loaf = null` and contribute no observations. Chromium < 123 behaves the same way.
+
+The Act 3 view-model gates LoAF narration on the INP funnel stage being active — LoAF is never claimed when the INP story itself could not be defended.
+
 ## Comparison Tier
 
 The comparison tier is the highest-share non-urban classified tier. If no non-urban tier has observations, `comparison_tier = "none"`.

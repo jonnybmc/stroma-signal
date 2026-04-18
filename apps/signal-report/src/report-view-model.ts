@@ -6,6 +6,8 @@ import type {
   SignalLcpCulpritKind,
   SignalLcpStory,
   SignalLcpSubpart,
+  SignalLoafCause,
+  SignalLoafStory,
   SignalNetworkTier,
   SignalRaceFallbackReason,
   SignalRaceMetric,
@@ -93,6 +95,18 @@ export interface ReportInpStoryViewModel {
   dominant_phase: SignalInpPhase | null;
 }
 
+// Act 3 LoAF story — second-layer interaction diagnosis attached to the
+// INP funnel node when the aggregate carries a LoAF block. Chromium 123+
+// only; Safari / Firefox / older Chromium cohorts cleanly omit the line.
+// Runs against the same hedged-dominance gate as INP so we never narrate
+// a single-cause claim the data can't back.
+export interface ReportLoafStoryViewModel {
+  narrative: string;
+  is_hedged: boolean;
+  dominant_cause: SignalLoafCause | null;
+  worst_frame_ms_p75: number | null;
+}
+
 // Act 2 third-party pre-race headline — sits *above* the race gauge as a
 // pre-framing line. Names the external cause ("off-domain script weight
 // before first paint") that the race subsequently quantifies. 0% is
@@ -154,6 +168,7 @@ export interface ReportAct3ViewModel {
   stages: ReportExperienceStageViewModel[];
   legacy_message: string | null;
   inp_story: ReportInpStoryViewModel | null;
+  loaf_story: ReportLoafStoryViewModel | null;
 }
 
 export interface ReportCredibilityStripViewModel {
@@ -446,8 +461,16 @@ const INP_PHASE_NARRATIVES: Record<SignalInpPhase, string> = {
   presentation: 'Handlers finish fast, but visual completion lags.'
 };
 
+const LOAF_CAUSE_NARRATIVES: Record<SignalLoafCause, string> = {
+  script: 'The slowest frame is dominated by script execution.',
+  layout: 'Layout work, not script, is what stalls the slowest frame.',
+  style: 'Style recalculation is what stalls the slowest frame.',
+  paint: 'Paint work stalls the slowest frame.'
+};
+
 const LCP_HEDGED_NARRATIVE = 'Paint delay is spread across multiple phases — no single cause dominates.';
 const INP_HEDGED_NARRATIVE = 'Interaction lag is spread across multiple phases — no single cause dominates.';
+const LOAF_HEDGED_NARRATIVE = 'The slowest frame is spread across multiple causes — no single driver dominates.';
 
 // Third-party pre-race headlines. `none` is narrated *positively* —
 // absence of third-party weight is a feature of the page, not missing
@@ -528,6 +551,25 @@ function buildInpStoryViewModel(story: SignalInpStory | undefined): ReportInpSto
     narrative,
     is_hedged: isHedged,
     dominant_phase: dominantPhase
+  };
+}
+
+function buildLoafStoryViewModel(story: SignalLoafStory | undefined): ReportLoafStoryViewModel | null {
+  if (!story) return null;
+
+  const isHedged =
+    story.dominant_cause == null ||
+    story.dominant_cause_share_pct == null ||
+    story.dominant_cause_share_pct < SIGNAL_STORY_HEDGED_THRESHOLD_PCT;
+
+  const dominantCause = isHedged ? null : story.dominant_cause;
+  const narrative = isHedged || !dominantCause ? LOAF_HEDGED_NARRATIVE : LOAF_CAUSE_NARRATIVES[dominantCause];
+
+  return {
+    narrative,
+    is_hedged: isHedged,
+    dominant_cause: dominantCause,
+    worst_frame_ms_p75: story.worst_frame_ms_p75
   };
 }
 
@@ -749,6 +791,12 @@ function buildAct3ViewModel(aggregate: SignalAggregateV1, moodHint: ReportMoodTi
   // inline line (§4.1 of the enrichment plan).
   const inpStage = funnel?.active_stages.includes('inp') ? aggregate.inp_story : undefined;
   const inpStory = buildInpStoryViewModel(inpStage);
+  // LoAF story sits alongside the INP phase line when both are present.
+  // Gated on the INP funnel stage for the same reason as the INP story —
+  // a LoAF diagnosis without a defensible interaction-ready funnel stage
+  // would narrate frame-level jank the funnel itself can't anchor.
+  const loafSource = funnel?.active_stages.includes('inp') ? aggregate.loaf_story : undefined;
+  const loafStory = buildLoafStoryViewModel(loafSource);
 
   if (!funnel) {
     return {
@@ -762,7 +810,8 @@ function buildAct3ViewModel(aggregate: SignalAggregateV1, moodHint: ReportMoodTi
       stages: [],
       legacy_message:
         'Acts 1 and 2 remain trustworthy, but this URL was generated before the measured funnel block existed.',
-      inp_story: null
+      inp_story: null,
+      loaf_story: null
     };
   }
 
@@ -777,7 +826,8 @@ function buildAct3ViewModel(aggregate: SignalAggregateV1, moodHint: ReportMoodTi
         'The current sample does not contain enough classified and measured sessions to build a defensible performance funnel.',
       stages: [],
       legacy_message: null,
-      inp_story: null
+      inp_story: null,
+      loaf_story: null
     };
   }
 
@@ -790,7 +840,8 @@ function buildAct3ViewModel(aggregate: SignalAggregateV1, moodHint: ReportMoodTi
     narrative_line: buildAct3Narrative(funnel.active_stages, moodHint),
     stages: buildExperienceStages(aggregate, moodHint),
     legacy_message: null,
-    inp_story: inpStory
+    inp_story: inpStory,
+    loaf_story: loafStory
   };
 }
 

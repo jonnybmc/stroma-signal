@@ -1132,6 +1132,106 @@ describe('signal contracts', () => {
     expect(decoded.third_party_story).toBeUndefined();
   });
 
+  it('aggregates loaf_story when observations cross the race threshold', () => {
+    const events = Array.from({ length: 30 }, (_, index) => ({
+      ...chromeColdNavFixture,
+      event_id: `loaf_${index}`,
+      ts: chromeColdNavFixture.ts + index * 1_000,
+      vitals: {
+        ...chromeColdNavFixture.vitals,
+        loaf: {
+          worst_duration_ms: 180 + index,
+          dominant_cause: 'script' as const,
+          script_origin_count: 3
+        }
+      }
+    }));
+
+    const aggregate = aggregateSignalEvents(events, 'production', chromeColdNavFixture.ts + 120_000);
+
+    expect(aggregate.loaf_story).toBeDefined();
+    expect(aggregate.loaf_story?.dominant_cause).toBe('script');
+    expect(aggregate.loaf_story?.dominant_cause_share_pct).toBe(100);
+    expect(aggregate.loaf_story?.worst_frame_ms_p75).toBeGreaterThanOrEqual(180);
+  });
+
+  it('omits loaf_story when the observation threshold is not met', () => {
+    const events = Array.from({ length: SIGNAL_MIN_RACE_OBSERVATIONS - 1 }, (_, index) => ({
+      ...chromeColdNavFixture,
+      event_id: `loaf_thin_${index}`,
+      ts: chromeColdNavFixture.ts + index * 1_000,
+      vitals: {
+        ...chromeColdNavFixture.vitals,
+        loaf: {
+          worst_duration_ms: 120,
+          dominant_cause: 'layout' as const,
+          script_origin_count: 1
+        }
+      }
+    }));
+
+    const aggregate = aggregateSignalEvents(events, 'preview', chromeColdNavFixture.ts + 60_000);
+
+    expect(aggregate.loaf_story).toBeUndefined();
+  });
+
+  it('ignores loaf events whose dominant_cause is null (partial entry)', () => {
+    const events = Array.from({ length: 30 }, (_, index) => ({
+      ...chromeColdNavFixture,
+      event_id: `loaf_null_${index}`,
+      ts: chromeColdNavFixture.ts + index * 1_000,
+      vitals: {
+        ...chromeColdNavFixture.vitals,
+        loaf: {
+          worst_duration_ms: 90,
+          dominant_cause: null,
+          script_origin_count: null
+        }
+      }
+    }));
+
+    const aggregate = aggregateSignalEvents(events, 'production', chromeColdNavFixture.ts + 60_000);
+
+    expect(aggregate.loaf_story).toBeUndefined();
+  });
+
+  it('round-trips loaf_story through the report URL codec', () => {
+    const enriched = {
+      ...strongLcpCoverageAggregateFixture,
+      loaf_story: {
+        dominant_cause: 'layout' as const,
+        dominant_cause_share_pct: 52,
+        worst_frame_ms_p75: 210
+      }
+    };
+
+    const encoded = encodeSignalReportUrl(enriched);
+    const decoded = decodeSignalReportUrl(encoded.url);
+
+    expect(decoded.loaf_story).toEqual(enriched.loaf_story);
+  });
+
+  it('leaves loaf_story undefined when absent from the encoded URL', () => {
+    const encoded = encodeSignalReportUrl(strongLcpCoverageAggregateFixture);
+    const decoded = decodeSignalReportUrl(encoded.url);
+
+    expect(decoded.loaf_story).toBeUndefined();
+  });
+
+  it('rejects malformed loaf_story enum on decode', () => {
+    const encoded = encodeSignalReportUrl({
+      ...strongLcpCoverageAggregateFixture,
+      loaf_story: {
+        dominant_cause: 'script',
+        dominant_cause_share_pct: 60,
+        worst_frame_ms_p75: 160
+      }
+    });
+    const tampered = encoded.url.replace('lfd=script', 'lfd=bogus');
+
+    expect(() => decodeSignalReportUrl(tampered)).toThrow(/Invalid encoded enum value for "lfd"/);
+  });
+
   it('drops background-tab events before accumulators run and records the exclusion count', () => {
     const events = Array.from({ length: 40 }, (_, index) => ({
       ...chromeColdNavFixture,

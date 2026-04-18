@@ -74,6 +74,14 @@ These fields enrich the core vitals with diagnostic context when the browser sup
 | `inp_attribution.processing_duration_ms` | `number \| null` | Time in handler execution. Chromium-only. |
 | `inp_attribution.presentation_delay_ms` | `number \| null` | Time waiting for next paint. Chromium-only. |
 
+**LoAF attribution** (Chromium 123+; null elsewhere):
+
+| Field | Type | Description |
+|---|---|---|
+| `vitals.loaf.worst_duration_ms` | `number \| null` | Duration of the worst long animation frame observed in the session (running max). |
+| `vitals.loaf.dominant_cause` | `'script' \| 'layout' \| 'style' \| 'paint' \| null` | Substage (argmax) most responsible for the worst frame. Null when every substage input is missing. |
+| `vitals.loaf.script_origin_count` | `number \| null` | Distinct hosts with script activity during the worst frame. Null when no parseable `sourceURL` is present. |
+
 ### Connection context (supplementary, non-classifying)
 
 These signals are collected for cross-reference but do not feed tier classification.

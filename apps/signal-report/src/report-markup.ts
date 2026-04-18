@@ -12,6 +12,7 @@ import {
   type ReportFormFactorViewModel,
   type ReportInpStoryViewModel,
   type ReportLcpStoryViewModel,
+  type ReportLoafStoryViewModel,
   type ReportMotionMode,
   type ReportPersonaContrast,
   type ReportPersonaProfile,
@@ -833,7 +834,8 @@ function renderFunnelWaterfall(act3: ReportViewModel['act3']): string {
       // aggregate carries a defensible INP story (see §3.3 / §4.1).
       // Other nodes pass `null` so the active-node renderer stays generic.
       const inpStoryForNode = stage.key === 'inp' ? act3.inp_story : null;
-      parts.push(renderFunnelNodeActive(stage, tooltip, inpStoryForNode));
+      const loafStoryForNode = stage.key === 'inp' ? act3.loaf_story : null;
+      parts.push(renderFunnelNodeActive(stage, tooltip, inpStoryForNode, loafStoryForNode));
       previousActive = stage;
     } else {
       parts.push(renderFunnelNodeInactive(key, label, caption, tooltip));
@@ -851,7 +853,8 @@ function renderFunnelWaterfall(act3: ReportViewModel['act3']): string {
 function renderFunnelNodeActive(
   stage: ReportExperienceStageViewModel,
   tooltip: string,
-  inpStory: ReportInpStoryViewModel | null = null
+  inpStory: ReportInpStoryViewModel | null = null,
+  loafStory: ReportLoafStoryViewModel | null = null
 ): string {
   const tone = stageToneForShare(stage.weighted_poor_share);
   // Inline INP-phase caption under the threshold line. The caption stays
@@ -860,6 +863,14 @@ function renderFunnelNodeActive(
   const inpCaption =
     inpStory && stage.key === 'inp'
       ? `<p class="sr-funnel-node-story" data-hedged="${inpStory.is_hedged ? 'true' : 'false'}">${escapeHtml(inpStory.narrative)}</p>`
+      : '';
+  // LoAF inline caption sits below the INP phase line — second-layer
+  // interaction diagnosis when Chromium 123+ long-animation-frame data
+  // is present. Omitted on Safari / Firefox / older Chromium and when the
+  // aggregate's LoAF story is hedged without a clear dominant cause.
+  const loafCaption =
+    loafStory && stage.key === 'inp'
+      ? `<p class="sr-funnel-node-story sr-funnel-node-loaf" data-hedged="${loafStory.is_hedged ? 'true' : 'false'}">${escapeHtml(loafStory.narrative)}</p>`
       : '';
   return `
     <article
@@ -876,6 +887,7 @@ function renderFunnelNodeActive(
       <strong class="sr-funnel-node-metric sr-mono">${stage.weighted_poor_share}%</strong>
       <p class="sr-funnel-node-threshold sr-mono sr-mono-sm">${escapeHtml(stage.threshold_label)}</p>
       ${inpCaption}
+      ${loafCaption}
     </article>
   `;
 }

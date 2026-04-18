@@ -3866,6 +3866,15 @@ body:has(.sr-root) {
   font-style: italic;
 }
 
+/* When the LoAF caption stacks under the INP phase caption, drop the  */
+/* second border + padding so the two stories read as one attached     */
+/* block — the first line's border already separates them from the     */
+/* threshold row above.                                                */
+.sr-funnel-node-story + .sr-funnel-node-loaf {
+  border-top: 0;
+  padding-top: 0.25rem;
+}
+
 /* --------------------------------------------------------------------- */
 /* Act 2 third-party pre-race headline                                   */
 /*                                                                       */

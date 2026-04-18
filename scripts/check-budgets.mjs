@@ -42,7 +42,7 @@ for (const file of reportFiles) {
   reportWeight += fileStat.size;
 }
 
-// 248 KB envelope. Current report includes a 6-slide horizontal deck
+// 252 KB envelope. Current report includes a 6-slide horizontal deck
 // (landing + Act 1 audience + Act 2 race + Act 3 funnel waterfall +
 // Act 4 handoff), Lucide icon set, severity gauges, horizontal
 // stacked-bar signal visualisations, persistent footer with credibility
@@ -52,17 +52,17 @@ for (const file of reportFiles) {
 // the Actionable Signals slide. Iteration 7 added evidence rail,
 // credibility strip, guard range validation, strict decode, and
 // freshness provenance. Bumped from 192 KB → 224 KB → 228 KB → 232 KB
-// → 236 KB → 244 KB → 248 KB. The +8 KB at 244 KB accommodated the
-// Round 1 enrichment narrative (aggregate-side `lcp_story` /
+// → 236 KB → 244 KB → 248 KB → 252 KB. The +8 KB at 244 KB accommodated
+// the Round 1 enrichment narrative (aggregate-side `lcp_story` /
 // `inp_story` decoders, Act 2 LCP-subpart inline block, Act 3 INP-phase
 // caption). The +4 KB at 248 KB covered the Round 1 third-party story:
 // aggregate-side `third_party_story` codec + accumulator, Act 2
 // pre-race third-party headline view-model + markup, and the
 // `sr-third-party-headline` CSS block keyed by dominant tier. PR-6
-// (visibility filter + credibility bundle) fits inside the existing
-// 248 KB envelope — the new credibility-strip segments and the
-// `coverage_marginal` warning surface are markup-side only, and the
-// URL-size guards add < 200 bytes of runtime code. No budget bump.
-assertUnderBudget('signal-report static weight', reportWeight, 248 * 1024);
+// (visibility filter + credibility bundle) fit inside the 248 KB
+// envelope. PR-7 (+4 KB → 252 KB) adds the LoAF story: aggregate-side
+// `loaf_story` codec + accumulator, Act 3 LoAF inline caption keyed to
+// the INP funnel stage, and the `sr-funnel-node-loaf` CSS rule.
+assertUnderBudget('signal-report static weight', reportWeight, 252 * 1024);
 
 console.log('Bundle budgets passed.');

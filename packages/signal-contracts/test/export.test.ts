@@ -44,8 +44,13 @@ describe('exportSignalEventsToCSV', () => {
     expect(headers).toContain('inp_attribution_dominant_phase');
     expect(headers).toContain('third_party_pre_lcp_script_share_pct');
     expect(headers).toContain('third_party_origin_count');
+    expect(headers).toContain('loaf_dominant_cause');
     expect(headers).toContain('context_visibility_hidden_at_load');
     expect(headers).not.toContain('nav_type');
+    // PR-7 positional lock: loaf_dominant_cause must sit immediately before
+    // context_visibility_hidden_at_load (§1.4 append order). Downstream
+    // positional parsers are keyed to this.
+    expect(headers.indexOf('loaf_dominant_cause')).toBe(headers.indexOf('context_visibility_hidden_at_load') - 1);
   });
 
   it('produces correct row count', () => {

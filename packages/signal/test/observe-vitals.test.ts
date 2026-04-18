@@ -12,7 +12,7 @@ interface ObserverRegistration {
 const registrations = new Map<string, ObserverRegistration[]>();
 
 class MockPerformanceObserver {
-  static supportedEntryTypes = ['event', 'largest-contentful-paint', 'layout-shift', 'paint'];
+  static supportedEntryTypes = ['event', 'largest-contentful-paint', 'layout-shift', 'paint', 'long-animation-frame'];
 
   private callback: ObserverCallback;
   private registration: ObserverRegistration | null = null;
@@ -631,6 +631,85 @@ describe('observeVitals', () => {
     ]);
 
     expect(observer.snapshot().third_party?.pre_lcp_script_share_pct).toBe(0);
+  });
+
+  it('captures the worst long-animation-frame with dominant script cause', () => {
+    setupObserverTest();
+
+    const observer = observeVitals();
+    emitEntries('long-animation-frame', [
+      {
+        duration: 180,
+        startTime: 100,
+        renderStart: 250,
+        styleAndLayoutDuration: 40,
+        forcedStyleAndLayoutDuration: 10,
+        scripts: [{ duration: 120, sourceURL: 'https://cdn.example.net/app.js' }]
+      } as unknown as PerformanceEntry
+    ]);
+
+    expect(observer.snapshot().loaf).toEqual({
+      worst_duration_ms: 180,
+      dominant_cause: 'script',
+      script_origin_count: 1
+    });
+  });
+
+  it('retains only the highest-duration long-animation-frame (running max)', () => {
+    setupObserverTest();
+
+    const observer = observeVitals();
+    emitEntries('long-animation-frame', [
+      {
+        duration: 90,
+        startTime: 100,
+        renderStart: 150,
+        styleAndLayoutDuration: 20,
+        forcedStyleAndLayoutDuration: 5,
+        scripts: [{ duration: 60, sourceURL: 'https://cdn.example.net/a.js' }]
+      } as unknown as PerformanceEntry,
+      {
+        duration: 260,
+        startTime: 500,
+        renderStart: 700,
+        styleAndLayoutDuration: 180,
+        forcedStyleAndLayoutDuration: 10,
+        scripts: [{ duration: 40, sourceURL: 'https://cdn.example.net/b.js' }]
+      } as unknown as PerformanceEntry,
+      {
+        duration: 140,
+        startTime: 900,
+        renderStart: 1_000,
+        styleAndLayoutDuration: 50,
+        forcedStyleAndLayoutDuration: 10,
+        scripts: [{ duration: 80, sourceURL: 'https://cdn.example.net/c.js' }]
+      } as unknown as PerformanceEntry
+    ]);
+
+    // Middle frame (260ms, layout-dominated) must win.
+    expect(observer.snapshot().loaf).toEqual({
+      worst_duration_ms: 260,
+      dominant_cause: 'layout',
+      script_origin_count: 1
+    });
+  });
+
+  it('nulls dominant_cause when every substage input is missing', () => {
+    setupObserverTest();
+
+    const observer = observeVitals();
+    emitEntries('long-animation-frame', [
+      {
+        duration: 120,
+        startTime: 100
+      } as unknown as PerformanceEntry
+    ]);
+
+    expect(observer.snapshot().loaf).toEqual({
+      worst_duration_ms: 120,
+      dominant_cause: null,
+      script_origin_count: null
+    });
   });
 
   it('returns null third_party when LCP never fires (Safari/Firefox boundary)', () => {

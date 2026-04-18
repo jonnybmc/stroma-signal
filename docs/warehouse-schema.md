@@ -48,6 +48,7 @@ Recommended flat warehouse row shape for non-GA4 collection:
 | `inp_attribution_dominant_phase` | STRING | Nullable enum: `input_delay`, `processing`, `presentation` |
 | `third_party_pre_lcp_script_share_pct` | INT64 | Nullable 0–100 share of off-domain script weight before LCP |
 | `third_party_origin_count` | INT64 | Nullable count of distinct off-domain script origins before LCP (hidden when below privacy mask of 3) |
+| `loaf_dominant_cause` | STRING | Nullable enum (Chromium 123+): `script`, `layout`, `style`, `paint`. Null when LoAF is unsupported, no frames fired, or substage inputs were absent. |
 | `context_visibility_hidden_at_load` | BOOL | `true` when `document.visibilityState === 'hidden'` at event creation. Default report aggregation pre-filters rows where this is `true` (background-tab loads) before computing sample size, percentiles, or shares. |
 
 Do not rename the canonical metric fields if you want to keep the provided aggregation and URL-builder templates usable as-is.

@@ -54,6 +54,7 @@ const WAREHOUSE_COLUMNS: ReadonlyArray<keyof SignalWarehouseRowV1> = [
   'inp_attribution_dominant_phase',
   'third_party_pre_lcp_script_share_pct',
   'third_party_origin_count',
+  'loaf_dominant_cause',
   'context_visibility_hidden_at_load'
 ];
 

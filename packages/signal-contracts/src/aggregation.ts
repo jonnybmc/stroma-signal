@@ -14,6 +14,8 @@ import type {
   SignalLcpCulpritKind,
   SignalLcpStory,
   SignalLcpSubpart,
+  SignalLoafCause,
+  SignalLoafStory,
   SignalMetricSelectionInput,
   SignalMetricSelectionResult,
   SignalNetworkSignals,
@@ -588,6 +590,71 @@ function finalizeThirdPartyStory(acc: ThirdPartyStoryAccumulator): SignalThirdPa
   };
 }
 
+// LoAF worst-frame story. `script | layout | style | paint` mirrors the
+// capture-side attribution so aggregation and SDK label the same frames
+// the same way. Gated on SIGNAL_MIN_RACE_OBSERVATIONS to avoid narrating
+// a single stray long frame.
+const LOAF_CAUSES = ['script', 'layout', 'style', 'paint'] as const satisfies readonly SignalLoafCause[];
+const ZERO_LOAF_CAUSE_COUNTS: Record<SignalLoafCause, number> = {
+  script: 0,
+  layout: 0,
+  style: 0,
+  paint: 0
+};
+
+interface LoafStoryAccumulator {
+  observations: number;
+  causeCounts: Record<SignalLoafCause, number>;
+  worstDurationSamples: number[];
+}
+
+function createLoafStoryAccumulator(): LoafStoryAccumulator {
+  return {
+    observations: 0,
+    causeCounts: { ...ZERO_LOAF_CAUSE_COUNTS },
+    worstDurationSamples: []
+  };
+}
+
+function ingestLoafStoryEvent(acc: LoafStoryAccumulator, event: SignalEventV1): void {
+  const loaf = event.vitals.loaf;
+  if (!loaf) return;
+  const cause = loaf.dominant_cause;
+  if (!cause) return;
+  acc.observations += 1;
+  acc.causeCounts[cause] += 1;
+  if (loaf.worst_duration_ms != null && Number.isFinite(loaf.worst_duration_ms) && loaf.worst_duration_ms >= 0) {
+    acc.worstDurationSamples.push(loaf.worst_duration_ms);
+  }
+}
+
+function percentile(values: readonly number[], ratio: number): number | null {
+  if (values.length === 0) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  const index = Math.max(0, Math.ceil(sorted.length * ratio) - 1);
+  const value = sorted[index];
+  return value == null ? null : Math.round(value);
+}
+
+function finalizeLoafStory(acc: LoafStoryAccumulator): SignalLoafStory | undefined {
+  if (acc.observations < SIGNAL_MIN_RACE_OBSERVATIONS) return undefined;
+
+  let dominantCause: SignalLoafCause = LOAF_CAUSES[0];
+  let dominantCount = acc.causeCounts[LOAF_CAUSES[0]];
+  for (const cause of LOAF_CAUSES) {
+    if (acc.causeCounts[cause] > dominantCount) {
+      dominantCause = cause;
+      dominantCount = acc.causeCounts[cause];
+    }
+  }
+
+  return {
+    dominant_cause: dominantCount > 0 ? dominantCause : null,
+    dominant_cause_share_pct: asPercent(dominantCount, acc.observations),
+    worst_frame_ms_p75: percentile(acc.worstDurationSamples, 0.75)
+  };
+}
+
 function ingestLcpStoryEvent(acc: LcpStoryAccumulator, event: SignalEventV1): void {
   const culprit = event.vitals.lcp_attribution?.culprit_kind;
   if (culprit && culprit in acc.culpritCounts) {
@@ -744,6 +811,7 @@ export function aggregateSignalEvents(
   const lcpStoryAcc = createLcpStoryAccumulator();
   const inpStoryAcc = createInpStoryAccumulator();
   const thirdPartyStoryAcc = createThirdPartyStoryAccumulator();
+  const loafStoryAcc = createLoafStoryAccumulator();
 
   for (const event of reportEvents) {
     if (!hasTimestamp) {
@@ -817,6 +885,7 @@ export function aggregateSignalEvents(
     ingestLcpStoryEvent(lcpStoryAcc, event);
     ingestInpStoryEvent(inpStoryAcc, event);
     ingestThirdPartyStoryEvent(thirdPartyStoryAcc, event);
+    ingestLoafStoryEvent(loafStoryAcc, event);
   }
 
   const classifiedSampleSize = total - networkDistribution.unknown;
@@ -948,6 +1017,7 @@ export function aggregateSignalEvents(
     lcp_story: finalizeLcpStory(lcpStoryAcc),
     inp_story: finalizeInpStory(inpStoryAcc),
     third_party_story: finalizeThirdPartyStory(thirdPartyStoryAcc),
+    loaf_story: finalizeLoafStory(loafStoryAcc),
     top_page_path: computeTopPagePathFromCounts(topPathCounts),
     warnings
   };
