@@ -69,6 +69,14 @@ for (const file of reportFiles) {
 // view-model + markup with contextual tooltips translating each metric
 // into a non-technical "what this means for you" read, and the
 // `sr-act1-ctx` CSS block.
-assertUnderBudget('signal-report static weight', reportWeight, 256 * 1024);
+// Design-alignment (+32 KB → 288 KB) ports static primitives from the
+// Stroma Landing `.report` shell: self-hosted Geist-Variable.woff2
+// (~24 KB) for display surfaces, italic-serif unit suffix spans
+// (Georgia, system), accent lineage tokens (--sr-accent-2 /
+// --sr-accent-line / --sr-serif-italic), shell upgrades (--sr-radius-shell
+// 22px / --sr-shadow-xl long drop / --sr-bg-proof), and an ambient radial
+// accent glow on Act 2 hero evidence. Inter + JetBrainsMono remain system
+// fallbacks; see report-tokens.css header for the rationale.
+assertUnderBudget('signal-report static weight', reportWeight, 288 * 1024);
 
 console.log('Bundle budgets passed.');

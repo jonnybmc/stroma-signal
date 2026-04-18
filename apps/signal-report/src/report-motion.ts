@@ -647,7 +647,13 @@ function runAct2Race(runtime: MotionRuntime): void {
 
   // Wait delta counter starts after urban finishes and runs until
   // comparison finishes — the counter duration IS the gap.
-  if (!waitEl || waitDeltaMs <= 0) return;
+  if (!waitEl) return;
+  if (waitDeltaMs <= 0) {
+    // Zero-delta edge: no count-up, but the hero still needs its italic
+    // unit restored so it does not read as raw plain text on landing.
+    waitEl.innerHTML = renderHeroValueHtml(waitEl.dataset.waitFinal ?? '0.0s');
+    return;
+  }
   const finalLabel = waitEl.dataset.waitFinal ?? waitEl.textContent ?? '';
   const counterDurationMs = Math.max(500, comparisonFillMs - urbanFillMs);
 
@@ -656,15 +662,33 @@ function runAct2Race(runtime: MotionRuntime): void {
     const animate = (now: number): void => {
       const elapsed = Math.min(1, (now - startAt) / counterDurationMs);
       const seconds = (waitDeltaMs / 1000) * elapsed;
+      // Plain text during tick is deliberate — keeps the count-up crisp
+      // and lets the italic-serif unit suffix pop in on landing.
       waitEl.textContent = `${seconds.toFixed(1)}s`;
       if (elapsed < 1) {
         window.requestAnimationFrame(animate);
       } else {
-        waitEl.textContent = finalLabel;
+        waitEl.innerHTML = renderHeroValueHtml(finalLabel);
       }
     };
     window.requestAnimationFrame(animate);
   }, urbanFillMs);
+}
+
+// Duplicate of the markup-side renderHeroValue (kept local to avoid
+// cross-module imports in the motion hot path). Splits a pre-formatted
+// measurement like "3.7s" / "45%" into a numeric body and an italic-serif
+// unit suffix. Falls through to plain text for "n/a" / "—".
+const HERO_VALUE_SPLITTER = /^(-?\d+(?:[.,]\d+)?)(ms|s|%|K|M|B)$/;
+function renderHeroValueHtml(text: string): string {
+  const match = HERO_VALUE_SPLITTER.exec(text.trim());
+  if (!match) return escapeHtmlMinimal(text);
+  const [, value, unit] = match;
+  if (!value || !unit) return escapeHtmlMinimal(text);
+  return `${escapeHtmlMinimal(value)}<span class="sr-unit" aria-hidden="true">${escapeHtmlMinimal(unit)}</span>`;
+}
+function escapeHtmlMinimal(input: string): string {
+  return input.replace(/[&<>]/g, (ch) => (ch === '&' ? '&amp;' : ch === '<' ? '&lt;' : '&gt;'));
 }
 
 function runAct3Counter(runtime: MotionRuntime): void {
@@ -672,7 +696,7 @@ function runAct3Counter(runtime: MotionRuntime): void {
   if (!counter) return;
   const final = Number(counter.dataset.counterFinal ?? '0');
   if (!Number.isFinite(final) || final <= 0) {
-    counter.textContent = `${Number.isFinite(final) ? final : 0}%`;
+    counter.innerHTML = renderHeroValueHtml(`${Number.isFinite(final) ? final : 0}%`);
     return;
   }
   const durationMs = 1200;
@@ -685,7 +709,7 @@ function runAct3Counter(runtime: MotionRuntime): void {
     if (elapsed < 1) {
       window.requestAnimationFrame(animate);
     } else {
-      counter.textContent = `${final}%`;
+      counter.innerHTML = renderHeroValueHtml(`${final}%`);
     }
   };
   window.requestAnimationFrame(animate);

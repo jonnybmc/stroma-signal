@@ -125,22 +125,22 @@ body:has(.sr-root) {
 
 .sr-hero {
   margin: 0.5rem 0 var(--sr-space-3);
-  font-family: var(--sr-sans);
+  font-family: var(--sr-display);
   font-size: var(--sr-type-hero);
-  font-weight: 700;
-  letter-spacing: -0.03em;
-  line-height: 1;
+  font-weight: 600;
+  letter-spacing: -0.042em;
+  line-height: 0.94;
   color: var(--sr-fg);
   text-wrap: balance;
 }
 
 .sr-act-title {
   margin: 0.5rem 0 var(--sr-space-3);
-  font-family: var(--sr-sans);
+  font-family: var(--sr-display);
   font-size: var(--sr-type-act);
   font-weight: 600;
-  letter-spacing: -0.02em;
-  line-height: 1.1;
+  letter-spacing: -0.025em;
+  line-height: 1.04;
   color: var(--sr-fg);
   text-wrap: balance;
   max-width: 24ch;
@@ -247,6 +247,26 @@ body:has(.sr-root) {
 
 .sr-mono-lg {
   font-size: var(--sr-type-mono-lg);
+}
+
+/* Italic-serif unit suffix — ported from the Stroma Landing `.report-value
+ * .unit` treatment. Wraps the trailing measurement unit (s, ms, %) on hero
+ * numbers in a Georgia italic glyph at 0.55em, coloured with the brighter
+ * accent-2 variant. The single "premium" accent in the type system.
+ * Targets use .sr-mono on the parent; .sr-unit resets the monospace
+ * inheritance so the italic serif lands properly. */
+.sr-unit {
+  font-family: var(--sr-serif-italic);
+  font-style: italic;
+  font-weight: 400;
+  font-size: 0.55em;
+  letter-spacing: 0;
+  color: var(--sr-accent-2);
+  margin-left: 0.15em;
+  vertical-align: baseline;
+  text-shadow: none;
+  font-variant-numeric: normal;
+  font-feature-settings: normal;
 }
 
 /* -------- Deck container + slide mechanics ---------------------------- */
@@ -2102,10 +2122,11 @@ body:has(.sr-root) {
 }
 
 .sr-takeaway-number {
+  font-family: var(--sr-display);
   font-size: clamp(3rem, 8vw, 5.25rem);
   line-height: 1;
-  font-weight: 700;
-  letter-spacing: -0.02em;
+  font-weight: 600;
+  letter-spacing: -0.025em;
   color: var(--sr-fg);
 }
 
@@ -2329,6 +2350,35 @@ body:has(.sr-root) {
   gap: clamp(1rem, 2vh, 1.5rem);
 }
 
+/* Ambient radial accent glow — ported from the Stroma Landing `.proof::before`
+ * treatment. Two soft radial gradients keyed to the mood accent create a
+ * sense of depth around the race stage without competing with the hero
+ * numbers. Purely atmospheric; no animation, no pointer events. Low
+ * saturation so the effect reads as stage lighting, not chrome. */
+.sr-act-2::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(
+      900px 440px at 20% 8%,
+      color-mix(in srgb, var(--sr-accent) 14%, transparent),
+      transparent 58%
+    ),
+    radial-gradient(
+      700px 360px at 100% 92%,
+      color-mix(in srgb, var(--sr-accent) 10%, transparent),
+      transparent 60%
+    );
+  pointer-events: none;
+  z-index: 0;
+}
+
+.sr-act-2 > * {
+  position: relative;
+  z-index: 1;
+}
+
 .sr-act-2 .sr-act-header {
   gap: 0.5rem;
   text-align: center;
@@ -2391,10 +2441,11 @@ body:has(.sr-root) {
 /* Wait delta is the scene's hero number. Give it presence without       */
 /* stealing the stage from the two devices racing on either side.        */
 .sr-wait-value {
+  font-family: var(--sr-display);
   font-size: clamp(2.75rem, 6vw, 4.5rem);
   line-height: 1;
-  font-weight: 700;
-  letter-spacing: -0.02em;
+  font-weight: 600;
+  letter-spacing: -0.025em;
   color: var(--sr-tier-constrained);
   text-shadow: 0 0 14px color-mix(in srgb, var(--sr-tier-constrained) 18%, transparent);
 }
@@ -2762,10 +2813,11 @@ body:has(.sr-root) {
 }
 
 .sr-lane-time {
+  font-family: var(--sr-display);
   font-size: clamp(1.25rem, 2vw, 1.75rem);
   color: var(--sr-fg);
-  font-weight: 700;
-  letter-spacing: -0.02em;
+  font-weight: 600;
+  letter-spacing: -0.025em;
   text-align: center;
   word-break: keep-all;
 }
@@ -3405,10 +3457,11 @@ body:has(.sr-root) {
 }
 
 .sr-act3-hero .sr-takeaway-number {
+  font-family: var(--sr-display);
   font-size: clamp(3.5rem, 8vw, 5.5rem);
   line-height: 1;
   color: var(--sr-accent);
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: -0.03em;
   text-shadow: 0 0 20px var(--sr-accent-soft);
 }

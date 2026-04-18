@@ -1,3 +1,15 @@
+/* Geist Variable is loaded here (served from /fonts) as the display face.
+ * Budget: ~24 KB woff2, self-hosted, swap behaviour. Inter + JetBrainsMono
+ * stay as system fallback to hold the static weight under the 280 KB cap
+ * documented in scripts/check-budgets.mjs. */
+@font-face {
+  font-family: "Geist";
+  src: url("/fonts/Geist-Variable.woff2") format("woff2-variations");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   color-scheme: dark;
 
@@ -28,6 +40,10 @@
   /* Mood accent alias — resolves per [data-mood] below. Default: sober. */
   --sr-accent: var(--sr-tier-constrained-moderate);
   --sr-accent-soft: color-mix(in srgb, var(--sr-accent) 18%, transparent);
+  /* Brighter alias used for italic-serif unit markers and secondary bars.
+   * Mood blocks override per accent. Default matches sober (watch tone). */
+  --sr-accent-2: color-mix(in srgb, var(--sr-accent) 72%, #ffffff 28%);
+  --sr-accent-line: color-mix(in srgb, var(--sr-accent) 34%, transparent);
 
   /* Stroma brand — used in Act 4 horizon where the product introduces     */
   /* itself. Distinct from mood accent so the brand identity is consistent  */
@@ -36,17 +52,22 @@
   --sr-brand-soft: color-mix(in srgb, var(--sr-brand) 18%, transparent);
   --sr-brand-glow: color-mix(in srgb, var(--sr-brand) 28%, transparent);
 
-  /* Typography — system fonts only to honour the 150KB static budget in
-   * scripts/check-budgets.mjs. Modern OSes ship premium sans and mono
-   * faces by default; Inter + JetBrains Mono can be added later by
-   * bumping the budget and dropping woff2 into public/fonts/.
+  /* Typography. Geist loads from /fonts (self-hosted, ~24 KB); Inter +
+   * system mono remain as fallbacks. --sr-display is the editorial
+   * face for hero numbers and act titles; --sr-sans handles body. The
+   * italic-serif face is Georgia (system everywhere) and is reserved
+   * for unit suffixes and emphasis ems — the single "premium" accent.
    */
+  --sr-display:
+    "Geist", "Inter Variable", "Inter", system-ui, -apple-system,
+    "Segoe UI Variable", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --sr-sans:
     "Inter Variable", "Inter", system-ui, -apple-system, "Segoe UI Variable",
     "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --sr-mono:
     ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
     "JetBrains Mono", "Liberation Mono", monospace;
+  --sr-serif-italic: "Georgia", "Times New Roman", serif;
 
   /* Type scale */
   --sr-type-hero: clamp(2.75rem, 6vw, 4.5rem);
@@ -117,6 +138,19 @@
     0 18px 40px rgba(0, 0, 0, 0.55);
   --sr-shadow-accent:
     0 12px 28px color-mix(in srgb, var(--sr-accent) 22%, transparent);
+  /* Long-drop shell shadow used by hero evidence panels. Matches the
+   * Stroma Landing `.report` shell — subtle, deep, never decorative. */
+  --sr-shadow-xl: 0 40px 80px -40px rgba(0, 0, 0, 0.6);
+
+  /* Premium shell radii — larger than card radii to distinguish a hero
+   * evidence shell from a nested card. */
+  --sr-radius-shell: 22px;
+  --sr-radius-card: 16px;
+
+  /* Proof surface — marginally cooler / violet-biased than --sr-bg so
+   * hero evidence panels recede from the stage behind them. Used for
+   * the Act-level shell that frames the scene-defining numbers. */
+  --sr-bg-proof: #0a0812;
 
   /* Icon sizes — mirror the type scale so icons align to baselines. */
   --sr-icon-size-sm: 0.875rem;
@@ -182,14 +216,20 @@
 .sr-root[data-mood="urgent"] {
   --sr-accent: var(--sr-tier-constrained);
   --sr-accent-soft: color-mix(in srgb, var(--sr-tier-constrained) 22%, transparent);
+  --sr-accent-2: color-mix(in srgb, var(--sr-tier-constrained) 66%, #ffffff 34%);
+  --sr-accent-line: color-mix(in srgb, var(--sr-tier-constrained) 36%, transparent);
 }
 .sr-root[data-mood="sober"] {
   --sr-accent: var(--sr-tier-constrained-moderate);
   --sr-accent-soft: color-mix(in srgb, var(--sr-tier-constrained-moderate) 18%, transparent);
+  --sr-accent-2: color-mix(in srgb, var(--sr-tier-constrained-moderate) 70%, #ffffff 30%);
+  --sr-accent-line: color-mix(in srgb, var(--sr-tier-constrained-moderate) 34%, transparent);
 }
 .sr-root[data-mood="affirming"] {
   --sr-accent: var(--sr-tier-moderate);
   --sr-accent-soft: color-mix(in srgb, var(--sr-tier-moderate) 18%, transparent);
+  --sr-accent-2: color-mix(in srgb, var(--sr-tier-moderate) 66%, #ffffff 34%);
+  --sr-accent-line: color-mix(in srgb, var(--sr-tier-moderate) 34%, transparent);
 }
 
 /* Reduced motion collapses durations end-to-end. */

@@ -351,6 +351,18 @@ export function formatMetricDuration(value: number | null): string {
   return value >= 1000 ? `${(value / 1000).toFixed(1)}s` : `${value}ms`;
 }
 
+// Splits a pre-formatted measurement (e.g. "4.2s", "2100ms", "45%", "3K")
+// into its numeric body and trailing unit characters. "n/a" / "—" / empty
+// return no unit. Powers the italic-serif unit-suffix treatment on hero
+// numbers in the report markup — see `.sr-unit` in report-immersive.css.
+const VALUE_UNIT_SPLITTER = /^(-?\d+(?:[.,]\d+)?)(ms|s|%|K|M|B)$/;
+export function splitValueUnit(text: string): { value: string; unit: string } {
+  const match = VALUE_UNIT_SPLITTER.exec(text.trim());
+  if (!match) return { value: text, unit: '' };
+  const [, value, unit] = match;
+  return { value: value ?? text, unit: unit ?? '' };
+}
+
 export function selectMotionMode(prefersReducedMotion: boolean): ReportMotionMode {
   return prefersReducedMotion ? 'reduced' : 'full';
 }

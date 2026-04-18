@@ -19,8 +19,19 @@ import {
   type ReportPersonaProfile,
   type ReportThirdPartyStoryViewModel,
   type ReportTierVisual,
-  type ReportViewModel
+  type ReportViewModel,
+  splitValueUnit
 } from './report-view-model';
+
+// Renders a hero number with the trailing unit wrapped in an italic-serif
+// span — the editorial "premium" accent ported from the Stroma Landing
+// `.report-value .unit` treatment. Returns escaped HTML; safe to inline
+// inside any hero-number slot (wait delta, lane time, takeaway counter).
+function renderHeroValue(text: string): string {
+  const { value, unit } = splitValueUnit(text);
+  if (!unit) return escapeHtml(value);
+  return `${escapeHtml(value)}<span class="sr-unit" aria-hidden="true">${escapeHtml(unit)}</span>`;
+}
 
 type SeverityTone = 'steady' | 'watch' | 'alert';
 
@@ -700,7 +711,7 @@ function renderAct2(viewModel: ReportViewModel): string {
         </header>
         ${renderDevice('premium', 'urban-progress')}
         <strong class="sr-mono sr-lane-time" data-role="urban-time">
-          ${escapeHtml(formatMetricDuration(race.urban_ms))}
+          ${renderHeroValue(formatMetricDuration(race.urban_ms))}
         </strong>
       </article>
 
@@ -709,7 +720,7 @@ function renderAct2(viewModel: ReportViewModel): string {
         <p class="sr-eyebrow sr-wait-eyebrow">Wait delta</p>
         <strong class="sr-mono sr-wait-value" data-role="wait-delta" data-wait-final="${escapeHtml(
           race.wait_delta_seconds
-        )}">${escapeHtml(race.wait_delta_seconds)}</strong>
+        )}">${renderHeroValue(race.wait_delta_seconds)}</strong>
         <div class="sr-delta-chip" data-tone="${tone}">
           ${renderIcon('trendingUp', 'sr-icon sr-icon-sm')}
           <span class="sr-delta-chip-abs sr-mono">+${escapeHtml(race.wait_delta_seconds)}</span>
@@ -731,7 +742,7 @@ function renderAct2(viewModel: ReportViewModel): string {
         </header>
         ${renderDevice('budget', 'comparison-progress')}
         <strong class="sr-mono sr-lane-time" data-role="comparison-time">
-          ${escapeHtml(formatMetricDuration(race.comparison_ms))}
+          ${renderHeroValue(formatMetricDuration(race.comparison_ms))}
         </strong>
       </article>
     </div>
@@ -1037,7 +1048,7 @@ function renderAct3(viewModel: ReportViewModel): string {
         ? 'Measurable performance cliff'
         : 'Controlled performance cliff';
   const heroNumber = hasPoor
-    ? `<strong class="sr-takeaway-number sr-counter sr-mono" data-role="counter" data-counter-final="${poorShare}">${poorShare}%</strong>`
+    ? `<strong class="sr-takeaway-number sr-counter sr-mono" data-role="counter" data-counter-final="${poorShare}">${poorShare}<span class="sr-unit" aria-hidden="true">%</span></strong>`
     : '<strong class="sr-takeaway-number sr-mono sr-takeaway-absent" aria-label="No measured poor-session share available">—</strong>';
   const heroCaption = hasPoor
     ? 'of classified sessions crossed a poor-performance threshold.'
