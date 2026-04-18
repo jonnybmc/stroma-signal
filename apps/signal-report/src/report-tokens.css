@@ -152,6 +152,22 @@
    * the Act-level shell that frames the scene-defining numbers. */
   --sr-bg-proof: #0a0812;
 
+  /* Report-grid primitives, ported from the Stroma Landing `.report-grid`
+   * rhythm. Divider-based column separation (gap: 0 + hairline border)
+   * reads as editorial page rather than dashboard chrome. The tier-row
+   * primitive mirrors `.tier-row` on that page: mono label, pill bar,
+   * display-face number. */
+  --sr-grid-shell-ratio: 1.2fr 1fr 1fr;
+  --sr-grid-divider: 1px solid var(--sr-border);
+  --sr-tier-row-cols: 68px 1fr 56px;
+  --sr-bar-gradient: linear-gradient(90deg, var(--sr-accent), var(--sr-accent-2));
+  --sr-bar-flat: var(--sr-accent);
+
+  /* Slide-level atmospheric glow alpha — tuned per mood below. Primary
+   * sits top-left, secondary bottom-right (dual-radial composition). */
+  --sr-glow-alpha-primary: 0.14;
+  --sr-glow-alpha-secondary: 0.1;
+
   /* Icon sizes — mirror the type scale so icons align to baselines. */
   --sr-icon-size-sm: 0.875rem;
   --sr-icon-size-md: 1rem;
@@ -218,18 +234,24 @@
   --sr-accent-soft: color-mix(in srgb, var(--sr-tier-constrained) 22%, transparent);
   --sr-accent-2: color-mix(in srgb, var(--sr-tier-constrained) 66%, #ffffff 34%);
   --sr-accent-line: color-mix(in srgb, var(--sr-tier-constrained) 36%, transparent);
+  --sr-glow-alpha-primary: 0.18;
+  --sr-glow-alpha-secondary: 0.12;
 }
 .sr-root[data-mood="sober"] {
   --sr-accent: var(--sr-tier-constrained-moderate);
   --sr-accent-soft: color-mix(in srgb, var(--sr-tier-constrained-moderate) 18%, transparent);
   --sr-accent-2: color-mix(in srgb, var(--sr-tier-constrained-moderate) 70%, #ffffff 30%);
   --sr-accent-line: color-mix(in srgb, var(--sr-tier-constrained-moderate) 34%, transparent);
+  --sr-glow-alpha-primary: 0.14;
+  --sr-glow-alpha-secondary: 0.1;
 }
 .sr-root[data-mood="affirming"] {
   --sr-accent: var(--sr-tier-moderate);
   --sr-accent-soft: color-mix(in srgb, var(--sr-tier-moderate) 18%, transparent);
   --sr-accent-2: color-mix(in srgb, var(--sr-tier-moderate) 66%, #ffffff 34%);
   --sr-accent-line: color-mix(in srgb, var(--sr-tier-moderate) 34%, transparent);
+  --sr-glow-alpha-primary: 0.11;
+  --sr-glow-alpha-secondary: 0.08;
 }
 
 /* Reduced motion collapses durations end-to-end. */

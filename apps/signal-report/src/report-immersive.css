@@ -309,6 +309,126 @@ body:has(.sr-root) {
   transition: none;
 }
 
+/* Slide-level atmospheric glow — ported from the Stroma Landing `.proof`
+ * treatment. Dual radial gradients, mood-keyed alpha, fade in on slide
+ * entry via the data-visible gate. Atmospheric only; no pointer events.
+ * Primitives for `.sr-act-title` underline, `.sr-italic-serif` utility,
+ * and the `.sr-proof-grid` / `.sr-tier-row` / `.sr-bar` editorial rhythm
+ * ported alongside live here as a self-contained block. */
+.sr-slide::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(900px 440px at 20% 8%,
+      oklch(from var(--sr-accent) l c h / var(--sr-glow-alpha-primary)),
+      transparent 58%),
+    radial-gradient(700px 360px at 100% 92%,
+      oklch(from var(--sr-accent) l c h / var(--sr-glow-alpha-secondary)),
+      transparent 60%);
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0;
+  transition: opacity 820ms var(--sr-ease-out);
+}
+.sr-slide[data-visible="true"]::before { opacity: 1; }
+.sr-slide > * { position: relative; z-index: 1; }
+
+.sr-slide .sr-act-title::after {
+  content: "";
+  display: block;
+  height: 1px;
+  width: 0;
+  margin-top: 10px;
+  background: var(--sr-accent-line);
+  transition: width 620ms var(--sr-ease-out) 120ms;
+}
+.sr-slide[data-visible="true"] .sr-act-title::after {
+  width: clamp(48px, 8vw, 96px);
+}
+
+.sr-italic-serif {
+  font-family: var(--sr-serif-italic);
+  font-style: italic;
+  letter-spacing: -0.01em;
+  color: var(--sr-accent-2);
+}
+
+.sr-proof-grid {
+  display: grid;
+  grid-template-columns: var(--sr-grid-shell-ratio);
+  gap: 0;
+  width: 100%;
+}
+.sr-proof-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 8px clamp(16px, 2vw, 24px);
+  border-right: var(--sr-grid-divider);
+}
+.sr-proof-cell:last-child { border-right: none; }
+
+.sr-tier-row {
+  display: grid;
+  grid-template-columns: var(--sr-tier-row-cols);
+  gap: 10px;
+  align-items: center;
+}
+.sr-tier-row__tag {
+  font-family: var(--sr-mono);
+  font-size: var(--sr-type-01);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--sr-fg-muted);
+}
+.sr-tier-row__num {
+  font-family: var(--sr-display);
+  font-size: var(--sr-type-05);
+  font-weight: 500;
+  color: var(--sr-fg);
+  text-align: right;
+  letter-spacing: -0.02em;
+}
+
+.sr-bar {
+  position: relative;
+  height: 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--sr-fg) 8%, transparent);
+  overflow: hidden;
+}
+.sr-bar__fill {
+  position: absolute;
+  inset: 0;
+  width: var(--bar-width, 0%);
+  background: var(--sr-bar-gradient);
+  border-radius: inherit;
+}
+.sr-bar__fill[data-bar-tone="flat"] { background: var(--sr-bar-flat); }
+
+@media (max-width: 760px) {
+  .sr-proof-grid { grid-template-columns: 1fr; }
+  .sr-proof-cell {
+    border-right: none;
+    border-bottom: var(--sr-grid-divider);
+  }
+  .sr-proof-cell:last-child { border-bottom: none; }
+}
+
+.sr-root[data-motion="reduced"] .sr-slide::before,
+.sr-root[data-motion="reduced"] .sr-slide .sr-act-title::after {
+  transition: none;
+}
+.sr-root[data-motion="reduced"] .sr-slide .sr-act-title::after {
+  width: clamp(48px, 8vw, 96px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .sr-slide::before,
+  .sr-slide .sr-act-title::after { transition: none; }
+  .sr-slide .sr-act-title::after { width: clamp(48px, 8vw, 96px); }
+}
+
 /* Mobile fallback: revert to the original scroll-driven experience. */
 @media (max-width: 1023px) {
   .sr-deck {
@@ -2350,30 +2470,9 @@ body:has(.sr-root) {
   gap: clamp(1rem, 2vh, 1.5rem);
 }
 
-/* Ambient radial accent glow — ported from the Stroma Landing `.proof::before`
- * treatment. Two soft radial gradients keyed to the mood accent create a
- * sense of depth around the race stage without competing with the hero
- * numbers. Purely atmospheric; no animation, no pointer events. Low
- * saturation so the effect reads as stage lighting, not chrome. */
-.sr-act-2::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background:
-    radial-gradient(
-      900px 440px at 20% 8%,
-      color-mix(in srgb, var(--sr-accent) 14%, transparent),
-      transparent 58%
-    ),
-    radial-gradient(
-      700px 360px at 100% 92%,
-      color-mix(in srgb, var(--sr-accent) 10%, transparent),
-      transparent 60%
-    );
-  pointer-events: none;
-  z-index: 0;
-}
-
+/* Act 2 keeps its own z-context for back-compat; the atmospheric glow is
+ * now owned by the slide-level `.sr-slide::before` primitive defined
+ * earlier in this file. */
 .sr-act-2 > * {
   position: relative;
   z-index: 1;

@@ -77,6 +77,15 @@ for (const file of reportFiles) {
 // 22px / --sr-shadow-xl long drop / --sr-bg-proof), and an ambient radial
 // accent glow on Act 2 hero evidence. Inter + JetBrainsMono remain system
 // fallbacks; see report-tokens.css header for the rationale.
-assertUnderBudget('signal-report static weight', reportWeight, 288 * 1024);
+// Motion-alignment PR-1 (+4 KB → 292 KB) ports the deeper `.report.reveal.in`
+// static lineage: grid rhythm tokens (--sr-grid-shell-ratio,
+// --sr-tier-row-cols, --sr-bar-gradient, --sr-glow-alpha-primary /
+// -secondary), `.sr-proof-grid` / `.sr-proof-cell` / `.sr-tier-row` /
+// `.sr-bar` primitives ready for targeted markup migrations, `.sr-italic-serif`
+// utility, act-title underline sweep, and the dual radial glow promoted from
+// Act-2-only to a slide-level `.sr-slide::before` primitive gated on
+// `data-visible="true"`. PR-2 (entrance motion) will bump again for the
+// bar-sweep / funnel-cascade / slide-entry glow-pulse layer.
+assertUnderBudget('signal-report static weight', reportWeight, 292 * 1024);
 
 console.log('Bundle budgets passed.');
