@@ -808,6 +808,11 @@ function markSlideVisible(runtime: MotionRuntime, index: number): void {
   if (runtime.deck.visitedSlides.has(index)) {
     slide.setAttribute('data-visited', 'true');
   }
+  // Brief brightness-pulse gesture that settles alongside the 820ms
+  // radial glow fade-in. The class carries its own animation; we remove
+  // it so repeat visits don't stack redundant animations.
+  slide.classList.add('sr-slide--entering');
+  window.setTimeout(() => slide.classList.remove('sr-slide--entering'), 820);
 }
 
 function navigateToSlide(runtime: MotionRuntime, rawIndex: number, options: { fromHistory?: boolean } = {}): void {

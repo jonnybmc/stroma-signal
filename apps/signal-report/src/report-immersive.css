@@ -416,17 +416,80 @@ body:has(.sr-root) {
   .sr-proof-cell:last-child { border-bottom: none; }
 }
 
+/* Entrance motion — slide-entry brightness pulse and eyebrow pop-in.
+ * `.sr-slide--entering` is toggled by motion.ts for 820ms when a slide's
+ * `data-visible` flips; it adds a subtle brightness overshoot that
+ * settles back to 1 in sync with the radial glow fade-in. The eyebrow
+ * atom scale-pops in at a 200ms delay so the marker lands after the
+ * title underline starts sweeping. Bar-sweep primitive is available
+ * via `[data-bar-sweep]` for incremental adoption on rail-style bars. */
+.sr-slide--entering {
+  animation: sr-slide-entry 820ms var(--sr-ease-out) both;
+}
+
+@keyframes sr-slide-entry {
+  0% { filter: brightness(1.08); }
+  100% { filter: brightness(1); }
+}
+
+.sr-slide .sr-eyebrow {
+  transform: scale(0.92);
+  opacity: 0;
+  transform-origin: left center;
+  transition:
+    transform 360ms var(--sr-ease-out) 200ms,
+    opacity 360ms var(--sr-ease-out) 200ms;
+}
+.sr-slide[data-visible="true"] .sr-eyebrow {
+  transform: none;
+  opacity: 1;
+}
+
+.sr-bar__fill[data-bar-sweep] {
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform var(--sr-motion-bar-sweep, 720ms) var(--sr-ease-out);
+  transition-delay: calc(var(--bar-sweep-order, 0) * 80ms);
+}
+.sr-slide[data-visible="true"] .sr-bar__fill[data-bar-sweep] {
+  transform: scaleX(1);
+}
+
 .sr-root[data-motion="reduced"] .sr-slide::before,
-.sr-root[data-motion="reduced"] .sr-slide .sr-act-title::after {
+.sr-root[data-motion="reduced"] .sr-slide .sr-act-title::after,
+.sr-root[data-motion="reduced"] .sr-slide .sr-eyebrow,
+.sr-root[data-motion="reduced"] .sr-slide .sr-bar__fill[data-bar-sweep] {
   transition: none;
+  animation: none;
 }
 .sr-root[data-motion="reduced"] .sr-slide .sr-act-title::after {
   width: clamp(48px, 8vw, 96px);
 }
+.sr-root[data-motion="reduced"] .sr-slide .sr-eyebrow,
+.sr-root[data-motion="reduced"] .sr-slide .sr-bar__fill[data-bar-sweep] {
+  transform: none;
+  opacity: 1;
+}
+.sr-root[data-motion="reduced"] .sr-slide--entering {
+  animation: none;
+  filter: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .sr-slide::before,
-  .sr-slide .sr-act-title::after { transition: none; }
+  .sr-slide .sr-act-title::after,
+  .sr-slide .sr-eyebrow,
+  .sr-slide .sr-bar__fill[data-bar-sweep] {
+    transition: none;
+    animation: none;
+  }
   .sr-slide .sr-act-title::after { width: clamp(48px, 8vw, 96px); }
+  .sr-slide .sr-eyebrow,
+  .sr-slide .sr-bar__fill[data-bar-sweep] {
+    transform: none;
+    opacity: 1;
+  }
+  .sr-slide--entering { animation: none; filter: none; }
 }
 
 /* Mobile fallback: revert to the original scroll-driven experience. */
