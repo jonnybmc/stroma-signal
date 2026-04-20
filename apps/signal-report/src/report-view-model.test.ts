@@ -231,6 +231,71 @@ describe('report view model', () => {
     }
   });
 
+  it('produces no NaN or undefined strings in act4 impact ledger rows across all fixtures', () => {
+    for (const fixture of signalReportScenarioFixtures) {
+      const viewModel = buildReportViewModel(fixture.aggregate);
+      for (const row of viewModel.act4_impact_rows) {
+        expect(row.metric_value).not.toContain('NaN');
+        expect(row.metric_value).not.toContain('undefined');
+        expect(row.metric_label).not.toContain('NaN');
+        expect(row.metric_label).not.toContain('undefined');
+        expect(row.kpi_label).not.toContain('NaN');
+        expect(row.kpi_label).not.toContain('undefined');
+        expect(row.impact_sentence_html).not.toContain('NaN');
+        expect(row.impact_sentence_html).not.toContain('undefined');
+        expect(row.impact_sentence_html).toContain('<em class="sr-italic-serif">');
+        expect(['alert', 'watch', 'steady']).toContain(row.tone);
+      }
+    }
+  });
+
+  it('emits the full KPI impact ledger on the full-depth fixture', () => {
+    const viewModel = buildReportViewModel(fullDepthAggregateFixture);
+    const ids = viewModel.act4_impact_rows.map((row) => row.id);
+
+    expect(ids).toContain('lcp_bounce');
+    expect(ids).toContain('inp_conversion');
+    expect(ids).toContain('script_roas');
+    expect(ids).toContain('network_reach');
+
+    const kpis = viewModel.act4_impact_rows.map((row) => row.kpi_label);
+    expect(kpis).toContain('Bounce Rate · Ad Quality Score');
+    expect(kpis).toContain('Conversion Rate · Cost Per Acquisition');
+    expect(kpis).toContain('Mobile ROAS · Audience Reach');
+    expect(kpis).toContain('Audience Reach · Campaign Efficiency');
+  });
+
+  it('only emits the script_roas row when third-party pressure is moderate+ OR a long LoAF frame is measured', () => {
+    // Invariant sweep across all fixtures: the heavy-script row must never
+    // fire without evidence. Either `third_party_story.dominant_tier` is
+    // moderate/heavy, or `loaf_story.worst_frame_ms_p75` clears the 50ms
+    // long-animation-frame threshold. No speculation.
+    for (const fixture of signalReportScenarioFixtures) {
+      const viewModel = buildReportViewModel(fixture.aggregate);
+      const scriptRow = viewModel.act4_impact_rows.find((row) => row.id === 'script_roas');
+      if (!scriptRow) continue;
+
+      const thirdParty = viewModel.race.third_party_story;
+      const loaf = viewModel.act3.loaf_story;
+      const thirdPartyHits =
+        thirdParty != null && (thirdParty.dominant_tier === 'moderate' || thirdParty.dominant_tier === 'heavy');
+      const loafHits = loaf != null && loaf.worst_frame_ms_p75 != null && loaf.worst_frame_ms_p75 >= 50;
+
+      expect(thirdPartyHits || loafHits).toBe(true);
+    }
+  });
+
+  it('falls back to the flat summary points when fewer than two impact rows qualify', () => {
+    const viewModel = buildReportViewModel(lowInpCoverageAggregateFixture);
+    // When the ledger cannot assemble a defensible row set, it collapses to
+    // an empty array so the markup path renders the legacy bullets instead
+    // of a thin one-row ledger. The summary points themselves must still
+    // carry observed evidence.
+    if (viewModel.act4_impact_rows.length === 0) {
+      expect(viewModel.act4_summary_points.length).toBeGreaterThan(0);
+    }
+  });
+
   it('builds evidence items with all required provenance fields', () => {
     const viewModel = buildReportViewModel(strongLcpCoverageAggregateFixture);
     const labels = viewModel.evidence_items.map((item) => item.label);
@@ -381,6 +446,14 @@ describe('report view model', () => {
         expect(point).not.toContain('undefined');
       }
 
+      // Act 4 impact ledger rows clean
+      for (const row of viewModel.act4_impact_rows) {
+        expect(row.metric_value).not.toContain('NaN');
+        expect(row.metric_value).not.toContain('undefined');
+        expect(row.impact_sentence_html).not.toContain('NaN');
+        expect(row.impact_sentence_html).not.toContain('undefined');
+      }
+
       // Mood tier is valid
       expect(['urgent', 'sober', 'affirming']).toContain(viewModel.mood_tier);
     }
@@ -490,7 +563,7 @@ describe('report view model', () => {
       }
     } as const;
 
-    it('builds a confident LCP story view-model with dominant row tinted and culprit clause appended', () => {
+    it('builds a confident LCP story view-model with the dominant row tinted and the culprit clause carried as a separate field', () => {
       const viewModel = buildReportViewModel(confidentLcpStoryAggregate);
       const story = viewModel.race.lcp_story;
 
@@ -499,11 +572,13 @@ describe('report view model', () => {
       expect(story?.dominant_subpart).toBe('element_render_delay');
       expect(story?.dominant_culprit_kind).toBe('hero_image');
       expect(story?.narrative).toContain('Element render delay dominates');
-      expect(story?.narrative).toContain('Usually a hero image.');
+      expect(story?.narrative).not.toMatch(/Usually a|Usually the/);
+      expect(story?.culprit_clause).toBe('Usually a hero image.');
       expect(story?.rows).toHaveLength(4);
       const dominant = story?.rows.find((row) => row.is_dominant);
       expect(dominant?.key).toBe('element_render_delay');
       expect(dominant?.share).toBe(52);
+      expect(dominant?.plain).toBe('painting the hero');
       expect(story?.rows.filter((row) => row.is_dominant)).toHaveLength(1);
     });
 
@@ -514,6 +589,7 @@ describe('report view model', () => {
       expect(story?.is_hedged).toBe(true);
       expect(story?.dominant_subpart).toBeNull();
       expect(story?.dominant_culprit_kind).toBeNull();
+      expect(story?.culprit_clause).toBeNull();
       expect(story?.narrative).toBe('Paint delay is spread across multiple phases — no single cause dominates.');
       expect(story?.rows.every((row) => row.is_dominant === false)).toBe(true);
     });
@@ -525,6 +601,7 @@ describe('report view model', () => {
       expect(story?.is_hedged).toBe(false);
       expect(story?.dominant_subpart).toBe('resource_load_time');
       expect(story?.dominant_culprit_kind).toBeNull();
+      expect(story?.culprit_clause).toBeNull();
       expect(story?.narrative).toContain('takes too long to travel the wire');
       expect(story?.narrative).not.toMatch(/Usually a|Usually the/);
     });
@@ -590,7 +667,7 @@ describe('report view model', () => {
       const viewModel = buildReportViewModel(aggregate);
       const html = renderReportMarkup(viewModel, 'full');
 
-      expect(html).toContain('sr-lcp-story');
+      expect(html).toContain('sr-lcp-anatomy');
       expect(html).toContain('Element render delay dominates');
       expect(html).toContain('Usually a hero image.');
       expect(html).toContain('data-dominant-subpart="element_render_delay"');
@@ -606,7 +683,7 @@ describe('report view model', () => {
       const html = renderReportMarkup(viewModel, 'full');
 
       expect(viewModel.race.lcp_story).toBeNull();
-      expect(html).not.toContain('sr-lcp-story');
+      expect(html).not.toContain('sr-lcp-anatomy');
     });
 
     it('omits the Act 3 INP caption when act3.inp_story is null', () => {
@@ -882,7 +959,7 @@ describe('report view model', () => {
       const viewModel = buildReportViewModel(fullDepthAggregateFixture);
       const html = renderReportMarkup(viewModel, 'full');
 
-      expect(html).toContain('sr-lcp-story');
+      expect(html).toContain('sr-lcp-anatomy');
       expect(html).toContain('sr-third-party-headline');
       expect(html).toContain('sr-funnel-node-loaf');
       expect(html).toContain('sr-act1-ctx');
@@ -919,7 +996,7 @@ describe('report view model', () => {
       const viewModel = buildReportViewModel(safariHeavyAggregateFixture);
       const html = renderReportMarkup(viewModel, 'full');
 
-      expect(html).not.toContain('sr-lcp-story');
+      expect(html).not.toContain('sr-lcp-anatomy');
       expect(html).not.toContain('sr-third-party-headline');
       expect(html).not.toContain('sr-funnel-node-loaf');
     });

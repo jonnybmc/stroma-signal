@@ -6,6 +6,7 @@ import { type IconName, renderIcon } from './report-icons';
 import {
   extractMotionPayload,
   formatMetricDuration,
+  type ReportAct4ImpactRow,
   type ReportActionableSignalsViewModel,
   type ReportContextStripViewModel,
   type ReportDeviceTierVisual,
@@ -42,22 +43,6 @@ const FOOTER_FALLBACK_COPY: Record<SignalRaceFallbackReason, string> = {
   fcp_unavailable: 'TTFB race (FCP unavailable)',
   insufficient_comparable_data: 'No race (no comparable cohort)'
 };
-
-/**
- * Radial severity gauge (LogRocket health-score pattern). One circular
- * track plus a coloured arc whose length telegraphs the tone on a 3-step
- * spectrum. A Lucide icon sits inside the centre hole.
- */
-function renderSeverityGauge(tone: SeverityTone, label: string): string {
-  return `
-    <span class="sr-severity-gauge" data-tone="${tone}" role="img" aria-label="${escapeHtml(label)}">
-      <svg viewBox="0 0 36 36" aria-hidden="true">
-        <circle class="sr-severity-gauge-track" cx="18" cy="18" r="15.915" />
-        <circle class="sr-severity-gauge-fill" cx="18" cy="18" r="15.915" pathLength="100" />
-      </svg>
-    </span>
-  `;
-}
 
 /**
  * Stage label → Lucide icon map. Each cliff stage gets a discreet visual
@@ -589,51 +574,92 @@ function renderLaneSampleLine(coverage: number | null, tierLabel: string): strin
 }
 
 /**
- * Act 2 LCP-subpart story block — inline narrative plus a compact 4-row
- * micro-chart that sits inside the `sr-wait` aside, immediately below the
- * wait-caption. The chart's dominant row takes the mood accent; non-
- * dominant rows stay muted so the eye lands on the single claim the
- * narrative makes. When the story is hedged (no clear dominant), the
- * chart renders without a tinted row and the narrative switches to the
- * honest "spread across multiple phases" line.
+ * Act 2 "Where the gap lives" anatomy band — the third beat of Act 2.
+ * Replaces the legacy LCP P75 comparison rail (which only restated the
+ * per-lane numbers already shown at the top of each race card) with a
+ * diagnostic band that answers "where in the paint pipeline does the
+ * gap actually live?" — the claim nothing else in Act 2 makes.
+ *
+ * Structure, top to bottom:
+ *   - Header: "Where the gap lives" eyebrow + "LCP subpart composition ·
+ *     p75" secondary eyebrow on the right.
+ *   - Lede: the mechanism sentence (plain English, no jargon, no
+ *     prescription) + the optional culprit clause as a trailing muted
+ *     line. Hedged cohorts get the honest "spread across every phase"
+ *     sentence with no culprit.
+ *   - Bar: a single stacked horizontal bar where each segment is sized
+ *     by its share of the p75 LCP. The dominant segment takes the mood
+ *     accent; non-dominant segments stay muted. Composition, not four
+ *     unrelated bars, is the story.
+ *   - Legend: four-column row pairing share · technical label · plain-
+ *     language verb ("server replies", "painting the hero") so a non-
+ *     technical CMO can brief an engineering lead without translating.
  *
  * Returns an empty string when the aggregate carries no LCP story
  * (Safari / Firefox / below race-observation threshold / no defensible
- * subpart breakdown) — the wait aside retains its existing rhythm with
- * no phantom caption or empty container (§4.1 of the enrichment plan).
+ * subpart breakdown) — the slide falls back to race + wait aside alone
+ * rather than rendering an empty band.
  */
-function renderAct2LcpStory(story: ReportLcpStoryViewModel | null): string {
+function renderAct2LcpAnatomy(story: ReportLcpStoryViewModel | null): string {
   if (!story) return '';
-  const chart = story.rows
+  const ariaSummary = story.rows.map((row) => `${row.label} ${row.share}%`).join(', ');
+  const segments = story.rows
     .map(
       (row) => `
-        <div
-          class="sr-lcp-story-row"
+        <span
+          class="sr-lcp-anatomy-segment"
           data-subpart="${escapeHtml(row.key)}"
           data-dominant="${row.is_dominant ? 'true' : 'false'}"
           style="--share:${row.share}"
-        >
-          <span class="sr-lcp-story-row-label">${escapeHtml(row.label)}</span>
-          <span class="sr-lcp-story-row-bar" aria-hidden="true">
-            <span class="sr-lcp-story-row-fill"></span>
-          </span>
-          <span class="sr-lcp-story-row-value sr-mono sr-mono-sm">${row.share}%</span>
-        </div>
+          aria-hidden="true"
+        ></span>
       `
     )
     .join('');
-  const ariaSummary = story.rows.map((row) => `${row.label} ${row.share}%`).join(', ');
+  const legend = story.rows
+    .map(
+      (row) => `
+        <li
+          class="sr-lcp-anatomy-legend-item"
+          data-subpart="${escapeHtml(row.key)}"
+          data-dominant="${row.is_dominant ? 'true' : 'false'}"
+          data-tooltip="${escapeHtml(row.label)} — ${escapeHtml(row.plain)}"
+          style="--share:${row.share}"
+          tabindex="0"
+        >
+          <span class="sr-lcp-anatomy-legend-share sr-mono">${row.share}%</span>
+          <span class="sr-lcp-anatomy-legend-label">${escapeHtml(row.label)}</span>
+        </li>
+      `
+    )
+    .join('');
+  const culprit = story.culprit_clause
+    ? `<span class="sr-lcp-anatomy-culprit">${escapeHtml(story.culprit_clause)}</span>`
+    : '';
   return `
-    <div
-      class="sr-lcp-story"
+    <section
+      class="sr-lcp-anatomy"
+      data-reveal
+      style="--reveal-order:3"
       data-hedged="${story.is_hedged ? 'true' : 'false'}"
       ${story.dominant_subpart ? `data-dominant-subpart="${escapeHtml(story.dominant_subpart)}"` : ''}
+      aria-labelledby="sr-lcp-anatomy-title"
     >
-      <p class="sr-lcp-story-narrative">${escapeHtml(story.narrative)}</p>
-      <div class="sr-lcp-story-chart" role="img" aria-label="LCP subpart distribution: ${escapeHtml(ariaSummary)}">
-        ${chart}
+      <header class="sr-lcp-anatomy-header">
+        <p class="sr-eyebrow sr-lcp-anatomy-eyebrow" id="sr-lcp-anatomy-title">Where the gap lives</p>
+        <p class="sr-eyebrow sr-lcp-anatomy-meta">LCP subpart composition · p75</p>
+      </header>
+      <p class="sr-lcp-anatomy-lede">
+        <span class="sr-lcp-anatomy-mechanism">${escapeHtml(story.narrative)}</span>
+        ${culprit}
+      </p>
+      <div class="sr-lcp-anatomy-bar" role="img" aria-label="LCP subpart composition: ${escapeHtml(ariaSummary)}">
+        ${segments}
       </div>
-    </div>
+      <ol class="sr-lcp-anatomy-legend" aria-hidden="true">
+        ${legend}
+      </ol>
+    </section>
   `;
 }
 
@@ -687,8 +713,6 @@ function renderAct2(viewModel: ReportViewModel): string {
   }
 
   const tone = severityToneForWaitDelta(race.wait_delta_ms);
-  const severityLabel =
-    tone === 'alert' ? 'Critical wait gap' : tone === 'watch' ? 'Meaningful wait gap' : 'Controlled wait gap';
   const ratio =
     race.urban_ms != null && race.comparison_ms != null && race.urban_ms > 0
       ? Math.round((race.comparison_ms / race.urban_ms) * 100)
@@ -716,7 +740,6 @@ function renderAct2(viewModel: ReportViewModel): string {
       </article>
 
       <aside class="sr-wait" aria-live="polite" data-tone="${tone}">
-        ${renderSeverityGauge(tone, severityLabel)}
         <p class="sr-eyebrow sr-wait-eyebrow">Wait delta</p>
         <strong class="sr-mono sr-wait-value" data-role="wait-delta" data-wait-final="${escapeHtml(
           race.wait_delta_seconds
@@ -732,7 +755,6 @@ function renderAct2(viewModel: ReportViewModel): string {
           }
         </div>
         <p class="sr-wait-caption">${escapeHtml(race.comparison_label)} users wait this much longer than urban users, every visit.</p>
-        ${renderAct2LcpStory(race.lcp_story)}
       </aside>
 
       <article class="sr-lane sr-lane-comparison" data-tone="comparison">
@@ -747,44 +769,14 @@ function renderAct2(viewModel: ReportViewModel): string {
       </article>
     </div>
 
-    ${renderAct2Timeline(race)}
-  `;
-}
-
-function renderAct2Timeline(race: ReportViewModel['race']): string {
-  if (!race.race_available || race.urban_ms == null || race.comparison_ms == null) return '';
-  const maxMs = Math.max(race.urban_ms, race.comparison_ms, 1);
-  const urbanPct = Math.max(4, Math.round((race.urban_ms / maxMs) * 100));
-  const comparisonPct = Math.max(4, Math.round((race.comparison_ms / maxMs) * 100));
-  return `
-    <div class="sr-timeline-compare" data-reveal style="--reveal-order:3" aria-hidden="true">
-      <p class="sr-eyebrow sr-timeline-title">${escapeHtml(race.metric_label)} p75 comparison</p>
-      <div class="sr-timeline-tracks">
-        <div class="sr-timeline-row" data-tone="urban">
-          <span class="sr-timeline-label sr-mono sr-mono-sm">Urban</span>
-          <div class="sr-timeline-bar">
-            <span class="sr-timeline-fill" style="width: ${urbanPct}%"></span>
-            <span class="sr-timeline-marker" style="left: ${urbanPct}%"></span>
-          </div>
-          <span class="sr-timeline-value sr-mono sr-mono-sm">${escapeHtml(formatMetricDuration(race.urban_ms))}</span>
-        </div>
-        <div class="sr-timeline-row" data-tone="comparison">
-          <span class="sr-timeline-label sr-mono sr-mono-sm">${escapeHtml(race.comparison_label)}</span>
-          <div class="sr-timeline-bar">
-            <span class="sr-timeline-fill" style="width: ${comparisonPct}%"></span>
-            <span class="sr-timeline-marker" style="left: ${comparisonPct}%"></span>
-          </div>
-          <span class="sr-timeline-value sr-mono sr-mono-sm">${escapeHtml(formatMetricDuration(race.comparison_ms))}</span>
-        </div>
-      </div>
-    </div>
+    ${renderAct2LcpAnatomy(race.lcp_story)}
   `;
 }
 
 function renderDevice(variant: 'premium' | 'budget', progressRole: string): string {
-  const network = variant === 'premium' ? '5G' : '3G';
-  const signalLevel = variant === 'premium' ? 4 : 1;
-  const batteryLevel = variant === 'premium' ? 82 : 64;
+  const network = variant === 'premium' ? '3G' : '5G';
+  const signalLevel = variant === 'premium' ? 1 : 4;
+  const batteryLevel = variant === 'premium' ? 64 : 82;
   const bars = [1, 2, 3, 4]
     .map((index) => `<span class="sr-device-signal-bar" data-active="${index <= signalLevel}"></span>`)
     .join('');
@@ -806,8 +798,8 @@ function renderDevice(variant: 'premium' | 'budget', progressRole: string): stri
 
           ${
             variant === 'premium'
-              ? '<div class="sr-device-island" aria-hidden="true"></div>'
-              : '<div class="sr-device-punchhole" aria-hidden="true"></div>'
+              ? '<div class="sr-device-punchhole" aria-hidden="true"></div>'
+              : '<div class="sr-device-island" aria-hidden="true"></div>'
           }
 
           <div class="sr-device-content">
@@ -1037,16 +1029,6 @@ function renderAct3(viewModel: ReportViewModel): string {
   const hasCoverage = act3.measured_session_coverage != null;
   const poorShare = hasPoor ? (act3.poor_session_share as number) : 0;
   const coverage = hasCoverage ? (act3.measured_session_coverage as number) : 0;
-  // Tone computation only trusts a measured share. Absent data defaults to
-  // 'steady' (neutral) rather than 'alert' (which would imply risk).
-  const tone = hasPoor ? stageToneForShare(poorShare) : 'steady';
-  const severityLabel = !hasPoor
-    ? 'Performance cliff unmeasurable'
-    : tone === 'alert'
-      ? 'Critical performance cliff'
-      : tone === 'watch'
-        ? 'Measurable performance cliff'
-        : 'Controlled performance cliff';
   const heroNumber = hasPoor
     ? `<strong class="sr-takeaway-number sr-counter sr-mono" data-role="counter" data-counter-final="${poorShare}">${poorShare}<span class="sr-unit" aria-hidden="true">%</span></strong>`
     : '<strong class="sr-takeaway-number sr-mono sr-takeaway-absent" aria-label="No measured poor-session share available">—</strong>';
@@ -1071,7 +1053,6 @@ function renderAct3(viewModel: ReportViewModel): string {
       style="--reveal-order:1"
       title="${titleAttr}"
     >
-      ${renderSeverityGauge(tone, severityLabel)}
       <div class="sr-act3-hero-body">
         ${heroNumber}
         <p class="sr-act3-hero-caption">${heroCaption}</p>
@@ -1088,25 +1069,19 @@ function renderAct4(viewModel: ReportViewModel): string {
   return `
     <header class="sr-act-header" data-reveal style="--reveal-order:0">
       <p class="sr-eyebrow">Act 4</p>
-      <h2 class="sr-act-title">What deeper layer exists beyond this?</h2>
+      <h2 class="sr-act-title">What this costs the business</h2>
       <p class="sr-act-lede">${escapeHtml(viewModel.act4_lede)}</p>
     </header>
 
     <div class="sr-act4-body" data-reveal style="--reveal-order:1">
       <div class="sr-act4-findings">
-        <p class="sr-act4-findings-eyebrow sr-eyebrow">What you now know</p>
-        ${
-          viewModel.act4_summary_points.length > 0
-            ? `<ul class="sr-act4-findings-list">${viewModel.act4_summary_points
-                .map((point) => `<li>${escapeHtml(point)}</li>`)
-                .join('')}</ul>`
-            : `<p class="sr-act4-findings-empty">This sample did not produce enough measured signal for a defensible summary — Acts 1 and 2 carry the observed evidence.</p>`
-        }
+        <p class="sr-act4-findings-eyebrow sr-eyebrow">Where the numbers land in your KPIs</p>
+        ${renderAct4FindingsBody(viewModel)}
       </div>
 
       <div class="sr-act4-horizon">
-        <p class="sr-eyebrow">The boundary of this artifact</p>
-        <p class="sr-act4-horizon-body">This report proves the existence and shape of the experience gap. It does not explain root cause, quantify business exposure, or prescribe remediation.</p>
+        <p class="sr-eyebrow">If you want to go deeper</p>
+        <p class="sr-act4-horizon-body">This report proves the shape of the gap. Root cause, business exposure, and fix order are the next read.</p>
         <div class="sr-offers">
           ${viewModel.offer_cards
             .map(
@@ -1125,6 +1100,37 @@ function renderAct4(viewModel: ReportViewModel): string {
         </div>
       </div>
     </div>
+  `;
+}
+
+function renderAct4FindingsBody(viewModel: ReportViewModel): string {
+  if (viewModel.act4_impact_rows.length > 0) {
+    return `<ul class="sr-act4-impact-ledger">${viewModel.act4_impact_rows
+      .map((row, index) => renderAct4ImpactRow(row, index))
+      .join('')}</ul>`;
+  }
+
+  if (viewModel.act4_summary_points.length > 0) {
+    return `<ul class="sr-act4-findings-list">${viewModel.act4_summary_points
+      .map((point) => `<li>${escapeHtml(point)}</li>`)
+      .join('')}</ul>`;
+  }
+
+  return `<p class="sr-act4-findings-empty">This sample did not produce enough measured signal for a defensible summary — Acts 1 and 2 carry the observed evidence.</p>`;
+}
+
+function renderAct4ImpactRow(row: ReportAct4ImpactRow, index: number): string {
+  return `
+    <li class="sr-act4-impact-row" data-tone="${escapeHtml(row.tone)}" data-reveal style="--reveal-order:${index + 2}">
+      <div class="sr-act4-impact-metric">
+        <span class="sr-act4-impact-metric-value">${escapeHtml(row.metric_value)}</span>
+        <span class="sr-act4-impact-metric-label">${escapeHtml(row.metric_label)}</span>
+      </div>
+      <div class="sr-act4-impact-chain">
+        <span class="sr-act4-impact-kpi" data-tone="${escapeHtml(row.tone)}">${escapeHtml(row.kpi_label)}</span>
+        <p class="sr-act4-impact-sentence">${row.impact_sentence_html}</p>
+      </div>
+    </li>
   `;
 }
 
@@ -1195,7 +1201,6 @@ function renderCredibilityStrip(viewModel: ReportViewModel): string {
 function renderFooter(viewModel: ReportViewModel): string {
   return `
     <footer class="sr-landing-footer" data-role="persistent-footer">
-      <p class="sr-landing-boundary">${escapeHtml(viewModel.boundary_statement)}</p>
       ${renderCredibilityStrip(viewModel)}
       ${viewModel.warnings.length > 0 ? `<div class="sr-warnings">${viewModel.warnings.map((w) => `<p class="sr-warning">${escapeHtml(w)}</p>`).join('')}</div>` : ''}
       <div class="sr-landing-brand">

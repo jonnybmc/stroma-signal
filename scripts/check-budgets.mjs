@@ -79,13 +79,22 @@ for (const file of reportFiles) {
 // fallbacks; see report-tokens.css header for the rationale.
 // Motion-alignment PR-1 (+4 KB → 292 KB) ports the deeper `.report.reveal.in`
 // static lineage: grid rhythm tokens (--sr-grid-shell-ratio,
-// --sr-tier-row-cols, --sr-bar-gradient, --sr-glow-alpha-primary /
-// -secondary), `.sr-proof-grid` / `.sr-proof-cell` / `.sr-tier-row` /
-// `.sr-bar` primitives ready for targeted markup migrations, `.sr-italic-serif`
-// utility, act-title underline sweep, and the dual radial glow promoted from
-// Act-2-only to a slide-level `.sr-slide::before` primitive gated on
-// `data-visible="true"`. PR-2 (entrance motion) will bump again for the
-// bar-sweep / funnel-cascade / slide-entry glow-pulse layer.
-assertUnderBudget('signal-report static weight', reportWeight, 292 * 1024);
+// --sr-tier-row-cols, --sr-bar-gradient), `.sr-proof-grid` / `.sr-proof-cell`
+// / `.sr-tier-row` / `.sr-bar` primitives ready for targeted markup
+// migrations, `.sr-italic-serif` utility, and the act-title underline sweep.
+// PR-2 (entrance motion) adds the bar-sweep / funnel-cascade / slide-entry
+// layer. The dual-radial ambient glow was removed in review — a report is
+// consumed analytically, not cinematically, and the accent tint pulled focus
+// from the numbers.
+// Act 4 KPI impact ledger (+4 KB → 296 KB) translates the proven technical
+// findings into the language the reader's stakeholder actually owns: bounce
+// rate + ad quality score (LCP), conversion rate + CPA (INP), mobile ROAS
+// (heavy scripts / LoAF), audience reach (constrained-network share). The
+// ledger rows reuse existing tone tokens + `.sr-italic-serif` utility so
+// incremental weight is row CSS (hairline-separated grid, tone-tinted KPI
+// pill, display-font tabular-num metric) plus the buildAct4ImpactRows
+// emission logic in the view model. Fallback path preserves the legacy
+// flat-bullet rendering when fewer than 2 rows qualify.
+assertUnderBudget('signal-report static weight', reportWeight, 296 * 1024);
 
 console.log('Bundle budgets passed.');

@@ -631,7 +631,8 @@ function runAct2Race(runtime: MotionRuntime): void {
 
   if (waitEl) waitEl.textContent = '0.0s';
 
-  // Both devices start filling at t=0, each at their real duration.
+  // Both devices start filling at t=0, each at their real duration, so
+  // the gap reads as a race playing out in real time.
   if (urban) {
     urban.style.transitionDuration = `${urbanFillMs}ms`;
     window.requestAnimationFrame(() => {

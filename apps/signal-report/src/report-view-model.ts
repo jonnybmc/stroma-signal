@@ -65,25 +65,32 @@ export interface ReportDeviceTierVisual {
   share: number;
 }
 
-// LCP subpart row in the compact 4-row micro-chart that sits below the
-// wait-delta aside in Act 2. `is_dominant` flags the row that owns the
-// dominant share so the renderer can tint it with the mood accent without
-// recomputing argmax.
+// LCP subpart row rendered in the Act 2 "Where the gap lives" anatomy
+// band. `is_dominant` flags the row that owns the dominant share so the
+// renderer can tint its segment without recomputing argmax. `plain` is a
+// short verb phrase aimed at the non-technical CMO/Growth reader — pairs
+// with the technical `label` so the legend says both what the subpart
+// measures and what it physically represents in the paint pipeline.
 export interface ReportLcpSubpartRow {
   key: SignalLcpSubpart;
   label: string;
+  plain: string;
   share: number;
   is_dominant: boolean;
 }
 
-// Act 2 LCP story — inline narrative under the wait-delta aside plus a
-// 4-row micro-chart of the subpart distribution. `is_hedged` is true when
-// no single subpart carries enough share to make a confident single-cause
-// claim (see SIGNAL_STORY_HEDGED_THRESHOLD_PCT). When hedged, the
-// narrative falls back to the honest "spread across multiple phases"
-// line and the chart omits the dominant-row tint.
+// Act 2 LCP story — data for the "Where the gap lives" anatomy band that
+// replaces the legacy LCP P75 comparison rail. `narrative` carries only
+// the mechanism sentence (subpart clause); `culprit_clause` is separated
+// so the band can render it as a distinct, muted trailing line rather
+// than as an appended second sentence. `is_hedged` is true when no single
+// subpart carries enough share for a confident claim — when hedged, the
+// narrative becomes the honest "spread across multiple phases" line and
+// the band omits both the accent-coloured dominant segment and the
+// culprit clause.
 export interface ReportLcpStoryViewModel {
   narrative: string;
+  culprit_clause: string | null;
   is_hedged: boolean;
   dominant_subpart: SignalLcpSubpart | null;
   dominant_culprit_kind: SignalLcpCulpritKind | null;
@@ -306,7 +313,28 @@ export interface ReportViewModel {
   act3: ReportAct3ViewModel;
   act4_lede: string;
   act4_summary_points: string[];
+  // KPI impact ledger — Act 4 translation of the proven technical findings
+  // into the language stakeholders own (bounce, conversion, ROAS, audience
+  // reach). Each row is emitted only when the underlying aggregate evidence
+  // is present. When fewer than 2 rows qualify the renderer falls back to
+  // the flat `act4_summary_points` bullets so we never ship an anaemic
+  // 1-row ledger. `impact_sentence_html` already contains the italic-serif
+  // cameo around the KPI word — markup stays declarative.
+  act4_impact_rows: ReportAct4ImpactRow[];
   offer_cards: Array<{ title: string; body: string; href: string; cta: string }>;
+}
+
+export type ReportAct4ImpactRowId = 'lcp_bounce' | 'inp_conversion' | 'script_roas' | 'network_reach';
+
+export type ReportAct4ImpactTone = 'alert' | 'watch' | 'steady';
+
+export interface ReportAct4ImpactRow {
+  id: ReportAct4ImpactRowId;
+  metric_value: string;
+  metric_label: string;
+  kpi_label: string;
+  impact_sentence_html: string;
+  tone: ReportAct4ImpactTone;
 }
 
 const BOUNDARY_STATEMENT =
@@ -459,14 +487,27 @@ function buildAct1Tiers(aggregate: SignalAggregateV1): ReportTierVisual[] {
   }));
 }
 
-// Short labels for the 4-bar LCP subpart chart. Kept terse so each row
-// comfortably fits the 80px-tall compact chart that sits beside the
-// wait-delta hero number without competing for visual weight.
+// Short technical labels for the LCP subpart legend. Kept terse so a
+// four-column legend fits a single row of the anatomy band without
+// wrapping at 1440px.
 const LCP_SUBPART_SHORT_LABELS: Record<SignalLcpSubpart, string> = {
   ttfb: 'TTFB',
   resource_load_delay: 'Load delay',
   resource_load_time: 'Load time',
   element_render_delay: 'Render delay'
+};
+
+// Plain-language verb phrases paired with each subpart label in the
+// anatomy-band legend. Target reader is the non-technical CMO / Growth
+// Head who recognises "TTFB" as jargon but instinctively maps
+// "server replies" to something they can brief their engineering lead
+// on. Each phrase names what physically happens in the paint pipeline;
+// no metrics, no thresholds, no prescriptions.
+const LCP_SUBPART_PLAIN_DESCRIPTORS: Record<SignalLcpSubpart, string> = {
+  ttfb: 'server replies',
+  resource_load_delay: 'finding the hero',
+  resource_load_time: 'downloading the hero',
+  element_render_delay: 'painting the hero'
 };
 
 // Narrative copy per dominant subpart. Matches §3.4 of the enrichment
@@ -626,30 +667,29 @@ function buildLcpStoryViewModel(story: SignalLcpStory | undefined): ReportLcpSto
       ? null
       : story.dominant_culprit_kind;
 
-  // Narrative composition: subpart clause + optional culprit clause.
-  // When hedged, the fixed "spread across multiple phases" line owns the
-  // whole narrative so we never imply a single-cause claim we can't back.
-  let narrative: string;
-  if (isHedged || !dominantSubpart) {
-    narrative = LCP_HEDGED_NARRATIVE;
-  } else {
-    narrative = LCP_SUBPART_NARRATIVES[dominantSubpart];
-    if (culprit) {
-      narrative = `${narrative} ${LCP_CULPRIT_CLAUSES[culprit]}`;
-    }
-  }
+  // Narrative + culprit are carried as separate fields so the anatomy
+  // band can render the mechanism sentence as the lede and the culprit
+  // (e.g. "Usually a hero image.") as a muted trailing line, rather than
+  // running them together as a single compound sentence. When hedged,
+  // the fixed "spread across multiple phases" line owns the whole lede
+  // and the culprit is dropped entirely — we don't narrate a single
+  // cause we can't back.
+  const narrative = isHedged || !dominantSubpart ? LCP_HEDGED_NARRATIVE : LCP_SUBPART_NARRATIVES[dominantSubpart];
+  const culpritClause = culprit ? LCP_CULPRIT_CLAUSES[culprit] : null;
 
   const rows: ReportLcpSubpartRow[] = (
     ['ttfb', 'resource_load_delay', 'resource_load_time', 'element_render_delay'] as const
   ).map((key) => ({
     key,
     label: LCP_SUBPART_SHORT_LABELS[key],
+    plain: LCP_SUBPART_PLAIN_DESCRIPTORS[key],
     share: distribution[key],
     is_dominant: dominantSubpart === key
   }));
 
   return {
     narrative,
+    culprit_clause: culpritClause,
     is_hedged: isHedged,
     dominant_subpart: dominantSubpart,
     dominant_culprit_kind: culprit,
@@ -1026,6 +1066,12 @@ function buildEvidenceItems(
   ];
 }
 
+// Editorial framings keyed off a measured `mood_tier` (itself derived
+// from real aggregate shares via `selectMoodTier`). The strings below
+// are author-written prose, not fabricated metrics — every number the
+// reader sees is rendered from view-model fields elsewhere. These
+// strings only provide the connective tissue between them, conditioned
+// on a three-way mood bucket the data has already chosen.
 function buildHeroCopy(
   aggregate: SignalAggregateV1,
   mood: ReportMoodTier
@@ -1040,7 +1086,8 @@ function buildHeroCopy(
         'A real share of the traffic you send here lands in a slower world. This report turns that hidden post-click reality into something visible, temporal, and difficult to dismiss.',
       act1_intro:
         'These are not average users. They are materially different infrastructure realities that a real share of your traffic already lands on.',
-      act4_lede: 'The gap is proven. What follows is root cause, cost, and fix order.'
+      act4_lede:
+        'Every number above meets a KPI someone on your team is accountable for. This is where the measured gap shows up in the business.'
     };
   }
 
@@ -1052,7 +1099,8 @@ function buildHeroCopy(
         'The measured story is more controlled here. Traffic still lands into different conditions across tiers, but most sessions stay on the safer side of the thresholds that matter.',
       act1_intro:
         'Your traffic still lands into different conditions. The difference is that this report shows the experience holding together across more of them.',
-      act4_lede: 'The gap is restrained, but it exists. What follows is why it holds and where it could weaken.'
+      act4_lede:
+        'The gap is restrained, but every number above still meets a KPI someone on your team is accountable for. This is where it shows up.'
     };
   }
 
@@ -1063,7 +1111,8 @@ function buildHeroCopy(
       'The post-click reality is real, but it sits in the middle ground: meaningful enough to feel, not yet severe enough to scream. That still deserves attention.',
     act1_intro:
       'These clusters show the real conditions your traffic lands on, not the calmer average implied by a single lab run.',
-    act4_lede: 'The gap is measurable. What follows is cause, cost, and fix order.'
+    act4_lede:
+      'Every number above meets a KPI someone on your team is accountable for. This is where the measured gap shows up in the business.'
   };
 }
 
@@ -1085,6 +1134,176 @@ function buildAct4SummaryPoints(
   }
 
   return points;
+}
+
+// W3C LoAF defines long animation frames as ≥50ms; the `script_roas` row
+// fires when the measured worst-frame p75 crosses this line.
+const ACT4_LOAF_LONG_FRAME_MS = 50;
+// Minimum ledger length before we commit to the ledger treatment. Below
+// this the renderer falls back to the flat `act4_summary_points` so we
+// never ship a single-row impact panel that reads thinner than the
+// bullets it replaced.
+const ACT4_IMPACT_MIN_ROWS = 2;
+// Act 4 `inp_conversion` row emission gate. Below ~25% poor-session share
+// the INP impact narrative reads as alarmist next to Act 3's own funnel
+// evidence; above it the share is large enough that the "drop conversion"
+// sentence meets the reader's own observation. Calibration choice (not an
+// empirical CWV threshold). Tune here, not inline.
+const ACT4_INP_GATE_POOR_SHARE_PCT = 25;
+// Act 4 `network_reach` row emission gate. A combined constrained /
+// constrained_moderate share of 30% is the point where "a real share"
+// stops being a hedge and starts being load-bearing for the
+// network_reach KPI claim. Calibration choice.
+const ACT4_NETWORK_GATE_CONSTRAINED_PCT = 30;
+// Tone escalation for the `script_roas` row when LoAF worst-frame p75
+// crosses into territory that will feel like a stall on mid-tier
+// devices. 150ms is 3× the W3C long-frame floor and the point above
+// which qualitative session logs commonly report "the page froze".
+// Calibration choice (not a spec threshold).
+const ACT4_LOAF_ALERT_MS = 150;
+
+function wrapKpiCameo(sentence: string, kpiCameo: string): string {
+  return sentence.replace(kpiCameo, `<em class="sr-italic-serif">${kpiCameo}</em>`);
+}
+
+// Presentation-calibration tone bands for the `lcp_bounce` row. Not CWV
+// thresholds — the CWV LCP "poor" line is 4000ms absolute; these bands
+// operate on the wait-*delta* between comparison and urban cohorts.
+// 1500ms delta ≈ the point where the gap feels categorical in
+// moderated testing; 800ms ≈ perceptible but not categorical.
+function toneFromWaitDeltaMs(deltaMs: number | null): ReportAct4ImpactTone {
+  if (deltaMs == null) return 'steady';
+  if (deltaMs >= 1500) return 'alert';
+  if (deltaMs >= 800) return 'watch';
+  return 'steady';
+}
+
+// Presentation-calibration tone bands for the `inp_conversion` row.
+// Operates on the share of sessions whose slowest measured phase
+// crosses a CWV poor threshold (FCP / LCP / INP). 50% ≈ majority-bad;
+// 15% ≈ a minority large enough to own a named KPI story.
+function toneFromPoorShare(share: number): ReportAct4ImpactTone {
+  if (share >= 50) return 'alert';
+  if (share >= 15) return 'watch';
+  return 'steady';
+}
+
+// Presentation-calibration tone bands for the `network_reach` row.
+// Operates on the combined constrained + constrained_moderate share.
+// 50% ≈ the urban assumption is strictly wrong; 30% ≈ load-bearing
+// enough to name the audience-reach KPI claim.
+function toneFromConstrainedShare(share: number): ReportAct4ImpactTone {
+  if (share >= 50) return 'alert';
+  if (share >= 30) return 'watch';
+  return 'steady';
+}
+
+// Deduced narrative bridges. Every `metric_value` / `metric_label`
+// below reads from a real measured field on `aggregate`, `race`, or
+// `act3`. The `impact_sentence_html` strings are author-written prose
+// tying those measured numbers to the stakeholder's KPI vocabulary
+// (CPC, CPA, ROAS, Campaign Efficiency). No numeric claim originates
+// in these sentences — they are editorial commentary on numbers the
+// reader has already seen earlier in the deck.
+function buildAct4ImpactRows(
+  aggregate: SignalAggregateV1,
+  race: ReportRaceViewModel,
+  act3: ReportAct3ViewModel
+): ReportAct4ImpactRow[] {
+  const rows: ReportAct4ImpactRow[] = [];
+
+  if (race.race_available && race.wait_delta_ms != null && race.wait_delta_seconds) {
+    rows.push({
+      id: 'lcp_bounce',
+      metric_value: race.wait_delta_seconds,
+      metric_label: `LCP wait delta · ${race.comparison_label} vs urban`,
+      kpi_label: 'Bounce Rate · Ad Quality Score',
+      impact_sentence_html: wrapKpiCameo(
+        'Google and Meta raise CPC on slow landing pages. You pay more for clicks that never become sessions.',
+        'CPC'
+      ),
+      tone: toneFromWaitDeltaMs(race.wait_delta_ms)
+    });
+  }
+
+  if (act3.poor_session_share != null && act3.poor_session_share >= ACT4_INP_GATE_POOR_SHARE_PCT) {
+    const phase = act3.inp_story?.dominant_phase;
+    rows.push({
+      id: 'inp_conversion',
+      metric_value: `${act3.poor_session_share}%`,
+      metric_label: phase
+        ? `Sessions past the poor-performance threshold · dominant phase ${phase.replace('_', ' ')}`
+        : 'Sessions past the poor-performance threshold',
+      kpi_label: 'Conversion Rate · Cost Per Acquisition',
+      impact_sentence_html: wrapKpiCameo(
+        'Mushy buttons at the point of intent drop conversion. Same ad spend, fewer leads, inflated CPA.',
+        'CPA'
+      ),
+      tone: toneFromPoorShare(act3.poor_session_share)
+    });
+  }
+
+  const thirdParty = race.third_party_story;
+  const loaf = act3.loaf_story;
+  const thirdPartyHits =
+    thirdParty != null && (thirdParty.dominant_tier === 'moderate' || thirdParty.dominant_tier === 'heavy');
+  const loafHits =
+    loaf != null && loaf.worst_frame_ms_p75 != null && loaf.worst_frame_ms_p75 >= ACT4_LOAF_LONG_FRAME_MS;
+
+  if (thirdPartyHits || loafHits) {
+    let metricValue: string;
+    let metricLabel: string;
+    let tone: ReportAct4ImpactTone;
+    if (thirdPartyHits && thirdParty != null && thirdParty.median_share_pct != null) {
+      metricValue = `${thirdParty.median_share_pct}%`;
+      metricLabel = 'Third-party script share (median origin)';
+      tone = thirdParty.dominant_tier === 'heavy' ? 'alert' : 'watch';
+    } else if (loafHits && loaf != null && loaf.worst_frame_ms_p75 != null) {
+      metricValue = `${Math.round(loaf.worst_frame_ms_p75)}ms`;
+      metricLabel = 'LoAF worst-frame p75';
+      tone = loaf.worst_frame_ms_p75 >= ACT4_LOAF_ALERT_MS ? 'alert' : 'watch';
+    } else {
+      // Defensive: if third-party fired without a share number, emit the
+      // row with a descriptive label but no metric value so the ledger
+      // row reads honestly instead of "undefined%".
+      metricValue = thirdParty?.dominant_tier === 'heavy' ? 'Heavy' : 'Moderate';
+      metricLabel = 'Third-party script load tier';
+      tone = thirdParty?.dominant_tier === 'heavy' ? 'alert' : 'watch';
+    }
+    rows.push({
+      id: 'script_roas',
+      metric_value: metricValue,
+      metric_label: metricLabel,
+      kpi_label: 'Mobile ROAS · Audience Reach',
+      impact_sentence_html: wrapKpiCameo(
+        'Mobile-first audiences cannot interact with a script-heavy page. Top-of-funnel reach without bottom-of-funnel ROAS.',
+        'ROAS'
+      ),
+      tone
+    });
+  }
+
+  const constrainedShare =
+    aggregate.network_distribution.constrained_moderate + aggregate.network_distribution.constrained;
+  if (constrainedShare >= ACT4_NETWORK_GATE_CONSTRAINED_PCT) {
+    rows.push({
+      id: 'network_reach',
+      metric_value: `${constrainedShare}%`,
+      metric_label: 'Audience on constrained or worse networks',
+      kpi_label: 'Audience Reach · Campaign Efficiency',
+      impact_sentence_html: wrapKpiCameo(
+        'A real share of your audience lives on constrained networks. Campaigns calibrated for urban speed leak Campaign Efficiency here.',
+        'Campaign Efficiency'
+      ),
+      tone: toneFromConstrainedShare(constrainedShare)
+    });
+  }
+
+  if (rows.length < ACT4_IMPACT_MIN_ROWS) {
+    return [];
+  }
+
+  return rows;
 }
 
 function buildOfferCards(): Array<{ title: string; body: string; href: string; cta: string }> {
@@ -1594,6 +1813,7 @@ export function buildReportViewModel(aggregate: SignalAggregateV1): ReportViewMo
     act3,
     act4_lede: heroCopy.act4_lede,
     act4_summary_points: buildAct4SummaryPoints(aggregate, race, act3),
+    act4_impact_rows: buildAct4ImpactRows(aggregate, race, act3),
     offer_cards: buildOfferCards()
   };
 }

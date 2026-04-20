@@ -36,7 +36,7 @@ test('proof-of-life flow flushes one payload into the collector and dataLayer', 
   await page.goto(previewHref);
   await expect(page.locator('.sr-hero')).toContainText('localhost:4173');
   await expect(page.locator('.sr-act[data-act="3"]')).toContainText('Where does performance become poor?');
-  await expect(page.locator('.sr-act[data-act="4"]')).toContainText('What deeper layer exists beyond this?');
+  await expect(page.locator('.sr-act[data-act="4"]')).toContainText('What this costs the business');
   await expect(page.locator('.sr-act[data-act="4"]')).toContainText('Rapid Fix Plan');
 });
 
@@ -165,7 +165,7 @@ test('strong fixture renders the four-act report experience end to end', async (
   await expect(page.locator('.sr-act[data-act="1"]')).toContainText('Who are your users?');
   await expect(page.locator('.sr-act[data-act="2"]')).toContainText('How far apart are their experiences?');
   await expect(page.locator('.sr-act[data-act="3"]')).toContainText('Where does performance become poor?');
-  await expect(page.locator('.sr-act[data-act="4"]')).toContainText('What deeper layer exists beyond this?');
+  await expect(page.locator('.sr-act[data-act="4"]')).toContainText('What this costs the business');
   await expect(page.locator('.sr-act[data-act="4"]')).toContainText('Performance Intelligence');
   await expect(page.locator('.sr-act[data-act="3"]')).toContainText('Interaction becomes ready');
 });
@@ -254,7 +254,7 @@ test('affirming fixture keeps the same four-act structure with calmer measured l
 
   await expect(page.locator('.sr-root')).toHaveAttribute('data-mood', 'affirming');
   await expect(page.locator('.sr-act[data-act="3"]')).toContainText('The cliff still exists');
-  await expect(page.locator('.sr-act[data-act="4"]')).toContainText('What deeper layer exists beyond this?');
+  await expect(page.locator('.sr-act[data-act="4"]')).toContainText('What this costs the business');
 });
 
 test('builder keeps mixed lifecycle fixtures load-shaped by default', async ({ page }) => {
