@@ -1,10 +1,14 @@
 -- Signal by Stroma
 -- BigQuery URL builder for a flat SignalWarehouseRowV1 table
 -- Default report math excludes non-load-shaped restore/prerender rows.
+-- Background-tab loads (context_visibility_hidden_at_load = TRUE) are
+-- pre-filtered before any accumulator; the filtered count is preserved
+-- separately as excluded_background_sessions for transparency.
+-- Invariant: raw_sample_size === sample_size + excluded_background_sessions.
 -- Canonical production window = the last 7 complete calendar days,
 -- excluding the current in-progress day.
 
-WITH source_events AS (
+WITH raw_events AS (
   SELECT
     host,
     path AS url,
@@ -24,12 +28,23 @@ WITH source_events AS (
     rtt_ms,
     save_data,
     browser,
+    context_visibility_hidden_at_load,
     TIMESTAMP(observed_at) AS observed_at
   FROM `your-project.signal.signal_events`
   WHERE DATE(observed_at) BETWEEN DATE_SUB(CURRENT_DATE(), INTERVAL 7 DAY) AND DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY)
     AND host = 'your-domain.com' -- replace with your domain; use @host in parameterized queries for production automation
     AND COALESCE(navigation_type, 'navigate') NOT IN ('restore', 'prerender')
   QUALIFY ROW_NUMBER() OVER (PARTITION BY event_id ORDER BY observed_at) = 1
+),
+source_events AS (
+  SELECT * FROM raw_events
+  WHERE context_visibility_hidden_at_load IS NOT TRUE
+),
+visibility_counts AS (
+  SELECT
+    COUNT(*) AS raw_sample_size,
+    COUNTIF(context_visibility_hidden_at_load = TRUE) AS excluded_background_sessions
+  FROM raw_events
 ),
 counts AS (
   SELECT
@@ -392,7 +407,10 @@ SELECT CONCAT(
   IF(rq IS NULL, '', CONCAT('&nsr=', CAST(rq[OFFSET(1)] AS STRING), ',', CAST(rq[OFFSET(2)] AS STRING), ',', CAST(rq[OFFSET(3)] AS STRING))),
   -- iteration-6: environment
   '&eb=', CAST(br_chrome AS STRING), ',', CAST(br_safari AS STRING), ',', CAST(br_firefox AS STRING), ',', CAST(br_edge AS STRING), ',', CAST(br_other AS STRING),
+  -- PR-6: visibility bookkeeping (raw pre-filter count + background exclusions)
+  '&rs=', CAST(raw_sample_size AS STRING),
+  '&xb=', CAST(excluded_background_sessions AS STRING),
   -- freshness provenance
   '&ga=', CAST(UNIX_MILLIS(CURRENT_TIMESTAMP()) AS STRING)
 ) AS signal_report_url
-FROM counts, vitals, comparison_tier, race_choice, stage_inputs, funnel_rollup, device_hardware, network_signals, downlink_quartiles, rtt_quartiles, env;
+FROM counts, vitals, comparison_tier, race_choice, stage_inputs, funnel_rollup, device_hardware, network_signals, downlink_quartiles, rtt_quartiles, env, visibility_counts;

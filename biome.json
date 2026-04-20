@@ -37,7 +37,10 @@
       "tests/**/*.ts",
       "*.ts",
       "*.mjs",
-      "*.json"
+      "*.json",
+      "!.claude",
+      "!**/node_modules",
+      "!**/dist"
     ]
   }
 }

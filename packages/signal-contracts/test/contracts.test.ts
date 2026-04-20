@@ -5,8 +5,10 @@ import {
   aggregateSignalEvents,
   chooseRaceMetric,
   chromeColdNavFixture,
+  classifyThirdPartyShareTier,
   decodeSignalReportUrl,
   deriveSignalAggregateWarnings,
+  deriveThirdPartyWeightTier,
   encodeSignalReportUrl,
   explainSignalAggregateIssues,
   explainSignalEventIssues,
@@ -162,7 +164,7 @@ describe('signal contracts', () => {
     const flattened = flattenSignalEventForGa4(chromeColdNavFixture);
 
     expect(flattened.event).toBe(SIGNAL_GA4_EVENT_NAME);
-    expect(Object.keys(flattened)).toHaveLength(22);
+    expect(Object.keys(flattened)).toHaveLength(25);
     expect(flattened.net_tier).toBe(chromeColdNavFixture.net_tier);
     expect(flattened.device_screen_w).toBe(chromeColdNavFixture.device_screen_w);
     expect(flattened.lcp_ms).toBe(chromeColdNavFixture.vitals.lcp_ms);
@@ -198,8 +200,12 @@ describe('signal contracts', () => {
     const flattened = flattenSignalEventForGa4(chromeColdNavFixture);
     const ga4SafeFieldCount = Object.keys(SIGNAL_GA4_FIELD_MAP_V1.fields).length;
 
-    expect(ga4SafeFieldCount).toBe(21);
-    expect(ga4SafeFieldCount).toBeLessThanOrEqual(25);
+    // Hard-equality: post-PR-5 the field map settled at exactly 24 (25
+    // flatten keys including `event`), with one slot of headroom against
+    // GA4's 25-custom-parameter cap. Any 26th param added in future would
+    // fail here at test time rather than at Google's ingestion boundary.
+    expect(ga4SafeFieldCount).toBe(24);
+    expect(Object.keys(flattened)).toHaveLength(25);
     expect(Object.keys(flattened).filter((key) => key !== 'event')).toHaveLength(ga4SafeFieldCount);
   });
 
@@ -797,7 +803,7 @@ describe('signal contracts', () => {
     };
 
     expect(explainSignalEventIssues(invalidEvent)).toContain(
-      'Expected "meta" to include pkg_version, browser, nav_type, and a valid optional navigation_type.'
+      'Expected "meta" to include pkg_version, browser, and a valid optional navigation_type.'
     );
     expect(explainSignalWarehouseRowIssues(invalidWarehouseRow)).toContain(
       'Expected "lcp_element_type" to be image, text, or null.'
@@ -805,5 +811,626 @@ describe('signal contracts', () => {
     expect(explainSignalWarehouseRowIssues(invalidWarehouseRow)).toContain(
       'Expected "interaction_type" to be pointer, keyboard, or null.'
     );
+  });
+
+  it('extracts lcp_breakdown + culprit_kind + inp dominant_phase into the warehouse row', () => {
+    const enrichedEvent = {
+      ...chromeColdNavFixture,
+      vitals: {
+        ...chromeColdNavFixture.vitals,
+        lcp_breakdown: {
+          resource_load_delay_ms: 210,
+          resource_load_time_ms: 1_480,
+          element_render_delay_ms: 6_240
+        },
+        lcp_attribution: {
+          ...(chromeColdNavFixture.vitals.lcp_attribution ?? {
+            load_state: null,
+            target: null,
+            element_type: null,
+            resource_url: null
+          }),
+          culprit_kind: 'hero_image' as const
+        },
+        inp_attribution: {
+          ...(chromeColdNavFixture.vitals.inp_attribution ?? {
+            load_state: null,
+            interaction_target: null,
+            interaction_type: null,
+            interaction_time_ms: null,
+            input_delay_ms: null,
+            processing_duration_ms: null,
+            presentation_delay_ms: null
+          }),
+          dominant_phase: 'processing' as const
+        }
+      }
+    };
+    const warehouseRow = toSignalWarehouseRow(enrichedEvent);
+
+    expect(warehouseRow.lcp_breakdown_resource_load_delay_ms).toBe(210);
+    expect(warehouseRow.lcp_breakdown_resource_load_time_ms).toBe(1_480);
+    expect(warehouseRow.lcp_breakdown_element_render_delay_ms).toBe(6_240);
+    expect(warehouseRow.lcp_attribution_culprit_kind).toBe('hero_image');
+    expect(warehouseRow.inp_attribution_dominant_phase).toBe('processing');
+  });
+
+  it('leaves lcp_breakdown and enum diagnostics null in the warehouse row when capture omits them', () => {
+    const warehouseRow = toSignalWarehouseRow(chromeColdNavFixture);
+
+    expect(warehouseRow.lcp_breakdown_resource_load_delay_ms).toBeNull();
+    expect(warehouseRow.lcp_breakdown_resource_load_time_ms).toBeNull();
+    expect(warehouseRow.lcp_breakdown_element_render_delay_ms).toBeNull();
+    expect(warehouseRow.lcp_attribution_culprit_kind).toBeNull();
+    expect(warehouseRow.inp_attribution_dominant_phase).toBeNull();
+  });
+
+  it('flattens lcp_dominant_subpart + culprit + inp phase for GA4 from enriched capture', () => {
+    const enrichedEvent = {
+      ...chromeColdNavFixture,
+      vitals: {
+        ...chromeColdNavFixture.vitals,
+        ttfb_ms: 813,
+        lcp_breakdown: {
+          resource_load_delay_ms: 210,
+          resource_load_time_ms: 1_480,
+          element_render_delay_ms: 6_240
+        },
+        lcp_attribution: {
+          ...(chromeColdNavFixture.vitals.lcp_attribution ?? {
+            load_state: null,
+            target: null,
+            element_type: null,
+            resource_url: null
+          }),
+          culprit_kind: 'hero_image' as const
+        },
+        inp_attribution: {
+          ...(chromeColdNavFixture.vitals.inp_attribution ?? {
+            load_state: null,
+            interaction_target: null,
+            interaction_type: null,
+            interaction_time_ms: null,
+            input_delay_ms: null,
+            processing_duration_ms: null,
+            presentation_delay_ms: null
+          }),
+          dominant_phase: 'processing' as const
+        }
+      }
+    };
+    const flattened = flattenSignalEventForGa4(enrichedEvent);
+
+    // element_render_delay is the largest of {ttfb=813, rld=210, rlt=1480, erd=6240}
+    expect(flattened.lcp_dominant_subpart).toBe('element_render_delay');
+    expect(flattened.lcp_culprit_kind).toBe('hero_image');
+    expect(flattened.inp_dominant_phase).toBe('processing');
+  });
+
+  it('aggregates lcp_story and inp_story when observations cross the race threshold', () => {
+    const events = Array.from({ length: 30 }, (_, index) => ({
+      ...chromeColdNavFixture,
+      event_id: `enriched_${index}`,
+      ts: chromeColdNavFixture.ts + index * 1_000,
+      vitals: {
+        ...chromeColdNavFixture.vitals,
+        ttfb_ms: 400,
+        lcp_breakdown: {
+          resource_load_delay_ms: 120,
+          resource_load_time_ms: 880,
+          element_render_delay_ms: 4_600
+        },
+        lcp_attribution: {
+          ...(chromeColdNavFixture.vitals.lcp_attribution ?? {
+            load_state: null,
+            target: null,
+            element_type: null,
+            resource_url: null
+          }),
+          culprit_kind: 'hero_image' as const
+        },
+        inp_attribution: {
+          ...(chromeColdNavFixture.vitals.inp_attribution ?? {
+            load_state: null,
+            interaction_target: null,
+            interaction_type: null,
+            interaction_time_ms: null,
+            input_delay_ms: null,
+            processing_duration_ms: null,
+            presentation_delay_ms: null
+          }),
+          dominant_phase: 'processing' as const
+        }
+      }
+    }));
+
+    const aggregate = aggregateSignalEvents(events, 'production', chromeColdNavFixture.ts + 120_000);
+
+    // Distribution is a time-share across subparts: {ttfb=400, rld=120, rlt=880, erd=4600}
+    // totals 6000ms; element_render_delay dominates at 4600/6000 ≈ 77%.
+    expect(aggregate.lcp_story).toBeDefined();
+    expect(aggregate.lcp_story?.dominant_subpart).toBe('element_render_delay');
+    expect(aggregate.lcp_story?.dominant_subpart_share_pct).toBe(77);
+    expect(aggregate.lcp_story?.dominant_culprit_kind).toBe('hero_image');
+    expect(aggregate.lcp_story?.subpart_distribution_pct?.element_render_delay).toBe(77);
+    expect(aggregate.lcp_story?.subpart_distribution_pct?.resource_load_time).toBe(15);
+    expect(aggregate.lcp_story?.subpart_distribution_pct?.ttfb).toBe(7);
+    expect(aggregate.lcp_story?.subpart_distribution_pct?.resource_load_delay).toBe(2);
+
+    expect(aggregate.inp_story).toBeDefined();
+    expect(aggregate.inp_story?.dominant_phase).toBe('processing');
+    expect(aggregate.inp_story?.dominant_phase_share_pct).toBe(100);
+    expect(aggregate.inp_story?.phase_distribution_pct?.processing).toBe(100);
+  });
+
+  it('omits lcp_story / inp_story when the observation threshold is not met', () => {
+    const events = Array.from({ length: SIGNAL_MIN_RACE_OBSERVATIONS - 1 }, (_, index) => ({
+      ...chromeColdNavFixture,
+      event_id: `thin_${index}`,
+      ts: chromeColdNavFixture.ts + index * 1_000,
+      vitals: {
+        ...chromeColdNavFixture.vitals,
+        ttfb_ms: 400,
+        lcp_breakdown: {
+          resource_load_delay_ms: 100,
+          resource_load_time_ms: 200,
+          element_render_delay_ms: 2_000
+        },
+        inp_attribution: {
+          ...(chromeColdNavFixture.vitals.inp_attribution ?? {
+            load_state: null,
+            interaction_target: null,
+            interaction_type: null,
+            interaction_time_ms: null,
+            input_delay_ms: null,
+            processing_duration_ms: null,
+            presentation_delay_ms: null
+          }),
+          dominant_phase: 'input_delay' as const
+        }
+      }
+    }));
+
+    const aggregate = aggregateSignalEvents(events, 'preview', chromeColdNavFixture.ts + 60_000);
+
+    expect(aggregate.lcp_story).toBeUndefined();
+    expect(aggregate.inp_story).toBeUndefined();
+  });
+
+  it('round-trips lcp_story and inp_story through the report URL codec', () => {
+    const enriched = {
+      ...strongLcpCoverageAggregateFixture,
+      lcp_story: {
+        dominant_subpart: 'element_render_delay' as const,
+        dominant_subpart_share_pct: 74,
+        dominant_culprit_kind: 'hero_image' as const,
+        subpart_distribution_pct: {
+          ttfb: 8,
+          resource_load_delay: 6,
+          resource_load_time: 12,
+          element_render_delay: 74
+        }
+      },
+      inp_story: {
+        dominant_phase: 'processing' as const,
+        dominant_phase_share_pct: 62,
+        phase_distribution_pct: {
+          input_delay: 14,
+          processing: 62,
+          presentation: 24
+        }
+      }
+    };
+
+    const encoded = encodeSignalReportUrl(enriched);
+    const decoded = decodeSignalReportUrl(encoded.url);
+
+    expect(decoded.lcp_story).toEqual(enriched.lcp_story);
+    expect(decoded.inp_story).toEqual(enriched.inp_story);
+  });
+
+  it('leaves lcp_story and inp_story undefined when absent from the encoded URL', () => {
+    const encoded = encodeSignalReportUrl(strongLcpCoverageAggregateFixture);
+    const decoded = decodeSignalReportUrl(encoded.url);
+
+    expect(decoded.lcp_story).toBeUndefined();
+    expect(decoded.inp_story).toBeUndefined();
+  });
+
+  it('classifies third-party weight tiers by pre-LCP script share (§2.4)', () => {
+    expect(classifyThirdPartyShareTier(null)).toBeNull();
+    expect(classifyThirdPartyShareTier(-1)).toBeNull();
+    expect(classifyThirdPartyShareTier(0)).toBe('none');
+    expect(classifyThirdPartyShareTier(1)).toBe('light');
+    expect(classifyThirdPartyShareTier(15)).toBe('light');
+    expect(classifyThirdPartyShareTier(16)).toBe('moderate');
+    expect(classifyThirdPartyShareTier(40)).toBe('moderate');
+    expect(classifyThirdPartyShareTier(41)).toBe('heavy');
+    expect(classifyThirdPartyShareTier(100)).toBe('heavy');
+  });
+
+  it('derives the GA4 third_party_weight_tier enum from the event payload', () => {
+    const heavyEvent = {
+      ...chromeColdNavFixture,
+      vitals: {
+        ...chromeColdNavFixture.vitals,
+        third_party: { pre_lcp_script_share_pct: 62, origin_count: 7 }
+      }
+    };
+    const bareEvent = {
+      ...chromeColdNavFixture,
+      vitals: { ...chromeColdNavFixture.vitals, third_party: null }
+    };
+
+    expect(deriveThirdPartyWeightTier(heavyEvent)).toBe('heavy');
+    expect(deriveThirdPartyWeightTier(bareEvent)).toBeNull();
+
+    const flattened = flattenSignalEventForGa4(heavyEvent);
+    expect(flattened.third_party_weight_tier).toBe('heavy');
+  });
+
+  it('aggregates third_party_story when observations cross the race threshold', () => {
+    const events = Array.from({ length: 30 }, (_, index) => ({
+      ...chromeColdNavFixture,
+      event_id: `tp_${index}`,
+      ts: chromeColdNavFixture.ts + index * 1_000,
+      vitals: {
+        ...chromeColdNavFixture.vitals,
+        third_party: {
+          pre_lcp_script_share_pct: 55,
+          origin_count: 8
+        }
+      }
+    }));
+
+    const aggregate = aggregateSignalEvents(events, 'production', chromeColdNavFixture.ts + 120_000);
+
+    expect(aggregate.third_party_story).toBeDefined();
+    expect(aggregate.third_party_story?.dominant_tier).toBe('heavy');
+    expect(aggregate.third_party_story?.dominant_tier_share_pct).toBe(100);
+    expect(aggregate.third_party_story?.median_share_pct).toBe(55);
+    expect(aggregate.third_party_story?.median_origin_count).toBe(8);
+  });
+
+  it('omits third_party_story when the observation threshold is not met', () => {
+    const events = Array.from({ length: SIGNAL_MIN_RACE_OBSERVATIONS - 1 }, (_, index) => ({
+      ...chromeColdNavFixture,
+      event_id: `tp_thin_${index}`,
+      ts: chromeColdNavFixture.ts + index * 1_000,
+      vitals: {
+        ...chromeColdNavFixture.vitals,
+        third_party: { pre_lcp_script_share_pct: 20, origin_count: 4 }
+      }
+    }));
+
+    const aggregate = aggregateSignalEvents(events, 'preview', chromeColdNavFixture.ts + 60_000);
+
+    expect(aggregate.third_party_story).toBeUndefined();
+  });
+
+  it('round-trips third_party_story through the report URL codec', () => {
+    const enriched = {
+      ...strongLcpCoverageAggregateFixture,
+      third_party_story: {
+        median_share_pct: 32,
+        dominant_tier: 'moderate' as const,
+        dominant_tier_share_pct: 58,
+        median_origin_count: 6
+      }
+    };
+
+    const encoded = encodeSignalReportUrl(enriched);
+    const decoded = decodeSignalReportUrl(encoded.url);
+
+    expect(decoded.third_party_story).toEqual(enriched.third_party_story);
+  });
+
+  it('leaves third_party_story undefined when absent from the encoded URL', () => {
+    const encoded = encodeSignalReportUrl(strongLcpCoverageAggregateFixture);
+    const decoded = decodeSignalReportUrl(encoded.url);
+
+    expect(decoded.third_party_story).toBeUndefined();
+  });
+
+  it('aggregates loaf_story when observations cross the race threshold', () => {
+    const events = Array.from({ length: 30 }, (_, index) => ({
+      ...chromeColdNavFixture,
+      event_id: `loaf_${index}`,
+      ts: chromeColdNavFixture.ts + index * 1_000,
+      vitals: {
+        ...chromeColdNavFixture.vitals,
+        loaf: {
+          worst_duration_ms: 180 + index,
+          dominant_cause: 'script' as const,
+          script_origin_count: 3
+        }
+      }
+    }));
+
+    const aggregate = aggregateSignalEvents(events, 'production', chromeColdNavFixture.ts + 120_000);
+
+    expect(aggregate.loaf_story).toBeDefined();
+    expect(aggregate.loaf_story?.dominant_cause).toBe('script');
+    expect(aggregate.loaf_story?.dominant_cause_share_pct).toBe(100);
+    expect(aggregate.loaf_story?.worst_frame_ms_p75).toBeGreaterThanOrEqual(180);
+  });
+
+  it('omits loaf_story when the observation threshold is not met', () => {
+    const events = Array.from({ length: SIGNAL_MIN_RACE_OBSERVATIONS - 1 }, (_, index) => ({
+      ...chromeColdNavFixture,
+      event_id: `loaf_thin_${index}`,
+      ts: chromeColdNavFixture.ts + index * 1_000,
+      vitals: {
+        ...chromeColdNavFixture.vitals,
+        loaf: {
+          worst_duration_ms: 120,
+          dominant_cause: 'layout' as const,
+          script_origin_count: 1
+        }
+      }
+    }));
+
+    const aggregate = aggregateSignalEvents(events, 'preview', chromeColdNavFixture.ts + 60_000);
+
+    expect(aggregate.loaf_story).toBeUndefined();
+  });
+
+  it('ignores loaf events whose dominant_cause is null (partial entry)', () => {
+    const events = Array.from({ length: 30 }, (_, index) => ({
+      ...chromeColdNavFixture,
+      event_id: `loaf_null_${index}`,
+      ts: chromeColdNavFixture.ts + index * 1_000,
+      vitals: {
+        ...chromeColdNavFixture.vitals,
+        loaf: {
+          worst_duration_ms: 90,
+          dominant_cause: null,
+          script_origin_count: null
+        }
+      }
+    }));
+
+    const aggregate = aggregateSignalEvents(events, 'production', chromeColdNavFixture.ts + 60_000);
+
+    expect(aggregate.loaf_story).toBeUndefined();
+  });
+
+  it('round-trips loaf_story through the report URL codec', () => {
+    const enriched = {
+      ...strongLcpCoverageAggregateFixture,
+      loaf_story: {
+        dominant_cause: 'layout' as const,
+        dominant_cause_share_pct: 52,
+        worst_frame_ms_p75: 210
+      }
+    };
+
+    const encoded = encodeSignalReportUrl(enriched);
+    const decoded = decodeSignalReportUrl(encoded.url);
+
+    expect(decoded.loaf_story).toEqual(enriched.loaf_story);
+  });
+
+  it('leaves loaf_story undefined when absent from the encoded URL', () => {
+    const encoded = encodeSignalReportUrl(strongLcpCoverageAggregateFixture);
+    const decoded = decodeSignalReportUrl(encoded.url);
+
+    expect(decoded.loaf_story).toBeUndefined();
+  });
+
+  it('rejects malformed loaf_story enum on decode', () => {
+    const encoded = encodeSignalReportUrl({
+      ...strongLcpCoverageAggregateFixture,
+      loaf_story: {
+        dominant_cause: 'script',
+        dominant_cause_share_pct: 60,
+        worst_frame_ms_p75: 160
+      }
+    });
+    const tampered = encoded.url.replace('lfd=script', 'lfd=bogus');
+
+    expect(() => decodeSignalReportUrl(tampered)).toThrow(/Invalid encoded enum value for "lfd"/);
+  });
+
+  it('drops background-tab events before accumulators run and records the exclusion count', () => {
+    const events = Array.from({ length: 40 }, (_, index) => ({
+      ...chromeColdNavFixture,
+      event_id: `fg_${index}`,
+      ts: chromeColdNavFixture.ts + index * 1_000
+    }));
+    const backgroundEvents = Array.from({ length: 10 }, (_, index) => ({
+      ...chromeColdNavFixture,
+      event_id: `bg_${index}`,
+      ts: chromeColdNavFixture.ts + index * 1_000,
+      context: {
+        ...chromeColdNavFixture.context,
+        visibility_hidden_at_load: true
+      }
+    }));
+
+    const aggregate = aggregateSignalEvents(
+      [...events, ...backgroundEvents],
+      'production',
+      chromeColdNavFixture.ts + 120_000
+    );
+
+    expect(aggregate.sample_size).toBe(40);
+    expect(aggregate.coverage.raw_sample_size).toBe(50);
+    expect(aggregate.coverage.excluded_background_sessions).toBe(10);
+    expect(aggregate.coverage.raw_sample_size).toBe(
+      aggregate.sample_size + (aggregate.coverage.excluded_background_sessions ?? 0)
+    );
+  });
+
+  it('does not push the marginal-coverage warning when the race cohort is comfortably above thresholds', () => {
+    const aggregate = aggregateSignalEvents(
+      Array.from({ length: 40 }, (_, index) => ({
+        ...chromeColdNavFixture,
+        event_id: `comfort_${index}`,
+        ts: chromeColdNavFixture.ts + index * 1_000
+      })),
+      'production',
+      chromeColdNavFixture.ts + 120_000
+    );
+
+    expect(aggregate.warnings).not.toContain('coverage_marginal');
+  });
+
+  it('round-trips raw_sample_size and excluded_background_sessions through the report URL codec', () => {
+    const enriched = {
+      ...strongLcpCoverageAggregateFixture,
+      coverage: {
+        ...strongLcpCoverageAggregateFixture.coverage,
+        raw_sample_size: strongLcpCoverageAggregateFixture.sample_size + 7,
+        excluded_background_sessions: 7
+      }
+    };
+
+    const encoded = encodeSignalReportUrl(enriched);
+    const decoded = decodeSignalReportUrl(encoded.url);
+
+    expect(decoded.coverage.raw_sample_size).toBe(enriched.coverage.raw_sample_size);
+    expect(decoded.coverage.excluded_background_sessions).toBe(enriched.coverage.excluded_background_sessions);
+  });
+
+  it('decodes legacy report URLs without raw_sample_size / excluded_background_sessions params', () => {
+    const encoded = encodeSignalReportUrl(strongLcpCoverageAggregateFixture);
+    const url = new URL(encoded.url);
+    url.searchParams.delete('rs');
+    url.searchParams.delete('xb');
+    const decoded = decodeSignalReportUrl(url.toString());
+
+    expect(decoded.coverage.raw_sample_size).toBeUndefined();
+    expect(decoded.coverage.excluded_background_sessions).toBeUndefined();
+  });
+
+  it('surfaces a soft-limit warning when the encoded report URL exceeds 2048 bytes', () => {
+    const long = 'a'.repeat(1800);
+    const enriched = {
+      ...strongLcpCoverageAggregateFixture,
+      domain: `${long}.example.test`
+    };
+
+    const encoded = encodeSignalReportUrl(enriched);
+    const softWarning = encoded.warnings.find((warning) => warning.startsWith('signal_report_url_exceeds_soft_limit:'));
+    expect(softWarning).toBeDefined();
+  });
+
+  it('throws when the encoded report URL exceeds the 4096-byte hard limit', () => {
+    const long = 'a'.repeat(4200);
+    const enriched = {
+      ...strongLcpCoverageAggregateFixture,
+      domain: `${long}.example.test`
+    };
+
+    expect(() => encodeSignalReportUrl(enriched)).toThrow(/hard limit/);
+  });
+
+  it('keeps a realistic enriched aggregate comfortably below the soft URL limit', () => {
+    const enriched = {
+      ...strongLcpCoverageAggregateFixture,
+      third_party_story: {
+        median_share_pct: 32,
+        dominant_tier: 'moderate' as const,
+        dominant_tier_share_pct: 58,
+        median_origin_count: 6
+      },
+      coverage: {
+        ...strongLcpCoverageAggregateFixture.coverage,
+        raw_sample_size: strongLcpCoverageAggregateFixture.sample_size + 25,
+        excluded_background_sessions: 25
+      }
+    };
+    const encoded = encodeSignalReportUrl(enriched);
+    expect(encoded.url.length).toBeLessThan(2048);
+    expect(encoded.warnings).not.toContain(expect.stringContaining('signal_report_url_exceeds_soft_limit'));
+  });
+
+  it('aggregates context_story from audience signals and counts cellular sessions', () => {
+    const events = Array.from({ length: 40 }, (_, index) => ({
+      ...chromeColdNavFixture,
+      event_id: `ctx_${index}`,
+      ts: chromeColdNavFixture.ts + index * 1_000,
+      context: {
+        ...chromeColdNavFixture.context,
+        save_data: index % 5 === 0,
+        connection_type: 'cellular' as const,
+        rtt_ms: 180 + (index % 3) * 10,
+        effective_type: '3g'
+      }
+    }));
+
+    const aggregate = aggregateSignalEvents(events, 'production', chromeColdNavFixture.ts + 120_000);
+
+    expect(aggregate.context_story).toBeDefined();
+    expect(aggregate.context_story?.save_data_share_pct).toBe(20);
+    expect(aggregate.context_story?.cellular_share_pct).toBe(100);
+    expect(aggregate.context_story?.effective_type_dominant).toBe('3g');
+    expect(aggregate.context_story?.median_rtt_ms).toBeGreaterThan(0);
+  });
+
+  it('returns context_story with null median_rtt when sample is below quartile minimum', () => {
+    const events = Array.from({ length: 5 }, (_, index) => ({
+      ...chromeColdNavFixture,
+      event_id: `ctx_thin_${index}`,
+      ts: chromeColdNavFixture.ts + index * 1_000,
+      context: {
+        ...chromeColdNavFixture.context,
+        save_data: false,
+        connection_type: null,
+        rtt_ms: 120,
+        effective_type: '4g'
+      }
+    }));
+
+    const aggregate = aggregateSignalEvents(events, 'preview', chromeColdNavFixture.ts + 60_000);
+
+    expect(aggregate.context_story?.median_rtt_ms).toBeNull();
+    expect(aggregate.context_story?.save_data_share_pct).toBe(0);
+    expect(aggregate.context_story?.cellular_share_pct).toBe(0);
+  });
+
+  it('round-trips context_story through the report URL codec', () => {
+    const enriched = {
+      ...strongLcpCoverageAggregateFixture,
+      context_story: {
+        save_data_share_pct: 12,
+        median_rtt_ms: 180,
+        cellular_share_pct: 35,
+        effective_type_dominant: '3g' as const
+      }
+    };
+
+    const encoded = encodeSignalReportUrl(enriched);
+    const decoded = decodeSignalReportUrl(encoded.url);
+
+    expect(decoded.context_story).toEqual(enriched.context_story);
+  });
+
+  it('leaves context_story undefined when absent from the encoded URL', () => {
+    const encoded = encodeSignalReportUrl(strongLcpCoverageAggregateFixture);
+    const url = new URL(encoded.url);
+    url.searchParams.delete('csd');
+    url.searchParams.delete('cmr');
+    url.searchParams.delete('ccs');
+    url.searchParams.delete('cet');
+    const decoded = decodeSignalReportUrl(url.toString());
+
+    expect(decoded.context_story).toBeUndefined();
+  });
+
+  it('rejects malformed context_story effective_type enum on decode', () => {
+    const encoded = encodeSignalReportUrl({
+      ...strongLcpCoverageAggregateFixture,
+      context_story: {
+        save_data_share_pct: 4,
+        median_rtt_ms: 150,
+        cellular_share_pct: 20,
+        effective_type_dominant: '3g'
+      }
+    });
+    const tampered = encoded.url.replace('cet=3g', 'cet=bogus');
+
+    expect(() => decodeSignalReportUrl(tampered)).toThrow(/Invalid encoded enum value for "cet"/);
   });
 });

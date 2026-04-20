@@ -74,6 +74,14 @@ These fields enrich the core vitals with diagnostic context when the browser sup
 | `inp_attribution.processing_duration_ms` | `number \| null` | Time in handler execution. Chromium-only. |
 | `inp_attribution.presentation_delay_ms` | `number \| null` | Time waiting for next paint. Chromium-only. |
 
+**LoAF attribution** (Chromium 123+; null elsewhere):
+
+| Field | Type | Description |
+|---|---|---|
+| `vitals.loaf.worst_duration_ms` | `number \| null` | Duration of the worst long animation frame observed in the session (running max). |
+| `vitals.loaf.dominant_cause` | `'script' \| 'layout' \| 'style' \| 'paint' \| null` | Substage (argmax) most responsible for the worst frame. Null when every substage input is missing. |
+| `vitals.loaf.script_origin_count` | `number \| null` | Distinct hosts with script activity during the worst frame. Null when no parseable `sourceURL` is present. |
+
 ### Connection context (supplementary, non-classifying)
 
 These signals are collected for cross-reference but do not feed tier classification.
@@ -92,8 +100,7 @@ These signals are collected for cross-reference but do not feed tier classificat
 |---|---|---|
 | `meta.pkg_version` | `string` | Signal package version. |
 | `meta.browser` | `string` | Browser family. |
-| `meta.nav_type` | `string` | Raw navigation type string. |
-| `meta.navigation_type` | `'navigate' \| 'reload' \| 'back-forward' \| 'prerender' \| 'restore'` | Normalized navigation semantics. |
+| `meta.navigation_type` | `'navigate' \| 'reload' \| 'back-forward' \| 'prerender' \| 'restore'` | Normalized navigation semantics. Replaces the legacy `meta.nav_type` field (removed in 0.1.x). |
 
 ---
 
@@ -171,7 +178,7 @@ Signal normalizes the browser's navigation context into five semantic types:
 
 The GA4 dataLayer sink pushes a flattened `perf_tier_report` event with a compact subset of the full schema. This path is designed for GTM forwarding, GA4 DebugView, and BigQuery export. The subset stays within GA4's standard event parameter limits.
 
-The GA4 compact subset includes 21 fields: `event_id`, `host`, `url`, `net_tier`, `net_tcp_ms`, `net_tcp_source`, `device_tier`, `device_screen_w`, `lcp_ms`, `fcp_ms`, `ttfb_ms`, `browser`, `nav_type`, `navigation_type`, `lcp_load_state`, `lcp_element_type`, `inp_load_state`, `interaction_type`, `input_delay_ms`, `processing_duration_ms`, `presentation_delay_ms`.
+The GA4 compact subset includes 24 fields: `event_id`, `host`, `url`, `net_tier`, `net_tcp_ms`, `net_tcp_source`, `device_tier`, `device_screen_w`, `lcp_ms`, `fcp_ms`, `ttfb_ms`, `browser`, `navigation_type`, `lcp_load_state`, `lcp_element_type`, `inp_load_state`, `interaction_type`, `input_delay_ms`, `processing_duration_ms`, `presentation_delay_ms`, `lcp_culprit_kind`, `lcp_dominant_subpart`, `inp_dominant_phase`, `third_party_weight_tier` — plus the `event` name itself for 25 total, exactly at GA4's custom-parameter ceiling. The legacy `nav_type` parameter has been removed in 0.1.x; use `navigation_type` (identical semantics, wider coverage).
 
 `device_screen_w` unlocks the aggregate-time form-factor split (mobile / tablet / desktop) that the hosted report surfaces in the persistent footer. Breakpoints and rationale in [aggregation-spec.md](./aggregation-spec.md).
 
@@ -226,7 +233,7 @@ Quartile blocks return `null` when the underlying sample is below 20 — the rep
 |---|---|---|---|
 | `browser_hist` | `navigator.userAgent` parsed | `chrome / safari / firefox / edge / other` | Testing matrix priority: webkit smoke coverage in proportion to real audience share |
 
-**Deliberately excluded** — viewport, device pixel ratio, touch points, `connection.type`, TCP quartiles, `nav_type` histogram. Each was interrogated against the usefulness filter and cut.
+**Deliberately excluded** — viewport, device pixel ratio, touch points, `connection.type`, TCP quartiles, navigation-type histogram. Each was interrogated against the usefulness filter and cut.
 
 All three blocks are additive and backward-compatible. `rv=1` URLs without these fields decode cleanly; the report surfaces the blocks only when present.
 

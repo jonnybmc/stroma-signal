@@ -1,14 +1,70 @@
 import type {
   SignalInpAttribution,
+  SignalInpPhase,
   SignalInteractionType,
   SignalLcpAttribution,
+  SignalLcpBreakdown,
+  SignalLcpCulpritKind,
   SignalLcpElementType,
   SignalLoadState,
-  SignalVitals
+  SignalLoafCause,
+  SignalVitals,
+  SignalVitalsLoaf,
+  SignalVitalsThirdParty
 } from '@stroma-labs/signal-contracts';
+
+// Culprit-kind regex patterns — compiled once at module load (§9a.3).
+const LCP_HERO_URL_PATTERN = /(hero|banner|splash|cover)/i;
+const LCP_PRODUCT_URL_PATTERN = /(product|sku|gallery|pdp)/i;
+const LCP_VIDEO_URL_PATTERN = /(poster|video|thumb(?:nail)?)/i;
+const LCP_BANNER_TARGET_PATTERN = /banner/i;
+
+// INP interactionRecords Map cap (§2.3). Unbounded map on long-lived SPA
+// sessions was a memory regression risk for customer apps; capping at 100
+// with lowest-duration eviction preserves the p98 INP selection.
+const INP_INTERACTION_RECORDS_CAP = 100;
+
+// Inline public-suffix list for eTLD+1 extraction (§2.4). Keeps the
+// zero-dependency posture — unmatched hosts fall back to "last two labels",
+// an acceptable approximation for the buyer cohort.
+const MULTI_PART_PUBLIC_SUFFIXES = new Set<string>([
+  'co.uk',
+  'org.uk',
+  'ac.uk',
+  'gov.uk',
+  'me.uk',
+  'com.au',
+  'net.au',
+  'org.au',
+  'co.jp',
+  'ne.jp',
+  'or.jp',
+  'ac.jp',
+  'co.nz',
+  'net.nz',
+  'org.nz',
+  'co.za',
+  'co.kr',
+  'co.in',
+  'co.id',
+  'co.il',
+  'com.br',
+  'com.mx',
+  'com.ar',
+  'com.cn',
+  'net.cn',
+  'org.cn',
+  'com.tw',
+  'com.hk',
+  'com.sg',
+  'com.tr'
+]);
 
 export interface ObserveVitalsOptions {
   generateTarget?: (element: Element | null) => string | null;
+  // §2.4 — opt-in first-party aliasing for exotic infrastructure.
+  // Entries are treated as first-party after strict-host + eTLD+1 checks.
+  firstPartyOriginsAllowlist?: readonly string[];
 }
 
 interface RawPaintDebugEntry {
@@ -44,6 +100,7 @@ type LargestContentfulPaintEntry = PerformanceEntry & {
   startTime: number;
   element?: Element | null;
   url?: string;
+  loadTime?: number;
 };
 
 type LayoutShiftEntry = PerformanceEntry & {
@@ -64,6 +121,21 @@ type EventTimingEntry = PerformanceEntry & {
   processingEnd?: number;
   name?: string;
   target?: Element | null;
+};
+
+type LoafScriptEntry = {
+  duration?: number;
+  sourceURL?: string;
+};
+
+type LongAnimationFrameEntry = PerformanceEntry & {
+  duration: number;
+  startTime: number;
+  renderStart?: number;
+  styleAndLayoutStart?: number;
+  styleAndLayoutDuration?: number;
+  forcedStyleAndLayoutDuration?: number;
+  scripts?: readonly LoafScriptEntry[];
 };
 
 interface ObservedPerformanceStream {
@@ -163,6 +235,228 @@ function roundPositive(value: number | undefined): number | null {
   return Math.max(0, Math.round(value));
 }
 
+function classifyLcpCulprit(
+  elementType: SignalLcpElementType | null,
+  resourceUrl: string | null,
+  target: string | null
+): SignalLcpCulpritKind {
+  if (elementType === 'text') return 'headline_text';
+  if (elementType === 'image') {
+    if (resourceUrl) {
+      if (LCP_HERO_URL_PATTERN.test(resourceUrl)) return 'hero_image';
+      if (LCP_PRODUCT_URL_PATTERN.test(resourceUrl)) return 'product_image';
+      if (LCP_VIDEO_URL_PATTERN.test(resourceUrl)) return 'video_poster';
+    }
+    if (target && LCP_BANNER_TARGET_PATTERN.test(target)) return 'banner_image';
+    return 'hero_image';
+  }
+  return 'unknown';
+}
+
+// Tiebreak order: processing > input_delay > presentation — most actionable first.
+function deriveInpDominantPhase(
+  inputDelayMs: number | null,
+  processingDurationMs: number | null,
+  presentationDelayMs: number | null
+): SignalInpPhase | null {
+  if (inputDelayMs == null && processingDurationMs == null && presentationDelayMs == null) {
+    return null;
+  }
+  const processing = processingDurationMs ?? -1;
+  const inputDelay = inputDelayMs ?? -1;
+  const presentation = presentationDelayMs ?? -1;
+  if (processing >= inputDelay && processing >= presentation) return 'processing';
+  if (inputDelay >= presentation) return 'input_delay';
+  return 'presentation';
+}
+
+// §2.5 — LoAF dominant-cause: argmax across the four substages. Any
+// substage with missing inputs is excluded from the argmax; if every
+// candidate is null, dominant_cause returns null rather than guessing.
+// Null-safe against the partial entries early Chrome 123 betas produced.
+function deriveLoafAttribution(entry: LongAnimationFrameEntry): SignalVitalsLoaf {
+  const duration = Number.isFinite(entry.duration) ? Math.max(0, entry.duration) : null;
+  const worstDurationMs = duration != null ? Math.round(duration) : null;
+
+  const styleAndLayoutDuration = Number.isFinite(entry.styleAndLayoutDuration ?? Number.NaN)
+    ? (entry.styleAndLayoutDuration as number)
+    : null;
+  const forcedStyleAndLayoutDuration = Number.isFinite(entry.forcedStyleAndLayoutDuration ?? Number.NaN)
+    ? (entry.forcedStyleAndLayoutDuration as number)
+    : null;
+
+  let scriptTime: number | null = null;
+  const scriptHosts = new Set<string>();
+  if (entry.scripts && entry.scripts.length > 0) {
+    let scriptTotal = 0;
+    for (const script of entry.scripts) {
+      if (Number.isFinite(script.duration ?? Number.NaN)) {
+        scriptTotal += Math.max(0, script.duration as number);
+      }
+      if (typeof script.sourceURL === 'string' && script.sourceURL.length > 0) {
+        try {
+          scriptHosts.add(new URL(script.sourceURL).host.toLowerCase());
+        } catch {
+          // Unparseable sourceURL (inline script, blob:, etc.) contributes
+          // no origin. Silently skip — do not inflate the origin count.
+        }
+      }
+    }
+    scriptTime = scriptTotal;
+  }
+
+  const layoutTime =
+    styleAndLayoutDuration != null && forcedStyleAndLayoutDuration != null
+      ? Math.max(0, styleAndLayoutDuration - forcedStyleAndLayoutDuration)
+      : null;
+  const styleTime = forcedStyleAndLayoutDuration != null ? Math.max(0, forcedStyleAndLayoutDuration) : null;
+  const paintTime =
+    duration != null &&
+    Number.isFinite(entry.renderStart ?? Number.NaN) &&
+    (entry.renderStart as number) > 0 &&
+    Number.isFinite(entry.startTime)
+      ? Math.max(0, duration - ((entry.renderStart as number) - entry.startTime))
+      : null;
+
+  const candidates: Array<{ cause: SignalLoafCause; value: number }> = [];
+  if (scriptTime != null) candidates.push({ cause: 'script', value: scriptTime });
+  if (layoutTime != null) candidates.push({ cause: 'layout', value: layoutTime });
+  if (styleTime != null) candidates.push({ cause: 'style', value: styleTime });
+  if (paintTime != null) candidates.push({ cause: 'paint', value: paintTime });
+
+  let dominantCause: SignalLoafCause | null = null;
+  if (candidates.length > 0) {
+    let best = candidates[0];
+    if (!best) {
+      dominantCause = null;
+    } else {
+      for (let index = 1; index < candidates.length; index += 1) {
+        const candidate = candidates[index];
+        if (candidate && candidate.value > best.value) best = candidate;
+      }
+      dominantCause = best.cause;
+    }
+  }
+
+  return {
+    worst_duration_ms: worstDurationMs,
+    dominant_cause: dominantCause,
+    script_origin_count: scriptHosts.size > 0 ? scriptHosts.size : null
+  };
+}
+
+function getRegistrableDomain(host: string): string {
+  const normalized = host.toLowerCase();
+  const labels = normalized.split('.');
+  if (labels.length < 2) return normalized;
+  const lastTwo = labels.slice(-2).join('.');
+  if (labels.length >= 3 && MULTI_PART_PUBLIC_SUFFIXES.has(lastTwo)) {
+    return labels.slice(-3).join('.');
+  }
+  return lastTwo;
+}
+
+// §2.4 first-party policy: strict host → eTLD+1 → optional allowlist.
+function isFirstPartyHost(host: string, currentHost: string, allowlist: readonly string[]): boolean {
+  if (!host || !currentHost) return false;
+  const normalized = host.toLowerCase();
+  const current = currentHost.toLowerCase();
+  if (normalized === current) return true;
+  const currentDomain = getRegistrableDomain(current);
+  if (getRegistrableDomain(normalized) === currentDomain) return true;
+  for (const entry of allowlist) {
+    const allowedHost = entry.toLowerCase();
+    if (normalized === allowedHost) return true;
+    if (getRegistrableDomain(normalized) === getRegistrableDomain(allowedHost)) return true;
+  }
+  return false;
+}
+
+function deriveThirdPartyShare(
+  resourceEntries: readonly PerformanceResourceTiming[],
+  lcpStartTime: number | null,
+  currentHost: string | null,
+  allowlist: readonly string[]
+): SignalVitalsThirdParty | null {
+  if (lcpStartTime == null || !Number.isFinite(lcpStartTime) || lcpStartTime <= 0) return null;
+  if (!currentHost) return null;
+
+  let totalBytes = 0;
+  let thirdPartyBytes = 0;
+  const thirdPartyHosts = new Set<string>();
+
+  for (const entry of resourceEntries) {
+    if (entry.initiatorType !== 'script') continue;
+    if (entry.startTime >= lcpStartTime) continue;
+    const bytes = entry.transferSize || entry.encodedBodySize || 0;
+    if (bytes <= 0) continue;
+    totalBytes += bytes;
+    let entryHost: string;
+    try {
+      entryHost = new URL(entry.name).host;
+    } catch {
+      continue;
+    }
+    if (!isFirstPartyHost(entryHost, currentHost, allowlist)) {
+      thirdPartyBytes += bytes;
+      thirdPartyHosts.add(entryHost.toLowerCase());
+    }
+  }
+
+  if (totalBytes <= 0) return null;
+
+  const sharePct = Math.max(0, Math.min(100, Math.round((thirdPartyBytes / totalBytes) * 100)));
+  // Privacy mask: small-site third-party origin counts below 3 are hidden.
+  const originCount = thirdPartyHosts.size >= 3 ? thirdPartyHosts.size : null;
+
+  return {
+    pre_lcp_script_share_pct: sharePct,
+    origin_count: originCount
+  };
+}
+
+// All-or-nothing per §2.1. Any missing input → whole breakdown is null.
+function deriveLcpBreakdown(
+  rawStartTime: number | undefined,
+  rawLoadTime: number | undefined,
+  rawUrl: string | undefined,
+  elementType: SignalLcpElementType | null,
+  navResponseStart: number,
+  resourceEntries: readonly PerformanceResourceTiming[]
+): SignalLcpBreakdown | null {
+  if (rawStartTime == null || !Number.isFinite(rawStartTime)) return null;
+  if (!Number.isFinite(navResponseStart) || navResponseStart <= 0) return null;
+
+  if (elementType === 'text') {
+    return {
+      resource_load_delay_ms: 0,
+      resource_load_time_ms: 0,
+      element_render_delay_ms: Math.max(0, Math.round(rawStartTime - navResponseStart))
+    };
+  }
+
+  if (elementType === 'image') {
+    if (!rawUrl || rawLoadTime == null || !Number.isFinite(rawLoadTime) || rawLoadTime <= 0) return null;
+    const match = resourceEntries.find((entry) => entry.name === rawUrl);
+    if (!match) return null;
+    if (
+      !Number.isFinite(match.requestStart) ||
+      !Number.isFinite(match.responseEnd) ||
+      match.requestStart <= 0 ||
+      match.responseEnd <= 0
+    ) {
+      return null;
+    }
+    return {
+      resource_load_delay_ms: Math.max(0, Math.round(match.requestStart - navResponseStart)),
+      resource_load_time_ms: Math.max(0, Math.round(match.responseEnd - match.requestStart)),
+      element_render_delay_ms: Math.max(0, Math.round(rawStartTime - rawLoadTime))
+    };
+  }
+
+  return null;
+}
+
 function createInpAttribution(
   entry: EventTimingEntry,
   generateTarget: (element: Element | null) => string | null
@@ -175,33 +469,49 @@ function createInpAttribution(
   const processingDuration =
     processingStart != null && processingEnd != null ? processingEnd - processingStart : undefined;
   const presentationDelay = processingEnd != null ? duration - (processingEnd - startTime) : undefined;
+  const inputDelayMs = roundPositive(inputDelay);
+  const processingDurationMs = roundPositive(processingDuration);
+  const presentationDelayMs = roundPositive(presentationDelay);
 
   return {
     load_state: readLoadState(),
     interaction_target: generateTarget(entry.target ?? null),
     interaction_type: inferInteractionType(entry.name),
     interaction_time_ms: roundPositive(startTime),
-    input_delay_ms: roundPositive(inputDelay),
-    processing_duration_ms: roundPositive(processingDuration),
-    presentation_delay_ms: roundPositive(presentationDelay)
+    input_delay_ms: inputDelayMs,
+    processing_duration_ms: processingDurationMs,
+    presentation_delay_ms: presentationDelayMs,
+    dominant_phase: deriveInpDominantPhase(inputDelayMs, processingDurationMs, presentationDelayMs)
   };
 }
 
 export function observeVitals(options: ObserveVitalsOptions = {}): VitalObserverController {
   const generateTarget = options.generateTarget ?? defaultGenerateTarget;
+  const firstPartyAllowlist = options.firstPartyOriginsAllowlist ?? [];
   let largestContentfulPaint: number | null = null;
   let lcpAttribution: SignalLcpAttribution | undefined;
+  let lcpRawStartTime: number | undefined;
+  let lcpRawLoadTime: number | undefined;
+  let lcpRawUrl: string | undefined;
+  let lcpElementType: SignalLcpElementType | null = null;
   let cumulativeLayoutShift = 0;
   const interactionRecords = new Map<number, InpInteractionRecord>();
   let firstContentfulPaint: number | null = null;
   let rawFcpEntry: RawPaintDebugEntry | null = null;
   let rawLcpEntry: RawLcpDebugEntry | null = null;
+  // LoAF worst-duration running max. Only the highest-duration frame is
+  // retained (bounded memory per §9a.7); the rest are discarded as they
+  // arrive. Safe on long-lived SPA sessions with many janky frames.
+  let worstLoaf: LongAnimationFrameEntry | null = null;
 
   const observers: ObservedPerformanceStream[] = [];
 
   const handleLcpEntry = (entry: PerformanceEntry): void => {
     const lcpEntry = entry as LargestContentfulPaintEntry;
     largestContentfulPaint = Math.round(lcpEntry.startTime);
+    lcpRawStartTime = lcpEntry.startTime;
+    lcpRawLoadTime = lcpEntry.loadTime;
+    lcpRawUrl = lcpEntry.url;
     rawLcpEntry = {
       entry_type: 'largest-contentful-paint',
       start_time_ms: Math.round(lcpEntry.startTime),
@@ -209,11 +519,15 @@ export function observeVitals(options: ObserveVitalsOptions = {}): VitalObserver
       element_tag: lcpEntry.element?.tagName?.toLowerCase() ?? null
     };
     const resourceUrl = sanitizeResourceUrl(lcpEntry.url);
+    const elementType = inferLcpElementType(lcpEntry.element ?? null, resourceUrl);
+    const target = generateTarget(lcpEntry.element ?? null);
+    lcpElementType = elementType;
     lcpAttribution = {
       load_state: readLoadState(),
-      target: generateTarget(lcpEntry.element ?? null),
-      element_type: inferLcpElementType(lcpEntry.element ?? null, resourceUrl),
-      resource_url: resourceUrl
+      target,
+      element_type: elementType,
+      resource_url: resourceUrl,
+      culprit_kind: classifyLcpCulprit(elementType, resourceUrl, target)
     };
   };
 
@@ -243,11 +557,39 @@ export function observeVitals(options: ObserveVitalsOptions = {}): VitalObserver
     if (duration == null || !Number.isFinite(duration) || interactionId <= 0) return;
 
     const current = interactionRecords.get(interactionId);
-    if (!current || duration > current.duration) {
+    if (current) {
+      if (duration <= current.duration) return;
       interactionRecords.set(interactionId, {
         duration,
         attribution: createInpAttribution(eventEntry, generateTarget)
       });
+      return;
+    }
+
+    if (interactionRecords.size >= INP_INTERACTION_RECORDS_CAP) {
+      let evictKey: number | null = null;
+      let evictDuration = Number.POSITIVE_INFINITY;
+      for (const [key, record] of interactionRecords) {
+        if (record.duration < evictDuration) {
+          evictDuration = record.duration;
+          evictKey = key;
+        }
+      }
+      if (duration <= evictDuration) return;
+      if (evictKey != null) interactionRecords.delete(evictKey);
+    }
+
+    interactionRecords.set(interactionId, {
+      duration,
+      attribution: createInpAttribution(eventEntry, generateTarget)
+    });
+  };
+
+  const handleLoafEntry = (entry: PerformanceEntry): void => {
+    const loafEntry = entry as LongAnimationFrameEntry;
+    if (!Number.isFinite(loafEntry.duration)) return;
+    if (worstLoaf == null || loafEntry.duration > worstLoaf.duration) {
+      worstLoaf = loafEntry;
     }
   };
 
@@ -285,6 +627,11 @@ export function observeVitals(options: ObserveVitalsOptions = {}): VitalObserver
     durationThreshold: 40
   } as PerformanceObserverInit);
 
+  createObserver('long-animation-frame', handleLoafEntry, {
+    type: 'long-animation-frame',
+    buffered: true
+  });
+
   return {
     disconnect() {
       for (const { observer } of observers) observer.disconnect();
@@ -302,6 +649,26 @@ export function observeVitals(options: ObserveVitalsOptions = {}): VitalObserver
       const ttfb =
         navigation && navigation.responseStart > 0 ? Math.round(navigation.responseStart - navigationStart) : null;
       const inpRecord = pickInpRecord([...interactionRecords.values()]);
+      const resourceEntries =
+        (globalThis.performance?.getEntriesByType?.('resource') as PerformanceResourceTiming[] | undefined) ?? [];
+      const lcpBreakdown =
+        largestContentfulPaint != null
+          ? deriveLcpBreakdown(
+              lcpRawStartTime,
+              lcpRawLoadTime,
+              lcpRawUrl,
+              lcpElementType,
+              navigation?.responseStart ?? 0,
+              resourceEntries
+            )
+          : null;
+      const thirdParty = deriveThirdPartyShare(
+        resourceEntries,
+        lcpRawStartTime ?? null,
+        globalThis.location?.host ?? null,
+        firstPartyAllowlist
+      );
+      const loaf = worstLoaf ? deriveLoafAttribution(worstLoaf) : null;
 
       return {
         lcp_ms: largestContentfulPaint,
@@ -310,7 +677,10 @@ export function observeVitals(options: ObserveVitalsOptions = {}): VitalObserver
         fcp_ms: firstContentfulPaint,
         ttfb_ms: ttfb,
         lcp_attribution: largestContentfulPaint != null ? lcpAttribution : undefined,
-        inp_attribution: inpRecord?.attribution
+        inp_attribution: inpRecord?.attribution,
+        lcp_breakdown: lcpBreakdown,
+        third_party: thirdParty,
+        loaf
       };
     },
     debugSnapshot() {

@@ -1,16 +1,35 @@
 import type {
   SignalAggregateV1,
+  SignalContextStory,
+  SignalEffectiveTypeDominant,
   SignalExperienceStage,
+  SignalInpPhase,
+  SignalInpStory,
+  SignalLcpCulpritKind,
+  SignalLcpStory,
+  SignalLcpSubpart,
+  SignalLoafCause,
+  SignalLoafStory,
   SignalNetworkTier,
   SignalRaceFallbackReason,
-  SignalRaceMetric
+  SignalRaceMetric,
+  SignalThirdPartyStory,
+  SignalThirdPartyTier
 } from '@stroma-labs/signal-contracts';
 import {
+  SIGNAL_CELLULAR_NARRATE_THRESHOLD_PCT,
   SIGNAL_FRESHNESS_UNKNOWN_WARNING,
   SIGNAL_FUNNEL_FCP_POOR_THRESHOLD,
   SIGNAL_FUNNEL_INP_POOR_THRESHOLD,
-  SIGNAL_FUNNEL_LCP_POOR_THRESHOLD
+  SIGNAL_FUNNEL_LCP_POOR_THRESHOLD,
+  SIGNAL_SAVE_DATA_NARRATE_THRESHOLD_PCT
 } from '@stroma-labs/signal-contracts';
+
+// Dominance share threshold below which the LCP / INP story narratives
+// fall back to hedged copy instead of claiming a single dominant cause.
+// Kept as a named constant per plan §10.7 so future buyer-research feedback
+// can tune the aggressiveness of single-cause claims in one place.
+export const SIGNAL_STORY_HEDGED_THRESHOLD_PCT = 35;
 
 export type ReportMotionMode = 'full' | 'reduced';
 export type ReportAct3Mode = 'full' | 'reduced' | 'legacy';
@@ -46,6 +65,90 @@ export interface ReportDeviceTierVisual {
   share: number;
 }
 
+// LCP subpart row rendered in the Act 2 "Where the gap lives" anatomy
+// band. `is_dominant` flags the row that owns the dominant share so the
+// renderer can tint its segment without recomputing argmax. `plain` is a
+// short verb phrase aimed at the non-technical CMO/Growth reader — pairs
+// with the technical `label` so the legend says both what the subpart
+// measures and what it physically represents in the paint pipeline.
+export interface ReportLcpSubpartRow {
+  key: SignalLcpSubpart;
+  label: string;
+  plain: string;
+  share: number;
+  is_dominant: boolean;
+}
+
+// Act 2 LCP story — data for the "Where the gap lives" anatomy band that
+// replaces the legacy LCP P75 comparison rail. `narrative` carries only
+// the mechanism sentence (subpart clause); `culprit_clause` is separated
+// so the band can render it as a distinct, muted trailing line rather
+// than as an appended second sentence. `is_hedged` is true when no single
+// subpart carries enough share for a confident claim — when hedged, the
+// narrative becomes the honest "spread across multiple phases" line and
+// the band omits both the accent-coloured dominant segment and the
+// culprit clause.
+export interface ReportLcpStoryViewModel {
+  narrative: string;
+  culprit_clause: string | null;
+  is_hedged: boolean;
+  dominant_subpart: SignalLcpSubpart | null;
+  dominant_culprit_kind: SignalLcpCulpritKind | null;
+  rows: ReportLcpSubpartRow[];
+}
+
+// Act 3 INP story — inline line inside the INP funnel node. No new card;
+// the narrative sits under the existing `sr-funnel-node-threshold` line.
+// `is_hedged` uses the same threshold rule as the LCP story.
+export interface ReportInpStoryViewModel {
+  narrative: string;
+  is_hedged: boolean;
+  dominant_phase: SignalInpPhase | null;
+}
+
+// Act 3 LoAF story — second-layer interaction diagnosis attached to the
+// INP funnel node when the aggregate carries a LoAF block. Chromium 123+
+// only; Safari / Firefox / older Chromium cohorts cleanly omit the line.
+// Runs against the same hedged-dominance gate as INP so we never narrate
+// a single-cause claim the data can't back.
+export interface ReportLoafStoryViewModel {
+  narrative: string;
+  is_hedged: boolean;
+  dominant_cause: SignalLoafCause | null;
+  worst_frame_ms_p75: number | null;
+}
+
+// Act 1 context lines — editorial narration of already-captured
+// audience signals (save-data, median RTT, cellular share, dominant
+// effective_type). Each field renders as its own inline strip row and
+// every row carries a `tooltip` string translating the technical
+// number into the "what it means for you" read for non-technical
+// buyers. Any row can be null independently — the strip surfaces only
+// the ones that crossed their narration threshold, and the whole block
+// hides when nothing meaningful survived.
+export interface ReportContextStripRow {
+  key: 'save_data' | 'median_rtt' | 'cellular' | 'effective_type';
+  label: string;
+  narrative: string;
+  tooltip: string;
+}
+
+export interface ReportContextStripViewModel {
+  rows: ReportContextStripRow[];
+}
+
+// Act 2 third-party pre-race headline — sits *above* the race gauge as a
+// pre-framing line. Names the external cause ("off-domain script weight
+// before first paint") that the race subsequently quantifies. 0% is
+// narrated positively ("served entirely from your own origins") — absence
+// of third-party is a feature, not missing data.
+export interface ReportThirdPartyStoryViewModel {
+  narrative: string;
+  dominant_tier: SignalThirdPartyTier;
+  median_share_pct: number | null;
+  median_origin_count: number | null;
+}
+
 export interface ReportRaceViewModel {
   metric: SignalRaceMetric;
   metric_label: string;
@@ -62,6 +165,8 @@ export interface ReportRaceViewModel {
   comparison_coverage: number | null;
   schematic_path_hint: string | null;
   race_story: string;
+  lcp_story: ReportLcpStoryViewModel | null;
+  third_party_story: ReportThirdPartyStoryViewModel | null;
 }
 
 export interface ReportStageEvidenceChip {
@@ -92,6 +197,8 @@ export interface ReportAct3ViewModel {
   narrative_line: string;
   stages: ReportExperienceStageViewModel[];
   legacy_message: string | null;
+  inp_story: ReportInpStoryViewModel | null;
+  loaf_story: ReportLoafStoryViewModel | null;
 }
 
 export interface ReportCredibilityStripViewModel {
@@ -101,6 +208,15 @@ export interface ReportCredibilityStripViewModel {
   connection_reuse_share: number;
   metric_coverage: number;
   metric_coverage_label: string;
+  // Count of background-tab loads dropped before accumulation (§1.2).
+  // Null when the aggregate pre-dates the visibility filter or no
+  // sessions were excluded — the markup hides the segment in both cases
+  // so silence stays the correct signal.
+  excluded_background_sessions: number | null;
+  // True when the LCP race cohort lands within the slack threshold of
+  // the ship gates (§5.1). The credibility strip appends a tone-tempered
+  // note, and view-model copy swaps to lighter phrasing for Act 3.
+  coverage_marginal: boolean;
 }
 
 // Form-factor visualization — mobile / tablet / desktop audience split,
@@ -189,12 +305,36 @@ export interface ReportViewModel {
   act1_tiers: ReportTierVisual[];
   act1_device_tiers: ReportDeviceTierVisual[];
   persona_contrast: ReportPersonaContrast;
+  // Null when the aggregate carried no context_story or none of the
+  // rows crossed their narration threshold — renderer hides the strip.
+  act1_context_strip: ReportContextStripViewModel | null;
   actionable_signals: ReportActionableSignalsViewModel;
   race: ReportRaceViewModel;
   act3: ReportAct3ViewModel;
   act4_lede: string;
   act4_summary_points: string[];
+  // KPI impact ledger — Act 4 translation of the proven technical findings
+  // into the language stakeholders own (bounce, conversion, ROAS, audience
+  // reach). Each row is emitted only when the underlying aggregate evidence
+  // is present. When fewer than 2 rows qualify the renderer falls back to
+  // the flat `act4_summary_points` bullets so we never ship an anaemic
+  // 1-row ledger. `impact_sentence_html` already contains the italic-serif
+  // cameo around the KPI word — markup stays declarative.
+  act4_impact_rows: ReportAct4ImpactRow[];
   offer_cards: Array<{ title: string; body: string; href: string; cta: string }>;
+}
+
+export type ReportAct4ImpactRowId = 'lcp_bounce' | 'inp_conversion' | 'script_roas' | 'network_reach';
+
+export type ReportAct4ImpactTone = 'alert' | 'watch' | 'steady';
+
+export interface ReportAct4ImpactRow {
+  id: ReportAct4ImpactRowId;
+  metric_value: string;
+  metric_label: string;
+  kpi_label: string;
+  impact_sentence_html: string;
+  tone: ReportAct4ImpactTone;
 }
 
 const BOUNDARY_STATEMENT =
@@ -237,6 +377,18 @@ export function humanizeToken(value: string): string {
 export function formatMetricDuration(value: number | null): string {
   if (value == null) return 'n/a';
   return value >= 1000 ? `${(value / 1000).toFixed(1)}s` : `${value}ms`;
+}
+
+// Splits a pre-formatted measurement (e.g. "4.2s", "2100ms", "45%", "3K")
+// into its numeric body and trailing unit characters. "n/a" / "—" / empty
+// return no unit. Powers the italic-serif unit-suffix treatment on hero
+// numbers in the report markup — see `.sr-unit` in report-immersive.css.
+const VALUE_UNIT_SPLITTER = /^(-?\d+(?:[.,]\d+)?)(ms|s|%|K|M|B)$/;
+export function splitValueUnit(text: string): { value: string; unit: string } {
+  const match = VALUE_UNIT_SPLITTER.exec(text.trim());
+  if (!match) return { value: text, unit: '' };
+  const [, value, unit] = match;
+  return { value: value ?? text, unit: unit ?? '' };
 }
 
 export function selectMotionMode(prefersReducedMotion: boolean): ReportMotionMode {
@@ -335,6 +487,272 @@ function buildAct1Tiers(aggregate: SignalAggregateV1): ReportTierVisual[] {
   }));
 }
 
+// Short technical labels for the LCP subpart legend. Kept terse so a
+// four-column legend fits a single row of the anatomy band without
+// wrapping at 1440px.
+const LCP_SUBPART_SHORT_LABELS: Record<SignalLcpSubpart, string> = {
+  ttfb: 'TTFB',
+  resource_load_delay: 'Load delay',
+  resource_load_time: 'Load time',
+  element_render_delay: 'Render delay'
+};
+
+// Plain-language verb phrases paired with each subpart label in the
+// anatomy-band legend. Target reader is the non-technical CMO / Growth
+// Head who recognises "TTFB" as jargon but instinctively maps
+// "server replies" to something they can brief their engineering lead
+// on. Each phrase names what physically happens in the paint pipeline;
+// no metrics, no thresholds, no prescriptions.
+const LCP_SUBPART_PLAIN_DESCRIPTORS: Record<SignalLcpSubpart, string> = {
+  ttfb: 'server replies',
+  resource_load_delay: 'finding the hero',
+  resource_load_time: 'downloading the hero',
+  element_render_delay: 'painting the hero'
+};
+
+// Narrative copy per dominant subpart. Matches §3.4 of the enrichment
+// plan — honest, temporal, measured, no prescription. Each sentence names
+// what is happening, not what to fix.
+const LCP_SUBPART_NARRATIVES: Record<SignalLcpSubpart, string> = {
+  element_render_delay:
+    'The bytes arrive in time, but render is blocked afterwards. Element render delay dominates the largest paint.',
+  resource_load_delay:
+    'The largest element is discovered too late. Most of the paint delay comes from waiting to start loading the hero resource.',
+  resource_load_time: 'The largest element is discovered and ready — it just takes too long to travel the wire.',
+  ttfb: "The server's first byte lands slowly. The hero can't load until the document starts."
+};
+
+// Culprit-clause copy appended after the subpart narrative when the
+// aggregate carries a confident culprit kind. `unknown` is deliberately
+// absent — the clause is omitted entirely when the classifier falls
+// through, rather than narrating a guess.
+const LCP_CULPRIT_CLAUSES: Record<Exclude<SignalLcpCulpritKind, 'unknown'>, string> = {
+  hero_image: 'Usually a hero image.',
+  headline_text: 'Usually the headline text.',
+  banner_image: 'Usually a banner image.',
+  product_image: 'Usually a product image.',
+  video_poster: 'Usually a video poster.'
+};
+
+const INP_PHASE_NARRATIVES: Record<SignalInpPhase, string> = {
+  processing: 'Interaction lag is dominated by handler work after the click.',
+  input_delay: 'The page is busy before clicks can start — input waits on other work.',
+  presentation: 'Handlers finish fast, but visual completion lags.'
+};
+
+const LOAF_CAUSE_NARRATIVES: Record<SignalLoafCause, string> = {
+  script: 'The slowest frame is dominated by script execution.',
+  layout: 'Layout work, not script, is what stalls the slowest frame.',
+  style: 'Style recalculation is what stalls the slowest frame.',
+  paint: 'Paint work stalls the slowest frame.'
+};
+
+const LCP_HEDGED_NARRATIVE = 'Paint delay is spread across multiple phases — no single cause dominates.';
+const INP_HEDGED_NARRATIVE = 'Interaction lag is spread across multiple phases — no single cause dominates.';
+const LOAF_HEDGED_NARRATIVE = 'The slowest frame is spread across multiple causes — no single driver dominates.';
+
+// Third-party pre-race headlines. `none` is narrated *positively* —
+// absence of third-party weight is a feature of the page, not missing
+// data. `heavy` / `moderate` / `light` read as honest observations of an
+// external cause the race subsequently quantifies.
+const THIRD_PARTY_TIER_NARRATIVES: Record<SignalThirdPartyTier, (sharePct: number | null) => string> = {
+  heavy: (share) =>
+    share != null
+      ? `${share}% of the pre-paint script weight comes from off-domain tags.`
+      : 'Off-domain scripts dominate the pre-paint window.',
+  moderate: (share) =>
+    share != null
+      ? `${share}% of the pre-paint script weight is third-party.`
+      : 'Third-party scripts carry meaningful weight before first paint.',
+  light: () => 'Third-party script weight is modest before first paint.',
+  none: () => 'The pre-paint is served entirely from your own origins.'
+};
+
+// Act 1 context strip tooltips — paired with each narrated row. The
+// narrative line names the number; the tooltip translates the number
+// into the "what this means for you" read that non-technical buyers
+// (CRO / paid media / SEO / product) can act on. Kept intentionally
+// short so they fit inside the slide's 100vh envelope without wrapping.
+const CONTEXT_TOOLTIPS = {
+  save_data:
+    'These users have told their browser to minimise data use. Heavy pages, autoplay video, and preloaded assets will feel punishing to them — test the experience you ship with Save-Data on.',
+  median_rtt:
+    'Round-trip time is how long one request takes to reach your server and back. Every request the page needs compounds this delay, so a high median explains sluggish perceived loading even on fast links.',
+  cellular:
+    'A meaningful share of this audience is on a mobile network. Mobile links lose bandwidth and gain latency under load, so mobile-heavy cohorts amplify any page weight or redirect cost.',
+  effective_type:
+    "Effective connection type is the browser's own read of perceived network speed. When the dominant bucket drops below 4G, expect visible lag on hero media, fonts, and anything that blocks first paint."
+} satisfies Record<ReportContextStripRow['key'], string>;
+
+// Effective-type narration. Only 3g / 2g / slow-2g trigger a line —
+// a 4g-dominant cohort reads as unremarkable baseline and renders as
+// silence. Unknown-dominant cohorts (Safari / Firefox without the
+// NetworkInformation API) likewise omit — we do not narrate absence of
+// data as absence of quality.
+const EFFECTIVE_TYPE_NARRATIVES: Partial<Record<SignalEffectiveTypeDominant, string>> = {
+  '3g': 'The dominant connection reported by this audience is 3G.',
+  '2g': 'The dominant connection reported by this audience is 2G.',
+  'slow-2g': 'The dominant connection reported by this audience is slow-2G.'
+};
+
+// Builds the Act 1 context strip. Each field applies its own gate:
+//  - save_data: SIGNAL_SAVE_DATA_NARRATE_THRESHOLD_PCT (sub-1% is
+//    rounding noise, not audience reality).
+//  - median_rtt: only narrate when the aggregate has a non-null median
+//    (quartiles() returns null below QUARTILE_MIN_SAMPLE).
+//  - cellular: SIGNAL_CELLULAR_NARRATE_THRESHOLD_PCT (below 10% is
+//    not surprising enough to frame editorially).
+//  - effective_type: only 3g / 2g / slow-2g dominant cohorts trigger
+//    the micro-fact; 4g / unknown fall through.
+// When no rows survive the gates, returns null so the renderer hides
+// the whole block.
+function buildContextStripViewModel(story: SignalContextStory | undefined): ReportContextStripViewModel | null {
+  if (!story) return null;
+
+  const rows: ReportContextStripRow[] = [];
+
+  if (story.save_data_share_pct != null && story.save_data_share_pct >= SIGNAL_SAVE_DATA_NARRATE_THRESHOLD_PCT) {
+    rows.push({
+      key: 'save_data',
+      label: 'Save-Data',
+      narrative: `${story.save_data_share_pct}% of this audience browses with Data Saver on.`,
+      tooltip: CONTEXT_TOOLTIPS.save_data
+    });
+  }
+
+  if (story.median_rtt_ms != null) {
+    rows.push({
+      key: 'median_rtt',
+      label: 'Median RTT',
+      narrative: `Median round-trip time is ${story.median_rtt_ms} milliseconds.`,
+      tooltip: CONTEXT_TOOLTIPS.median_rtt
+    });
+  }
+
+  if (story.cellular_share_pct != null && story.cellular_share_pct >= SIGNAL_CELLULAR_NARRATE_THRESHOLD_PCT) {
+    rows.push({
+      key: 'cellular',
+      label: 'Cellular share',
+      narrative: `${story.cellular_share_pct}% of measured sessions are on cellular networks.`,
+      tooltip: CONTEXT_TOOLTIPS.cellular
+    });
+  }
+
+  if (story.effective_type_dominant && EFFECTIVE_TYPE_NARRATIVES[story.effective_type_dominant]) {
+    rows.push({
+      key: 'effective_type',
+      label: 'Connection class',
+      narrative: EFFECTIVE_TYPE_NARRATIVES[story.effective_type_dominant] as string,
+      tooltip: CONTEXT_TOOLTIPS.effective_type
+    });
+  }
+
+  if (rows.length === 0) return null;
+  return { rows };
+}
+
+function buildLcpStoryViewModel(story: SignalLcpStory | undefined): ReportLcpStoryViewModel | null {
+  if (!story) return null;
+  if (!story.subpart_distribution_pct) return null;
+
+  const distribution = story.subpart_distribution_pct;
+  const isHedged =
+    story.dominant_subpart == null ||
+    story.dominant_subpart_share_pct == null ||
+    story.dominant_subpart_share_pct < SIGNAL_STORY_HEDGED_THRESHOLD_PCT;
+
+  const dominantSubpart = isHedged ? null : story.dominant_subpart;
+  const culprit =
+    isHedged || !story.dominant_culprit_kind || story.dominant_culprit_kind === 'unknown'
+      ? null
+      : story.dominant_culprit_kind;
+
+  // Narrative + culprit are carried as separate fields so the anatomy
+  // band can render the mechanism sentence as the lede and the culprit
+  // (e.g. "Usually a hero image.") as a muted trailing line, rather than
+  // running them together as a single compound sentence. When hedged,
+  // the fixed "spread across multiple phases" line owns the whole lede
+  // and the culprit is dropped entirely — we don't narrate a single
+  // cause we can't back.
+  const narrative = isHedged || !dominantSubpart ? LCP_HEDGED_NARRATIVE : LCP_SUBPART_NARRATIVES[dominantSubpart];
+  const culpritClause = culprit ? LCP_CULPRIT_CLAUSES[culprit] : null;
+
+  const rows: ReportLcpSubpartRow[] = (
+    ['ttfb', 'resource_load_delay', 'resource_load_time', 'element_render_delay'] as const
+  ).map((key) => ({
+    key,
+    label: LCP_SUBPART_SHORT_LABELS[key],
+    plain: LCP_SUBPART_PLAIN_DESCRIPTORS[key],
+    share: distribution[key],
+    is_dominant: dominantSubpart === key
+  }));
+
+  return {
+    narrative,
+    culprit_clause: culpritClause,
+    is_hedged: isHedged,
+    dominant_subpart: dominantSubpart,
+    dominant_culprit_kind: culprit,
+    rows
+  };
+}
+
+function buildInpStoryViewModel(story: SignalInpStory | undefined): ReportInpStoryViewModel | null {
+  if (!story) return null;
+
+  const isHedged =
+    story.dominant_phase == null ||
+    story.dominant_phase_share_pct == null ||
+    story.dominant_phase_share_pct < SIGNAL_STORY_HEDGED_THRESHOLD_PCT;
+
+  const dominantPhase = isHedged ? null : story.dominant_phase;
+  const narrative = isHedged || !dominantPhase ? INP_HEDGED_NARRATIVE : INP_PHASE_NARRATIVES[dominantPhase];
+
+  return {
+    narrative,
+    is_hedged: isHedged,
+    dominant_phase: dominantPhase
+  };
+}
+
+function buildLoafStoryViewModel(story: SignalLoafStory | undefined): ReportLoafStoryViewModel | null {
+  if (!story) return null;
+
+  const isHedged =
+    story.dominant_cause == null ||
+    story.dominant_cause_share_pct == null ||
+    story.dominant_cause_share_pct < SIGNAL_STORY_HEDGED_THRESHOLD_PCT;
+
+  const dominantCause = isHedged ? null : story.dominant_cause;
+  const narrative = isHedged || !dominantCause ? LOAF_HEDGED_NARRATIVE : LOAF_CAUSE_NARRATIVES[dominantCause];
+
+  return {
+    narrative,
+    is_hedged: isHedged,
+    dominant_cause: dominantCause,
+    worst_frame_ms_p75: story.worst_frame_ms_p75
+  };
+}
+
+function buildThirdPartyStoryViewModel(
+  story: SignalThirdPartyStory | undefined
+): ReportThirdPartyStoryViewModel | null {
+  if (!story) return null;
+  const tier = story.dominant_tier;
+  if (!tier) return null;
+
+  const share = story.median_share_pct;
+  const originCount = story.median_origin_count;
+  const narrative = THIRD_PARTY_TIER_NARRATIVES[tier](share);
+
+  return {
+    narrative,
+    dominant_tier: tier,
+    median_share_pct: share,
+    median_origin_count: originCount
+  };
+}
+
 function buildRaceStory(comparisonLabel: string, waitDeltaMs: number | null, metric: SignalRaceMetric): string {
   if (metric === 'none' || waitDeltaMs == null) {
     return 'The current sample does not yet support a defensible race, so the report keeps the comparison honest instead of inventing certainty.';
@@ -376,7 +794,9 @@ function buildRaceViewModel(aggregate: SignalAggregateV1): ReportRaceViewModel {
     urban_coverage: aggregate.coverage.selected_metric_urban_coverage,
     comparison_coverage: aggregate.coverage.selected_metric_comparison_coverage,
     schematic_path_hint: aggregate.top_page_path,
-    race_story: buildRaceStory(comparisonLabel, waitDeltaMs, metric)
+    race_story: buildRaceStory(comparisonLabel, waitDeltaMs, metric),
+    lcp_story: buildLcpStoryViewModel(aggregate.lcp_story),
+    third_party_story: buildThirdPartyStoryViewModel(aggregate.third_party_story)
   };
 }
 
@@ -525,6 +945,20 @@ function buildAct3Narrative(activeStages: SignalExperienceStage[], mood: ReportM
 
 function buildAct3ViewModel(aggregate: SignalAggregateV1, moodHint: ReportMoodTier = 'sober'): ReportAct3ViewModel {
   const funnel = aggregate.experience_funnel;
+  // INP story is tied to the INP funnel node. Only surface the story
+  // when the funnel has an active INP stage — otherwise we would be
+  // claiming a phase diagnosis for a stage the funnel itself could not
+  // defend. Legacy / reduced / coverage-thin funnels cleanly omit the
+  // inline line (§4.1 of the enrichment plan).
+  const inpStage = funnel?.active_stages.includes('inp') ? aggregate.inp_story : undefined;
+  const inpStory = buildInpStoryViewModel(inpStage);
+  // LoAF story sits alongside the INP phase line when both are present.
+  // Gated on the INP funnel stage for the same reason as the INP story —
+  // a LoAF diagnosis without a defensible interaction-ready funnel stage
+  // would narrate frame-level jank the funnel itself can't anchor.
+  const loafSource = funnel?.active_stages.includes('inp') ? aggregate.loaf_story : undefined;
+  const loafStory = buildLoafStoryViewModel(loafSource);
+
   if (!funnel) {
     return {
       mode: 'legacy',
@@ -536,7 +970,9 @@ function buildAct3ViewModel(aggregate: SignalAggregateV1, moodHint: ReportMoodTi
         'This report link predates the measured experience funnel. Regenerate it to see the new performance-cliff layer.',
       stages: [],
       legacy_message:
-        'Acts 1 and 2 remain trustworthy, but this URL was generated before the measured funnel block existed.'
+        'Acts 1 and 2 remain trustworthy, but this URL was generated before the measured funnel block existed.',
+      inp_story: null,
+      loaf_story: null
     };
   }
 
@@ -550,7 +986,9 @@ function buildAct3ViewModel(aggregate: SignalAggregateV1, moodHint: ReportMoodTi
       narrative_line:
         'The current sample does not contain enough classified and measured sessions to build a defensible performance funnel.',
       stages: [],
-      legacy_message: null
+      legacy_message: null,
+      inp_story: null,
+      loaf_story: null
     };
   }
 
@@ -562,7 +1000,9 @@ function buildAct3ViewModel(aggregate: SignalAggregateV1, moodHint: ReportMoodTi
     threshold_basis: thresholdBasis(funnel.active_stages, false),
     narrative_line: buildAct3Narrative(funnel.active_stages, moodHint),
     stages: buildExperienceStages(aggregate, moodHint),
-    legacy_message: null
+    legacy_message: null,
+    inp_story: inpStory,
+    loaf_story: loafStory
   };
 }
 
@@ -626,6 +1066,12 @@ function buildEvidenceItems(
   ];
 }
 
+// Editorial framings keyed off a measured `mood_tier` (itself derived
+// from real aggregate shares via `selectMoodTier`). The strings below
+// are author-written prose, not fabricated metrics — every number the
+// reader sees is rendered from view-model fields elsewhere. These
+// strings only provide the connective tissue between them, conditioned
+// on a three-way mood bucket the data has already chosen.
 function buildHeroCopy(
   aggregate: SignalAggregateV1,
   mood: ReportMoodTier
@@ -640,7 +1086,8 @@ function buildHeroCopy(
         'A real share of the traffic you send here lands in a slower world. This report turns that hidden post-click reality into something visible, temporal, and difficult to dismiss.',
       act1_intro:
         'These are not average users. They are materially different infrastructure realities that a real share of your traffic already lands on.',
-      act4_lede: 'The gap is proven. What follows is root cause, cost, and fix order.'
+      act4_lede:
+        'Every number above meets a KPI someone on your team is accountable for. This is where the measured gap shows up in the business.'
     };
   }
 
@@ -652,7 +1099,8 @@ function buildHeroCopy(
         'The measured story is more controlled here. Traffic still lands into different conditions across tiers, but most sessions stay on the safer side of the thresholds that matter.',
       act1_intro:
         'Your traffic still lands into different conditions. The difference is that this report shows the experience holding together across more of them.',
-      act4_lede: 'The gap is restrained, but it exists. What follows is why it holds and where it could weaken.'
+      act4_lede:
+        'The gap is restrained, but every number above still meets a KPI someone on your team is accountable for. This is where it shows up.'
     };
   }
 
@@ -663,7 +1111,8 @@ function buildHeroCopy(
       'The post-click reality is real, but it sits in the middle ground: meaningful enough to feel, not yet severe enough to scream. That still deserves attention.',
     act1_intro:
       'These clusters show the real conditions your traffic lands on, not the calmer average implied by a single lab run.',
-    act4_lede: 'The gap is measurable. What follows is cause, cost, and fix order.'
+    act4_lede:
+      'Every number above meets a KPI someone on your team is accountable for. This is where the measured gap shows up in the business.'
   };
 }
 
@@ -685,6 +1134,176 @@ function buildAct4SummaryPoints(
   }
 
   return points;
+}
+
+// W3C LoAF defines long animation frames as ≥50ms; the `script_roas` row
+// fires when the measured worst-frame p75 crosses this line.
+const ACT4_LOAF_LONG_FRAME_MS = 50;
+// Minimum ledger length before we commit to the ledger treatment. Below
+// this the renderer falls back to the flat `act4_summary_points` so we
+// never ship a single-row impact panel that reads thinner than the
+// bullets it replaced.
+const ACT4_IMPACT_MIN_ROWS = 2;
+// Act 4 `inp_conversion` row emission gate. Below ~25% poor-session share
+// the INP impact narrative reads as alarmist next to Act 3's own funnel
+// evidence; above it the share is large enough that the "drop conversion"
+// sentence meets the reader's own observation. Calibration choice (not an
+// empirical CWV threshold). Tune here, not inline.
+const ACT4_INP_GATE_POOR_SHARE_PCT = 25;
+// Act 4 `network_reach` row emission gate. A combined constrained /
+// constrained_moderate share of 30% is the point where "a real share"
+// stops being a hedge and starts being load-bearing for the
+// network_reach KPI claim. Calibration choice.
+const ACT4_NETWORK_GATE_CONSTRAINED_PCT = 30;
+// Tone escalation for the `script_roas` row when LoAF worst-frame p75
+// crosses into territory that will feel like a stall on mid-tier
+// devices. 150ms is 3× the W3C long-frame floor and the point above
+// which qualitative session logs commonly report "the page froze".
+// Calibration choice (not a spec threshold).
+const ACT4_LOAF_ALERT_MS = 150;
+
+function wrapKpiCameo(sentence: string, kpiCameo: string): string {
+  return sentence.replace(kpiCameo, `<em class="sr-italic-serif">${kpiCameo}</em>`);
+}
+
+// Presentation-calibration tone bands for the `lcp_bounce` row. Not CWV
+// thresholds — the CWV LCP "poor" line is 4000ms absolute; these bands
+// operate on the wait-*delta* between comparison and urban cohorts.
+// 1500ms delta ≈ the point where the gap feels categorical in
+// moderated testing; 800ms ≈ perceptible but not categorical.
+function toneFromWaitDeltaMs(deltaMs: number | null): ReportAct4ImpactTone {
+  if (deltaMs == null) return 'steady';
+  if (deltaMs >= 1500) return 'alert';
+  if (deltaMs >= 800) return 'watch';
+  return 'steady';
+}
+
+// Presentation-calibration tone bands for the `inp_conversion` row.
+// Operates on the share of sessions whose slowest measured phase
+// crosses a CWV poor threshold (FCP / LCP / INP). 50% ≈ majority-bad;
+// 15% ≈ a minority large enough to own a named KPI story.
+function toneFromPoorShare(share: number): ReportAct4ImpactTone {
+  if (share >= 50) return 'alert';
+  if (share >= 15) return 'watch';
+  return 'steady';
+}
+
+// Presentation-calibration tone bands for the `network_reach` row.
+// Operates on the combined constrained + constrained_moderate share.
+// 50% ≈ the urban assumption is strictly wrong; 30% ≈ load-bearing
+// enough to name the audience-reach KPI claim.
+function toneFromConstrainedShare(share: number): ReportAct4ImpactTone {
+  if (share >= 50) return 'alert';
+  if (share >= 30) return 'watch';
+  return 'steady';
+}
+
+// Deduced narrative bridges. Every `metric_value` / `metric_label`
+// below reads from a real measured field on `aggregate`, `race`, or
+// `act3`. The `impact_sentence_html` strings are author-written prose
+// tying those measured numbers to the stakeholder's KPI vocabulary
+// (CPC, CPA, ROAS, Campaign Efficiency). No numeric claim originates
+// in these sentences — they are editorial commentary on numbers the
+// reader has already seen earlier in the deck.
+function buildAct4ImpactRows(
+  aggregate: SignalAggregateV1,
+  race: ReportRaceViewModel,
+  act3: ReportAct3ViewModel
+): ReportAct4ImpactRow[] {
+  const rows: ReportAct4ImpactRow[] = [];
+
+  if (race.race_available && race.wait_delta_ms != null && race.wait_delta_seconds) {
+    rows.push({
+      id: 'lcp_bounce',
+      metric_value: race.wait_delta_seconds,
+      metric_label: `LCP wait delta · ${race.comparison_label} vs urban`,
+      kpi_label: 'Bounce Rate · Ad Quality Score',
+      impact_sentence_html: wrapKpiCameo(
+        'Google and Meta raise CPC on slow landing pages. You pay more for clicks that never become sessions.',
+        'CPC'
+      ),
+      tone: toneFromWaitDeltaMs(race.wait_delta_ms)
+    });
+  }
+
+  if (act3.poor_session_share != null && act3.poor_session_share >= ACT4_INP_GATE_POOR_SHARE_PCT) {
+    const phase = act3.inp_story?.dominant_phase;
+    rows.push({
+      id: 'inp_conversion',
+      metric_value: `${act3.poor_session_share}%`,
+      metric_label: phase
+        ? `Sessions past the poor-performance threshold · dominant phase ${phase.replace('_', ' ')}`
+        : 'Sessions past the poor-performance threshold',
+      kpi_label: 'Conversion Rate · Cost Per Acquisition',
+      impact_sentence_html: wrapKpiCameo(
+        'Mushy buttons at the point of intent drop conversion. Same ad spend, fewer leads, inflated CPA.',
+        'CPA'
+      ),
+      tone: toneFromPoorShare(act3.poor_session_share)
+    });
+  }
+
+  const thirdParty = race.third_party_story;
+  const loaf = act3.loaf_story;
+  const thirdPartyHits =
+    thirdParty != null && (thirdParty.dominant_tier === 'moderate' || thirdParty.dominant_tier === 'heavy');
+  const loafHits =
+    loaf != null && loaf.worst_frame_ms_p75 != null && loaf.worst_frame_ms_p75 >= ACT4_LOAF_LONG_FRAME_MS;
+
+  if (thirdPartyHits || loafHits) {
+    let metricValue: string;
+    let metricLabel: string;
+    let tone: ReportAct4ImpactTone;
+    if (thirdPartyHits && thirdParty != null && thirdParty.median_share_pct != null) {
+      metricValue = `${thirdParty.median_share_pct}%`;
+      metricLabel = 'Third-party script share (median origin)';
+      tone = thirdParty.dominant_tier === 'heavy' ? 'alert' : 'watch';
+    } else if (loafHits && loaf != null && loaf.worst_frame_ms_p75 != null) {
+      metricValue = `${Math.round(loaf.worst_frame_ms_p75)}ms`;
+      metricLabel = 'LoAF worst-frame p75';
+      tone = loaf.worst_frame_ms_p75 >= ACT4_LOAF_ALERT_MS ? 'alert' : 'watch';
+    } else {
+      // Defensive: if third-party fired without a share number, emit the
+      // row with a descriptive label but no metric value so the ledger
+      // row reads honestly instead of "undefined%".
+      metricValue = thirdParty?.dominant_tier === 'heavy' ? 'Heavy' : 'Moderate';
+      metricLabel = 'Third-party script load tier';
+      tone = thirdParty?.dominant_tier === 'heavy' ? 'alert' : 'watch';
+    }
+    rows.push({
+      id: 'script_roas',
+      metric_value: metricValue,
+      metric_label: metricLabel,
+      kpi_label: 'Mobile ROAS · Audience Reach',
+      impact_sentence_html: wrapKpiCameo(
+        'Mobile-first audiences cannot interact with a script-heavy page. Top-of-funnel reach without bottom-of-funnel ROAS.',
+        'ROAS'
+      ),
+      tone
+    });
+  }
+
+  const constrainedShare =
+    aggregate.network_distribution.constrained_moderate + aggregate.network_distribution.constrained;
+  if (constrainedShare >= ACT4_NETWORK_GATE_CONSTRAINED_PCT) {
+    rows.push({
+      id: 'network_reach',
+      metric_value: `${constrainedShare}%`,
+      metric_label: 'Audience on constrained or worse networks',
+      kpi_label: 'Audience Reach · Campaign Efficiency',
+      impact_sentence_html: wrapKpiCameo(
+        'A real share of your audience lives on constrained networks. Campaigns calibrated for urban speed leak Campaign Efficiency here.',
+        'Campaign Efficiency'
+      ),
+      tone: toneFromConstrainedShare(constrainedShare)
+    });
+  }
+
+  if (rows.length < ACT4_IMPACT_MIN_ROWS) {
+    return [];
+  }
+
+  return rows;
 }
 
 function buildOfferCards(): Array<{ title: string; body: string; href: string; cta: string }> {
@@ -783,13 +1402,20 @@ function buildCredibilityStrip(
         );
   const rawMetricCoverage = conservativeRaceCoverage;
   const metricCoverage = Math.round(Math.max(0, Math.min(100, rawMetricCoverage)));
+  const excludedBackgroundSessions =
+    typeof coverage.excluded_background_sessions === 'number' && coverage.excluded_background_sessions > 0
+      ? coverage.excluded_background_sessions
+      : null;
+  const coverageMarginal = aggregate.warnings.includes('coverage_marginal');
   return {
     sample_size: aggregate.sample_size,
     period_days: aggregate.period_days,
     classified_share: classifiedShare,
     connection_reuse_share: connectionReuseShare,
     metric_coverage: metricCoverage,
-    metric_coverage_label: raceMetric === 'none' ? 'lcp coverage' : `${race.metric_label} coverage`.toLowerCase()
+    metric_coverage_label: raceMetric === 'none' ? 'lcp coverage' : `${race.metric_label} coverage`.toLowerCase(),
+    excluded_background_sessions: excludedBackgroundSessions,
+    coverage_marginal: coverageMarginal
   };
 }
 
@@ -1181,11 +1807,13 @@ export function buildReportViewModel(aggregate: SignalAggregateV1): ReportViewMo
     act1_tiers: buildAct1Tiers(aggregate),
     act1_device_tiers: buildAct1DeviceTiers(aggregate),
     persona_contrast: buildPersonaContrast(aggregate),
+    act1_context_strip: buildContextStripViewModel(aggregate.context_story),
     actionable_signals: buildActionableSignals(aggregate),
     race,
     act3,
     act4_lede: heroCopy.act4_lede,
     act4_summary_points: buildAct4SummaryPoints(aggregate, race, act3),
+    act4_impact_rows: buildAct4ImpactRows(aggregate, race, act3),
     offer_cards: buildOfferCards()
   };
 }

@@ -10,6 +10,33 @@ export const SIGNAL_REPORT_BASE_URL = 'https://signal.stroma.design/r';
 export const SIGNAL_BUILDER_BASE_URL = 'https://signal.stroma.design/build';
 export const SIGNAL_GA4_EVENT_NAME = 'perf_tier_report';
 
+// Marginal-coverage caveat thresholds. When the race cohort lands within
+// this slack of `SIGNAL_MIN_LCP_COVERAGE` / `SIGNAL_MIN_RACE_OBSERVATIONS`
+// the aggregate raises a tone-tempering warning so the view model can
+// swap certain claims for lighter phrasing.
+export const SIGNAL_COVERAGE_MARGINAL_THRESHOLD_PCT = 10 as const;
+export const SIGNAL_COVERAGE_MARGINAL_THRESHOLD_OBS = 10 as const;
+export const SIGNAL_COVERAGE_MARGINAL_WARNING = 'coverage_marginal';
+
+// Minimum Save-Data share narratable in Act 1. Sub-1% readings are
+// either rounding artifacts or hostile-browser noise — not surprising
+// enough to carry a narrative line.
+export const SIGNAL_SAVE_DATA_NARRATE_THRESHOLD_PCT = 1 as const;
+
+// Minimum cellular-network share narratable in Act 1. Chromium-only
+// `connection_type` means Safari/Firefox cohorts are systematically
+// `null`; a small non-zero share on Chromium-Android slices isn't
+// surprising enough to frame in editorial voice. Hard-gate at 10%.
+export const SIGNAL_CELLULAR_NARRATE_THRESHOLD_PCT = 10 as const;
+
+// Report URL byte budgets. GA4 DataLayer → URL transport is commonly
+// capped around 2 KB by proxies; 4 KB is the hard ceiling most CDNs
+// accept. A soft breach emits a warning; a hard breach throws so we
+// never ship a truncated / silently-broken URL.
+export const SIGNAL_REPORT_URL_SOFT_LIMIT_BYTES = 2048 as const;
+export const SIGNAL_REPORT_URL_HARD_LIMIT_BYTES = 4096 as const;
+export const SIGNAL_REPORT_URL_SOFT_LIMIT_WARNING = 'signal_report_url_exceeds_soft_limit';
+
 export type SignalNetworkTier = 'urban' | 'moderate' | 'constrained_moderate' | 'constrained';
 
 export type SignalDeviceTier = 'low' | 'mid' | 'high';
@@ -35,6 +62,43 @@ export type SignalInteractionType = 'pointer' | 'keyboard';
 export type SignalLcpElementType = 'image' | 'text';
 export type SignalExperienceStage = 'fcp' | 'lcp' | 'inp';
 
+// Free-tier 0.1.x enrichment — additive, non-breaking. Each union below
+// corresponds to a story that surfaces in the hosted report; capture lands
+// per-PR in the 0.1.x sequence, aggregation/report consumption follows.
+
+// LCP subpart that dominates paint delay. `ttfb` maps to the existing
+// `vitals.ttfb_ms` field — no duplicate storage.
+export type SignalLcpSubpart = 'ttfb' | 'resource_load_delay' | 'resource_load_time' | 'element_render_delay';
+
+// Classifier output for the LCP element's likely editorial role. Runs
+// against the sanitized `resource_url` + element `target` tag — no CSS
+// selectors leave the browser (privacy posture preserved).
+export type SignalLcpCulpritKind =
+  | 'hero_image'
+  | 'headline_text'
+  | 'banner_image'
+  | 'product_image'
+  | 'video_poster'
+  | 'unknown';
+
+// Which INP substage dominates the slowest interaction: waiting for the
+// main thread (input_delay), running event handlers (processing), or
+// painting the visual update (presentation).
+export type SignalInpPhase = 'input_delay' | 'processing' | 'presentation';
+
+// LoAF dominant-cause bucket (Chromium 123+). Derived from the worst
+// long-animation-frame entry's substage durations.
+export type SignalLoafCause = 'script' | 'layout' | 'style' | 'paint';
+
+// Third-party script weight pre-LCP, tiered. 0% narrates positively
+// ("served entirely from your own origins"); missing data stays null.
+export type SignalThirdPartyTier = 'none' | 'light' | 'moderate' | 'heavy';
+
+// Dominant Network Information API effective type in the audience.
+// `unknown` covers Safari/Firefox and any session that didn't expose
+// the API. `slow-2g` matches the spec's hyphenated casing.
+export type SignalEffectiveTypeDominant = '4g' | '3g' | '2g' | 'slow-2g' | 'unknown';
+
 export interface SignalNetworkTierThresholds {
   urban: number;
   moderate: number;
@@ -46,6 +110,9 @@ export interface SignalLcpAttribution {
   target: string | null;
   element_type: SignalLcpElementType | null;
   resource_url: string | null;
+  // Classifier output — populated at emission time in PR-2 capture. Null
+  // when classification falls through or element_type is null.
+  culprit_kind?: SignalLcpCulpritKind | null;
 }
 
 export interface SignalInpAttribution {
@@ -56,6 +123,36 @@ export interface SignalInpAttribution {
   input_delay_ms: number | null;
   processing_duration_ms: number | null;
   presentation_delay_ms: number | null;
+  // Dominant phase (argmax of input_delay/processing/presentation with
+  // `processing > input_delay > presentation` tiebreak). Null when all
+  // three source values are null.
+  dominant_phase?: SignalInpPhase | null;
+}
+
+// LCP subpart breakdown — Chromium-only. Nulled as a group if any input
+// is missing (opaque cross-origin resource timing, etc.). Partial
+// breakdowns mislead aggregation, so we enforce all-or-nothing.
+export interface SignalLcpBreakdown {
+  resource_load_delay_ms: number | null;
+  resource_load_time_ms: number | null;
+  element_render_delay_ms: number | null;
+}
+
+// Third-party script weight pre-LCP. `pre_lcp_script_bytes` is
+// deliberately NOT persisted — raw bytes without compression/cache
+// context are non-narratable. Share % is the whole point.
+// `origin_count` hides when < 3 for small-site privacy posture.
+export interface SignalVitalsThirdParty {
+  pre_lcp_script_share_pct: number | null;
+  origin_count: number | null;
+}
+
+// Long Animation Frame summary — Chromium 123+. Only the worst-duration
+// frame is retained (bounded memory per capture performance principles).
+export interface SignalVitalsLoaf {
+  worst_duration_ms: number | null;
+  dominant_cause: SignalLoafCause | null;
+  script_origin_count: number | null;
 }
 
 export interface SignalVitals {
@@ -66,6 +163,14 @@ export interface SignalVitals {
   ttfb_ms: number | null;
   lcp_attribution?: SignalLcpAttribution;
   inp_attribution?: SignalInpAttribution;
+  // LCP subpart math (§2.1). Chromium-only; null on Safari/Firefox or
+  // when the all-or-nothing rule strips a partial breakdown.
+  lcp_breakdown?: SignalLcpBreakdown | null;
+  // Third-party pre-paint script share (§2.4). Requires an LCP anchor —
+  // null on browsers without LCP or when no scripts were loaded pre-LCP.
+  third_party?: SignalVitalsThirdParty | null;
+  // LoAF worst-frame attribution (§2.5). Chromium 123+; null otherwise.
+  loaf?: SignalVitalsLoaf | null;
 }
 
 export interface SignalContext {
@@ -74,12 +179,17 @@ export interface SignalContext {
   rtt_ms: number | null;
   save_data: boolean | null;
   connection_type: string | null;
+  // True when document.visibilityState === 'hidden' at event creation
+  // (backgrounded tab, prerendered navigation). Populated from PR-6
+  // onwards; aggregation uses it as a pre-accumulator filter. Optional
+  // during PR-1 scaffolding so existing fixtures stay valid — becomes
+  // effectively always-present once capture lands.
+  visibility_hidden_at_load?: boolean;
 }
 
 export interface SignalMeta {
   pkg_version: string;
   browser: string;
-  nav_type: string;
   navigation_type?: SignalNavigationType;
 }
 
@@ -129,7 +239,6 @@ export interface SignalWarehouseRowV1 {
   save_data: boolean | null;
   connection_type: string | null;
   browser: string;
-  nav_type: string;
   navigation_type: SignalNavigationType | null;
   lcp_load_state: SignalLoadState | null;
   lcp_target: string | null;
@@ -142,6 +251,19 @@ export interface SignalWarehouseRowV1 {
   input_delay_ms: number | null;
   processing_duration_ms: number | null;
   presentation_delay_ms: number | null;
+  // Free-tier 0.1.x enrichment columns — appended positionally (§1.4).
+  // Each column is optional during PR-1 scaffolding; PR-3/PR-5/PR-6/PR-7
+  // wire ga4.ts → toSignalWarehouseRow to emit them. Optional on the type
+  // so historical warehouse exports pre-enrichment round-trip cleanly.
+  lcp_breakdown_resource_load_delay_ms?: number | null;
+  lcp_breakdown_resource_load_time_ms?: number | null;
+  lcp_breakdown_element_render_delay_ms?: number | null;
+  lcp_attribution_culprit_kind?: SignalLcpCulpritKind | null;
+  inp_attribution_dominant_phase?: SignalInpPhase | null;
+  third_party_pre_lcp_script_share_pct?: number | null;
+  third_party_origin_count?: number | null;
+  loaf_dominant_cause?: SignalLoafCause | null;
+  context_visibility_hidden_at_load?: boolean | null;
 }
 
 export interface SignalTierDistribution {
@@ -165,6 +287,13 @@ export interface SignalCoverage {
   lcp_coverage: number;
   selected_metric_urban_coverage: number | null;
   selected_metric_comparison_coverage: number | null;
+  // Pre-filter observation count (before the visibility filter drops
+  // background-tab loads). Post-filter count remains the top-level
+  // `sample_size`. Aggregation-time invariant once PR-6 lands:
+  //   raw_sample_size === sample_size + excluded_background_sessions
+  // Optional during PR-1 scaffolding so legacy aggregates decode cleanly.
+  raw_sample_size?: number;
+  excluded_background_sessions?: number;
 }
 
 export interface SignalTierMetricSummary {
@@ -297,6 +426,69 @@ export interface SignalEnvironment {
   };
 }
 
+/* ---------------------------------------------------------------------
+ * Free-tier 0.1.x narrative stories.
+ *
+ * Each aggregate story answers a single question the hosted report narrates
+ * inline. `dominant_subpart_share_pct < 35%` (plan §4.1) triggers the
+ * hedged copy branch — surfaced via the `share_pct` field so the view model
+ * can decide. Undefined story = block omitted entirely.
+ * ------------------------------------------------------------------- */
+
+// Act 2 — "why does LCP fail?" Surfaced as an inline line under the
+// race gauge plus a 4-bar micro-chart of the subpart distribution.
+export interface SignalLcpStory {
+  dominant_subpart: SignalLcpSubpart | null;
+  dominant_subpart_share_pct: number | null;
+  dominant_culprit_kind: SignalLcpCulpritKind | null;
+  subpart_distribution_pct: {
+    ttfb: number;
+    resource_load_delay: number;
+    resource_load_time: number;
+    element_render_delay: number;
+  } | null;
+}
+
+// Act 3 — "why do interactions feel slow?" Pairs with the existing INP
+// funnel node.
+export interface SignalInpStory {
+  dominant_phase: SignalInpPhase | null;
+  dominant_phase_share_pct: number | null;
+  phase_distribution_pct: {
+    input_delay: number;
+    processing: number;
+    presentation: number;
+  } | null;
+}
+
+// Act 2 — "what's the external cause?" Pre-frames the race gauge.
+// `dominant_tier === 'none'` is narrated positively; the report never
+// treats a zero-third-party share as absence.
+export interface SignalThirdPartyStory {
+  median_share_pct: number | null;
+  dominant_tier: SignalThirdPartyTier | null;
+  dominant_tier_share_pct: number | null;
+  median_origin_count: number | null;
+}
+
+// Act 3 — LoAF worst-frame attribution across the cohort. Null-safe for
+// early Chrome 123 betas that produced partial entries.
+export interface SignalLoafStory {
+  dominant_cause: SignalLoafCause | null;
+  dominant_cause_share_pct: number | null;
+  worst_frame_ms_p75: number | null;
+}
+
+// Act 1 — audience reality. `save_data_share_pct < 1` and
+// `cellular_share_pct < 10` both fall back to line-omission in the
+// view model (not surprising enough to narrate).
+export interface SignalContextStory {
+  save_data_share_pct: number | null;
+  median_rtt_ms: number | null;
+  cellular_share_pct: number | null;
+  effective_type_dominant: SignalEffectiveTypeDominant | null;
+}
+
 export interface SignalAggregateV1 {
   v: typeof SIGNAL_EVENT_VERSION;
   rv: typeof SIGNAL_REPORT_VERSION;
@@ -325,6 +517,14 @@ export interface SignalAggregateV1 {
   // the mobile-friendliness axis paid-media buyers ask for first. Emitted
   // by both GA4 and normalized SQL paths.
   form_factor_distribution?: SignalFormFactorDistribution;
+  // Free-tier 0.1.x narrative stories. Each block is omitted entirely
+  // when upstream data is insufficient (Safari-only cohort, below-
+  // threshold coverage, etc.) — undefined always means "don't render".
+  lcp_story?: SignalLcpStory;
+  inp_story?: SignalInpStory;
+  third_party_story?: SignalThirdPartyStory;
+  loaf_story?: SignalLoafStory;
+  context_story?: SignalContextStory;
   top_page_path: string | null;
   warnings: string[];
 }

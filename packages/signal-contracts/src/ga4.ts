@@ -1,4 +1,11 @@
-import type { SignalEventV1, SignalGa4FieldMapV1, SignalWarehouseRowV1 } from './types.js';
+import { classifyThirdPartyShareTier } from './aggregation.js';
+import type {
+  SignalEventV1,
+  SignalGa4FieldMapV1,
+  SignalLcpSubpart,
+  SignalThirdPartyTier,
+  SignalWarehouseRowV1
+} from './types.js';
 import { SIGNAL_EVENT_VERSION, SIGNAL_GA4_EVENT_NAME } from './types.js';
 
 const SIGNAL_GA4_SAFE_FIELDS_V1: SignalGa4FieldMapV1['fields'] = {
@@ -14,7 +21,6 @@ const SIGNAL_GA4_SAFE_FIELDS_V1: SignalGa4FieldMapV1['fields'] = {
   fcp_ms: 'fcp_ms',
   ttfb_ms: 'ttfb_ms',
   browser: 'browser',
-  nav_type: 'nav_type',
   navigation_type: 'navigation_type',
   lcp_load_state: 'lcp_load_state',
   lcp_element_type: 'lcp_element_type',
@@ -22,8 +28,40 @@ const SIGNAL_GA4_SAFE_FIELDS_V1: SignalGa4FieldMapV1['fields'] = {
   interaction_type: 'interaction_type',
   input_delay_ms: 'input_delay_ms',
   processing_duration_ms: 'processing_duration_ms',
-  presentation_delay_ms: 'presentation_delay_ms'
+  presentation_delay_ms: 'presentation_delay_ms',
+  lcp_culprit_kind: 'lcp_culprit_kind',
+  lcp_dominant_subpart: 'lcp_dominant_subpart',
+  inp_dominant_phase: 'inp_dominant_phase',
+  third_party_weight_tier: 'third_party_weight_tier'
 };
+
+// Per-event third-party pre-LCP script weight tier (§2.4 of the enrichment
+// plan). Null when no LCP anchor is present (Safari/Firefox) or no scripts
+// loaded pre-paint. Keeps the GA4 row compact — full share % lives in the
+// warehouse column, the GA4 param carries the narratable bucket only.
+export function deriveThirdPartyWeightTier(event: SignalEventV1): SignalThirdPartyTier | null {
+  return classifyThirdPartyShareTier(event.vitals.third_party?.pre_lcp_script_share_pct ?? null);
+}
+
+// Per-event dominant LCP subpart (argmax of ttfb + 3-field breakdown).
+// Null when the breakdown or ttfb anchor is missing — keeps GA4 payloads
+// honest rather than inventing a winner from partial data.
+export function deriveLcpDominantSubpart(event: SignalEventV1): SignalLcpSubpart | null {
+  const breakdown = event.vitals.lcp_breakdown;
+  const ttfb = event.vitals.ttfb_ms;
+  if (!breakdown || ttfb == null) return null;
+  const { resource_load_delay_ms, resource_load_time_ms, element_render_delay_ms } = breakdown;
+  if (resource_load_delay_ms == null || resource_load_time_ms == null || element_render_delay_ms == null) {
+    return null;
+  }
+  const candidates: Array<[SignalLcpSubpart, number]> = [
+    ['ttfb', ttfb],
+    ['resource_load_delay', resource_load_delay_ms],
+    ['resource_load_time', resource_load_time_ms],
+    ['element_render_delay', element_render_delay_ms]
+  ];
+  return candidates.reduce((best, current) => (current[1] > best[1] ? current : best))[0];
+}
 
 export const SIGNAL_GA4_FIELD_MAP_V1: SignalGa4FieldMapV1 = {
   eventName: SIGNAL_GA4_EVENT_NAME,
@@ -53,7 +91,6 @@ export function flattenSignalEventForGa4(event: SignalEventV1): Record<string, s
     fcp_ms: event.vitals.fcp_ms,
     ttfb_ms: event.vitals.ttfb_ms,
     browser: event.meta.browser,
-    nav_type: event.meta.nav_type,
     navigation_type: event.meta.navigation_type ?? null,
     lcp_load_state: event.vitals.lcp_attribution?.load_state ?? null,
     lcp_element_type: event.vitals.lcp_attribution?.element_type ?? null,
@@ -61,7 +98,11 @@ export function flattenSignalEventForGa4(event: SignalEventV1): Record<string, s
     interaction_type: event.vitals.inp_attribution?.interaction_type ?? null,
     input_delay_ms: event.vitals.inp_attribution?.input_delay_ms ?? null,
     processing_duration_ms: event.vitals.inp_attribution?.processing_duration_ms ?? null,
-    presentation_delay_ms: event.vitals.inp_attribution?.presentation_delay_ms ?? null
+    presentation_delay_ms: event.vitals.inp_attribution?.presentation_delay_ms ?? null,
+    lcp_culprit_kind: event.vitals.lcp_attribution?.culprit_kind ?? null,
+    lcp_dominant_subpart: deriveLcpDominantSubpart(event),
+    inp_dominant_phase: event.vitals.inp_attribution?.dominant_phase ?? null,
+    third_party_weight_tier: deriveThirdPartyWeightTier(event)
   };
 }
 
@@ -92,7 +133,6 @@ export function toSignalWarehouseRow(event: SignalEventV1): SignalWarehouseRowV1
     save_data: event.context.save_data,
     connection_type: event.context.connection_type,
     browser: event.meta.browser,
-    nav_type: event.meta.nav_type,
     navigation_type: event.meta.navigation_type ?? null,
     lcp_load_state: event.vitals.lcp_attribution?.load_state ?? null,
     lcp_target: event.vitals.lcp_attribution?.target ?? null,
@@ -104,6 +144,15 @@ export function toSignalWarehouseRow(event: SignalEventV1): SignalWarehouseRowV1
     interaction_time_ms: event.vitals.inp_attribution?.interaction_time_ms ?? null,
     input_delay_ms: event.vitals.inp_attribution?.input_delay_ms ?? null,
     processing_duration_ms: event.vitals.inp_attribution?.processing_duration_ms ?? null,
-    presentation_delay_ms: event.vitals.inp_attribution?.presentation_delay_ms ?? null
+    presentation_delay_ms: event.vitals.inp_attribution?.presentation_delay_ms ?? null,
+    lcp_breakdown_resource_load_delay_ms: event.vitals.lcp_breakdown?.resource_load_delay_ms ?? null,
+    lcp_breakdown_resource_load_time_ms: event.vitals.lcp_breakdown?.resource_load_time_ms ?? null,
+    lcp_breakdown_element_render_delay_ms: event.vitals.lcp_breakdown?.element_render_delay_ms ?? null,
+    lcp_attribution_culprit_kind: event.vitals.lcp_attribution?.culprit_kind ?? null,
+    inp_attribution_dominant_phase: event.vitals.inp_attribution?.dominant_phase ?? null,
+    third_party_pre_lcp_script_share_pct: event.vitals.third_party?.pre_lcp_script_share_pct ?? null,
+    third_party_origin_count: event.vitals.third_party?.origin_count ?? null,
+    loaf_dominant_cause: event.vitals.loaf?.dominant_cause ?? null,
+    context_visibility_hidden_at_load: event.context.visibility_hidden_at_load ?? null
   };
 }

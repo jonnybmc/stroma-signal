@@ -617,8 +617,13 @@ function runAct2Race(runtime: MotionRuntime): void {
   const comparison = runtime.root.querySelector<HTMLElement>('[data-role="comparison-progress"]');
   const waitEl = runtime.root.querySelector<HTMLElement>('[data-role="wait-delta"]');
 
-  const rawUrbanMs = runtime.payload.act2.urban_ms ?? 2100;
-  const rawComparisonMs = runtime.payload.act2.comparison_ms ?? 3400;
+  const rawUrbanMs = runtime.payload.act2.urban_ms;
+  const rawComparisonMs = runtime.payload.act2.comparison_ms;
+  // If either measurement is null the race has no defensible magnitude
+  // to play against — render static. Fabricating decorative timings
+  // (prior default was 2100/3400ms) risks the reader inferring numbers
+  // from motion when none were measured.
+  if (rawUrbanMs == null || rawComparisonMs == null) return;
   const waitDeltaMs = runtime.payload.act2.wait_delta_ms ?? 0;
 
   const urbanFillMs = Math.min(RACE_PLAYBACK_CEILING_MS, rawUrbanMs);
@@ -626,7 +631,8 @@ function runAct2Race(runtime: MotionRuntime): void {
 
   if (waitEl) waitEl.textContent = '0.0s';
 
-  // Both devices start filling at t=0, each at their real duration.
+  // Both devices start filling at t=0, each at their real duration, so
+  // the gap reads as a race playing out in real time.
   if (urban) {
     urban.style.transitionDuration = `${urbanFillMs}ms`;
     window.requestAnimationFrame(() => {
@@ -642,7 +648,13 @@ function runAct2Race(runtime: MotionRuntime): void {
 
   // Wait delta counter starts after urban finishes and runs until
   // comparison finishes — the counter duration IS the gap.
-  if (!waitEl || waitDeltaMs <= 0) return;
+  if (!waitEl) return;
+  if (waitDeltaMs <= 0) {
+    // Zero-delta edge: no count-up, but the hero still needs its italic
+    // unit restored so it does not read as raw plain text on landing.
+    waitEl.innerHTML = renderHeroValueHtml(waitEl.dataset.waitFinal ?? '0.0s');
+    return;
+  }
   const finalLabel = waitEl.dataset.waitFinal ?? waitEl.textContent ?? '';
   const counterDurationMs = Math.max(500, comparisonFillMs - urbanFillMs);
 
@@ -651,15 +663,33 @@ function runAct2Race(runtime: MotionRuntime): void {
     const animate = (now: number): void => {
       const elapsed = Math.min(1, (now - startAt) / counterDurationMs);
       const seconds = (waitDeltaMs / 1000) * elapsed;
+      // Plain text during tick is deliberate — keeps the count-up crisp
+      // and lets the italic-serif unit suffix pop in on landing.
       waitEl.textContent = `${seconds.toFixed(1)}s`;
       if (elapsed < 1) {
         window.requestAnimationFrame(animate);
       } else {
-        waitEl.textContent = finalLabel;
+        waitEl.innerHTML = renderHeroValueHtml(finalLabel);
       }
     };
     window.requestAnimationFrame(animate);
   }, urbanFillMs);
+}
+
+// Duplicate of the markup-side renderHeroValue (kept local to avoid
+// cross-module imports in the motion hot path). Splits a pre-formatted
+// measurement like "3.7s" / "45%" into a numeric body and an italic-serif
+// unit suffix. Falls through to plain text for "n/a" / "—".
+const HERO_VALUE_SPLITTER = /^(-?\d+(?:[.,]\d+)?)(ms|s|%|K|M|B)$/;
+function renderHeroValueHtml(text: string): string {
+  const match = HERO_VALUE_SPLITTER.exec(text.trim());
+  if (!match) return escapeHtmlMinimal(text);
+  const [, value, unit] = match;
+  if (!value || !unit) return escapeHtmlMinimal(text);
+  return `${escapeHtmlMinimal(value)}<span class="sr-unit" aria-hidden="true">${escapeHtmlMinimal(unit)}</span>`;
+}
+function escapeHtmlMinimal(input: string): string {
+  return input.replace(/[&<>]/g, (ch) => (ch === '&' ? '&amp;' : ch === '<' ? '&lt;' : '&gt;'));
 }
 
 function runAct3Counter(runtime: MotionRuntime): void {
@@ -667,7 +697,7 @@ function runAct3Counter(runtime: MotionRuntime): void {
   if (!counter) return;
   const final = Number(counter.dataset.counterFinal ?? '0');
   if (!Number.isFinite(final) || final <= 0) {
-    counter.textContent = `${Number.isFinite(final) ? final : 0}%`;
+    counter.innerHTML = renderHeroValueHtml(`${Number.isFinite(final) ? final : 0}%`);
     return;
   }
   const durationMs = 1200;
@@ -680,7 +710,7 @@ function runAct3Counter(runtime: MotionRuntime): void {
     if (elapsed < 1) {
       window.requestAnimationFrame(animate);
     } else {
-      counter.textContent = `${final}%`;
+      counter.innerHTML = renderHeroValueHtml(`${final}%`);
     }
   };
   window.requestAnimationFrame(animate);
@@ -779,6 +809,11 @@ function markSlideVisible(runtime: MotionRuntime, index: number): void {
   if (runtime.deck.visitedSlides.has(index)) {
     slide.setAttribute('data-visited', 'true');
   }
+  // Brief brightness-pulse gesture that settles alongside the 820ms
+  // radial glow fade-in. The class carries its own animation; we remove
+  // it so repeat visits don't stack redundant animations.
+  slide.classList.add('sr-slide--entering');
+  window.setTimeout(() => slide.classList.remove('sr-slide--entering'), 820);
 }
 
 function navigateToSlide(runtime: MotionRuntime, rawIndex: number, options: { fromHistory?: boolean } = {}): void {

@@ -213,7 +213,6 @@ function isSignalMeta(value: unknown): boolean {
   return (
     isString(value.pkg_version) &&
     isString(value.browser) &&
-    isString(value.nav_type) &&
     (value.navigation_type == null || hasEnumValue(VALID_NAVIGATION_TYPES, value.navigation_type))
   );
 }
@@ -568,7 +567,7 @@ export function explainSignalEventIssues(value: unknown): string[] {
   if (!isSignalContext(value.context))
     issues.push('Expected "context" to include connection fields with number/string/null values.');
   if (!isSignalMeta(value.meta))
-    issues.push('Expected "meta" to include pkg_version, browser, nav_type, and a valid optional navigation_type.');
+    issues.push('Expected "meta" to include pkg_version, browser, and a valid optional navigation_type.');
 
   return issues;
 }
@@ -612,7 +611,6 @@ export function explainSignalWarehouseRowIssues(value: unknown): string[] {
   if (!isBooleanOrNull(value.save_data)) issues.push('Expected "save_data" to be a boolean or null.');
   if (!isStringOrNull(value.connection_type)) issues.push('Expected "connection_type" to be a string or null.');
   if (!isString(value.browser)) issues.push('Expected "browser" to be a string.');
-  if (!isString(value.nav_type)) issues.push('Expected "nav_type" to be a string.');
   if (!(value.navigation_type == null || hasEnumValue(VALID_NAVIGATION_TYPES, value.navigation_type)))
     issues.push('Expected "navigation_type" to be a valid navigation type or null.');
   if (!(value.lcp_load_state == null || hasEnumValue(VALID_LOAD_STATES, value.lcp_load_state)))

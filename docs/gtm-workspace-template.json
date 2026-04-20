@@ -26,7 +26,6 @@
     { "name": "DLV - fcp_ms", "type": "data_layer", "dataLayerName": "fcp_ms", "dataLayerVersion": 2, "required": true },
     { "name": "DLV - ttfb_ms", "type": "data_layer", "dataLayerName": "ttfb_ms", "dataLayerVersion": 2, "required": true },
     { "name": "DLV - browser", "type": "data_layer", "dataLayerName": "browser", "dataLayerVersion": 2, "required": true },
-    { "name": "DLV - nav_type", "type": "data_layer", "dataLayerName": "nav_type", "dataLayerVersion": 2, "required": true },
     { "name": "DLV - navigation_type", "type": "data_layer", "dataLayerName": "navigation_type", "dataLayerVersion": 2, "required": false },
     { "name": "DLV - lcp_load_state", "type": "data_layer", "dataLayerName": "lcp_load_state", "dataLayerVersion": 2, "required": false },
     { "name": "DLV - lcp_element_type", "type": "data_layer", "dataLayerName": "lcp_element_type", "dataLayerVersion": 2, "required": false },
@@ -34,7 +33,11 @@
     { "name": "DLV - interaction_type", "type": "data_layer", "dataLayerName": "interaction_type", "dataLayerVersion": 2, "required": false },
     { "name": "DLV - input_delay_ms", "type": "data_layer", "dataLayerName": "input_delay_ms", "dataLayerVersion": 2, "required": false },
     { "name": "DLV - processing_duration_ms", "type": "data_layer", "dataLayerName": "processing_duration_ms", "dataLayerVersion": 2, "required": false },
-    { "name": "DLV - presentation_delay_ms", "type": "data_layer", "dataLayerName": "presentation_delay_ms", "dataLayerVersion": 2, "required": false }
+    { "name": "DLV - presentation_delay_ms", "type": "data_layer", "dataLayerName": "presentation_delay_ms", "dataLayerVersion": 2, "required": false },
+    { "name": "DLV - lcp_culprit_kind", "type": "data_layer", "dataLayerName": "lcp_culprit_kind", "dataLayerVersion": 2, "required": false },
+    { "name": "DLV - lcp_dominant_subpart", "type": "data_layer", "dataLayerName": "lcp_dominant_subpart", "dataLayerVersion": 2, "required": false },
+    { "name": "DLV - inp_dominant_phase", "type": "data_layer", "dataLayerName": "inp_dominant_phase", "dataLayerVersion": 2, "required": false },
+    { "name": "DLV - third_party_weight_tier", "type": "data_layer", "dataLayerName": "third_party_weight_tier", "dataLayerVersion": 2, "required": false }
   ],
   "recommendedDataLayerVariables": [],
   "ga4EventTag": {
@@ -55,7 +58,6 @@
       { "name": "fcp_ms", "variable": "DLV - fcp_ms" },
       { "name": "ttfb_ms", "variable": "DLV - ttfb_ms" },
       { "name": "browser", "variable": "DLV - browser" },
-      { "name": "nav_type", "variable": "DLV - nav_type" },
       { "name": "navigation_type", "variable": "DLV - navigation_type" },
       { "name": "lcp_load_state", "variable": "DLV - lcp_load_state" },
       { "name": "lcp_element_type", "variable": "DLV - lcp_element_type" },
@@ -63,7 +65,11 @@
       { "name": "interaction_type", "variable": "DLV - interaction_type" },
       { "name": "input_delay_ms", "variable": "DLV - input_delay_ms" },
       { "name": "processing_duration_ms", "variable": "DLV - processing_duration_ms" },
-      { "name": "presentation_delay_ms", "variable": "DLV - presentation_delay_ms" }
+      { "name": "presentation_delay_ms", "variable": "DLV - presentation_delay_ms" },
+      { "name": "lcp_culprit_kind", "variable": "DLV - lcp_culprit_kind" },
+      { "name": "lcp_dominant_subpart", "variable": "DLV - lcp_dominant_subpart" },
+      { "name": "inp_dominant_phase", "variable": "DLV - inp_dominant_phase" },
+      { "name": "third_party_weight_tier", "variable": "DLV - third_party_weight_tier" }
     ]
   },
   "verificationChecklist": [

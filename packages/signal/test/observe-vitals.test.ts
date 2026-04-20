@@ -12,7 +12,7 @@ interface ObserverRegistration {
 const registrations = new Map<string, ObserverRegistration[]>();
 
 class MockPerformanceObserver {
-  static supportedEntryTypes = ['event', 'largest-contentful-paint', 'layout-shift', 'paint'];
+  static supportedEntryTypes = ['event', 'largest-contentful-paint', 'layout-shift', 'paint', 'long-animation-frame'];
 
   private callback: ObserverCallback;
   private registration: ObserverRegistration | null = null;
@@ -59,6 +59,7 @@ function queueEntries(type: string, entries: PerformanceEntry[]): void {
 function setupObserverTest(options?: {
   readyState?: DocumentReadyState;
   navigation?: Partial<PerformanceNavigationTiming>;
+  resources?: Partial<PerformanceResourceTiming>[];
 }) {
   vi.stubGlobal('PerformanceObserver', MockPerformanceObserver as unknown as typeof PerformanceObserver);
   vi.stubGlobal('document', {
@@ -72,18 +73,21 @@ function setupObserverTest(options?: {
     pathname: '/pricing'
   } as Location);
   vi.stubGlobal('performance', {
-    getEntriesByType: (type: string) =>
-      type === 'navigation'
-        ? [
-            {
-              startTime: 0,
-              activationStart: 0,
-              responseStart: 180,
-              requestStart: 120,
-              ...(options?.navigation ?? {})
-            }
-          ]
-        : []
+    getEntriesByType: (type: string) => {
+      if (type === 'navigation') {
+        return [
+          {
+            startTime: 0,
+            activationStart: 0,
+            responseStart: 180,
+            requestStart: 120,
+            ...(options?.navigation ?? {})
+          }
+        ];
+      }
+      if (type === 'resource') return options?.resources ?? [];
+      return [];
+    }
   } as Performance);
 }
 
@@ -139,7 +143,8 @@ describe('observeVitals', () => {
       load_state: 'interactive',
       target: 'img',
       element_type: 'image',
-      resource_url: '/assets/hero.webp'
+      resource_url: '/assets/hero.webp',
+      culprit_kind: 'hero_image'
     });
   });
 
@@ -238,5 +243,491 @@ describe('observeVitals', () => {
         presentation_delay_ms: 80
       }
     });
+  });
+
+  it('classifies LCP culprit kind by element type, URL pattern, and target hints', () => {
+    setupObserverTest();
+
+    const observer = observeVitals({
+      generateTarget: (element) =>
+        element?.tagName?.toLowerCase() === 'img' ? 'img.site-banner' : (element?.tagName?.toLowerCase() ?? null)
+    });
+
+    // Product image URL wins over default bias
+    emitEntries('largest-contentful-paint', [
+      {
+        startTime: 1_800,
+        element: { tagName: 'IMG' },
+        url: 'https://example.co.za/assets/product/sku-42.webp'
+      } as PerformanceEntry
+    ]);
+    expect(observer.snapshot().lcp_attribution?.culprit_kind).toBe('product_image');
+
+    // Banner target falls through when URL has no keyword match
+    emitEntries('largest-contentful-paint', [
+      {
+        startTime: 2_000,
+        element: { tagName: 'IMG' },
+        url: 'https://example.co.za/assets/generic.webp'
+      } as PerformanceEntry
+    ]);
+    expect(observer.snapshot().lcp_attribution?.culprit_kind).toBe('banner_image');
+
+    // Text LCP → headline_text
+    emitEntries('largest-contentful-paint', [
+      {
+        startTime: 2_200,
+        element: { tagName: 'H1' },
+        url: undefined
+      } as unknown as PerformanceEntry
+    ]);
+    expect(observer.snapshot().lcp_attribution?.culprit_kind).toBe('headline_text');
+
+    // Video poster URL → video_poster
+    emitEntries('largest-contentful-paint', [
+      {
+        startTime: 2_400,
+        element: { tagName: 'IMG' },
+        url: 'https://example.co.za/media/poster-01.jpg'
+      } as PerformanceEntry
+    ]);
+    expect(observer.snapshot().lcp_attribution?.culprit_kind).toBe('video_poster');
+  });
+
+  it('derives INP dominant phase with processing > input_delay > presentation tiebreak', () => {
+    setupObserverTest();
+
+    const observer = observeVitals();
+    emitEntries('event', [
+      {
+        duration: 300,
+        interactionId: 401,
+        startTime: 1_000,
+        processingStart: 1_060,
+        processingEnd: 1_260,
+        name: 'pointerdown',
+        target: { tagName: 'BUTTON' }
+      } as PerformanceEntry
+    ]);
+
+    expect(observer.snapshot().inp_attribution?.dominant_phase).toBe('processing');
+
+    // Tiebreak: equal input_delay and processing → processing wins
+    emitEntries('event', [
+      {
+        duration: 200,
+        interactionId: 402,
+        startTime: 2_000,
+        processingStart: 2_050,
+        processingEnd: 2_100,
+        name: 'click',
+        target: { tagName: 'A' }
+      } as PerformanceEntry
+    ]);
+    expect(observer.snapshot().inp_attribution?.dominant_phase).toBe('processing');
+  });
+
+  it('caps interactionRecords at 100 and evicts the lowest-duration entry', () => {
+    setupObserverTest();
+
+    const observer = observeVitals();
+    // Seed 100 low-duration interactions
+    const seedEntries = Array.from({ length: 100 }, (_, i) => ({
+      duration: 50 + i,
+      interactionId: 1_000 + i,
+      startTime: i * 10,
+      processingStart: i * 10 + 5,
+      processingEnd: i * 10 + 20,
+      name: 'click',
+      target: null
+    })) as unknown as PerformanceEntry[];
+    emitEntries('event', seedEntries);
+
+    // Push 100 higher-duration interactions that should evict the lowest
+    const highEntries = Array.from({ length: 100 }, (_, i) => ({
+      duration: 500 + i,
+      interactionId: 2_000 + i,
+      startTime: 10_000 + i * 10,
+      processingStart: 10_000 + i * 10 + 5,
+      processingEnd: 10_000 + i * 10 + 20,
+      name: 'click',
+      target: null
+    })) as unknown as PerformanceEntry[];
+    emitEntries('event', highEntries);
+
+    // p98 of the retained 100 must come from the high-duration cohort (>= 500)
+    const snapshot = observer.snapshot();
+    expect(snapshot.inp_ms).toBeGreaterThanOrEqual(500);
+  });
+
+  it('derives LCP breakdown for image LCP when matching resource timing is present', () => {
+    const resourceEntry = {
+      name: 'https://example.co.za/assets/hero.webp?cache=1',
+      initiatorType: 'img',
+      startTime: 200,
+      requestStart: 250,
+      responseStart: 400,
+      responseEnd: 600,
+      transferSize: 48_000,
+      encodedBodySize: 45_000,
+      duration: 400
+    } as PerformanceResourceTiming;
+
+    setupObserverTest({
+      navigation: {
+        startTime: 0,
+        activationStart: 0,
+        responseStart: 180,
+        requestStart: 120
+      },
+      resources: [resourceEntry]
+    });
+
+    const observer = observeVitals();
+    emitEntries('largest-contentful-paint', [
+      {
+        startTime: 2_400,
+        loadTime: 2_100,
+        element: { tagName: 'IMG' },
+        url: 'https://example.co.za/assets/hero.webp?cache=1'
+      } as PerformanceEntry
+    ]);
+
+    expect(observer.snapshot().lcp_breakdown).toEqual({
+      resource_load_delay_ms: 70,
+      resource_load_time_ms: 350,
+      element_render_delay_ms: 300
+    });
+  });
+
+  it('returns null lcp_breakdown when matching resource timing is missing (all-or-nothing)', () => {
+    setupObserverTest({
+      navigation: {
+        startTime: 0,
+        activationStart: 0,
+        responseStart: 180,
+        requestStart: 120
+      },
+      resources: []
+    });
+
+    const observer = observeVitals();
+    emitEntries('largest-contentful-paint', [
+      {
+        startTime: 2_400,
+        loadTime: 2_100,
+        element: { tagName: 'IMG' },
+        url: 'https://example.co.za/assets/hero.webp'
+      } as PerformanceEntry
+    ]);
+
+    expect(observer.snapshot().lcp_breakdown).toBeNull();
+  });
+
+  it('derives LCP breakdown for text LCP as element_render_delay with zero resource phases', () => {
+    setupObserverTest({
+      navigation: {
+        startTime: 0,
+        activationStart: 0,
+        responseStart: 180,
+        requestStart: 120
+      }
+    });
+
+    const observer = observeVitals();
+    emitEntries('largest-contentful-paint', [
+      {
+        startTime: 1_500,
+        element: { tagName: 'H1' },
+        url: undefined
+      } as unknown as PerformanceEntry
+    ]);
+
+    expect(observer.snapshot().lcp_breakdown).toEqual({
+      resource_load_delay_ms: 0,
+      resource_load_time_ms: 0,
+      element_render_delay_ms: 1_320
+    });
+  });
+
+  it('null-safes lcp_breakdown when opaque cross-origin resource lacks requestStart', () => {
+    const opaqueEntry = {
+      name: 'https://cdn.third.party/hero.webp',
+      initiatorType: 'img',
+      startTime: 200,
+      requestStart: 0,
+      responseStart: 0,
+      responseEnd: 0,
+      transferSize: 0,
+      encodedBodySize: 0,
+      duration: 0
+    } as PerformanceResourceTiming;
+
+    setupObserverTest({
+      navigation: {
+        startTime: 0,
+        activationStart: 0,
+        responseStart: 180,
+        requestStart: 120
+      },
+      resources: [opaqueEntry]
+    });
+
+    const observer = observeVitals();
+    emitEntries('largest-contentful-paint', [
+      {
+        startTime: 2_400,
+        loadTime: 2_100,
+        element: { tagName: 'IMG' },
+        url: 'https://cdn.third.party/hero.webp'
+      } as PerformanceEntry
+    ]);
+
+    expect(observer.snapshot().lcp_breakdown).toBeNull();
+  });
+
+  it('computes third-party pre-LCP script share with eTLD+1 first-party rule (§2.4)', () => {
+    const resources = [
+      {
+        name: 'https://example.co.za/bundle.js',
+        initiatorType: 'script',
+        startTime: 200,
+        transferSize: 80_000,
+        encodedBodySize: 80_000
+      },
+      {
+        name: 'https://cdn.example.co.za/vendor.js',
+        initiatorType: 'script',
+        startTime: 250,
+        transferSize: 40_000,
+        encodedBodySize: 40_000
+      },
+      {
+        name: 'https://analytics.thirdparty.com/tag.js',
+        initiatorType: 'script',
+        startTime: 300,
+        transferSize: 60_000,
+        encodedBodySize: 60_000
+      },
+      {
+        name: 'https://ads.othercdn.net/tag.js',
+        initiatorType: 'script',
+        startTime: 350,
+        transferSize: 40_000,
+        encodedBodySize: 40_000
+      },
+      {
+        name: 'https://late.thirdparty.com/tag.js',
+        initiatorType: 'script',
+        startTime: 2_500, // post-LCP, ignored
+        transferSize: 500_000,
+        encodedBodySize: 500_000
+      }
+    ] as Partial<PerformanceResourceTiming>[];
+
+    setupObserverTest({
+      navigation: { startTime: 0, activationStart: 0, responseStart: 180, requestStart: 120 },
+      resources
+    });
+
+    const observer = observeVitals();
+    emitEntries('largest-contentful-paint', [
+      {
+        startTime: 2_400,
+        loadTime: 2_100,
+        element: { tagName: 'IMG' },
+        url: 'https://example.co.za/assets/hero.webp'
+      } as PerformanceEntry
+    ]);
+
+    const thirdParty = observer.snapshot().third_party;
+    // Total pre-LCP script bytes: 220_000; third-party: 100_000 (45%).
+    // `cdn.example.co.za` matches first-party via eTLD+1 suffix rule.
+    expect(thirdParty).not.toBeNull();
+    expect(thirdParty?.pre_lcp_script_share_pct).toBe(45);
+    expect(thirdParty?.origin_count).toBeNull(); // 2 origins < 3 privacy threshold
+  });
+
+  it('exposes third-party origin count when ≥3 distinct pre-LCP third-party hosts are observed', () => {
+    const resources = [
+      {
+        name: 'https://example.com/bundle.js',
+        initiatorType: 'script',
+        startTime: 100,
+        transferSize: 100_000,
+        encodedBodySize: 100_000
+      },
+      ...['a', 'b', 'c'].map((label) => ({
+        name: `https://${label}.thirdparty.com/tag.js`,
+        initiatorType: 'script',
+        startTime: 200,
+        transferSize: 30_000,
+        encodedBodySize: 30_000
+      }))
+    ] as Partial<PerformanceResourceTiming>[];
+
+    setupObserverTest({
+      navigation: { startTime: 0, activationStart: 0, responseStart: 180, requestStart: 120 },
+      resources
+    });
+    vi.stubGlobal('location', {
+      origin: 'https://example.com',
+      protocol: 'https:',
+      host: 'example.com',
+      href: 'https://example.com/',
+      pathname: '/'
+    } as Location);
+
+    const observer = observeVitals();
+    emitEntries('largest-contentful-paint', [
+      {
+        startTime: 1_500,
+        element: { tagName: 'H1' },
+        url: undefined
+      } as unknown as PerformanceEntry
+    ]);
+
+    const thirdParty = observer.snapshot().third_party;
+    expect(thirdParty?.origin_count).toBe(3);
+  });
+
+  it('treats allowlisted origins as first-party when classifying pre-LCP scripts', () => {
+    const resources = [
+      {
+        name: 'https://example.com/bundle.js',
+        initiatorType: 'script',
+        startTime: 100,
+        transferSize: 100_000,
+        encodedBodySize: 100_000
+      },
+      {
+        name: 'https://static.exotic-cdn.net/vendor.js',
+        initiatorType: 'script',
+        startTime: 200,
+        transferSize: 60_000,
+        encodedBodySize: 60_000
+      }
+    ] as Partial<PerformanceResourceTiming>[];
+
+    setupObserverTest({
+      navigation: { startTime: 0, activationStart: 0, responseStart: 180, requestStart: 120 },
+      resources
+    });
+    vi.stubGlobal('location', {
+      origin: 'https://example.com',
+      protocol: 'https:',
+      host: 'example.com',
+      href: 'https://example.com/',
+      pathname: '/'
+    } as Location);
+
+    const observer = observeVitals({ firstPartyOriginsAllowlist: ['exotic-cdn.net'] });
+    emitEntries('largest-contentful-paint', [
+      {
+        startTime: 1_500,
+        element: { tagName: 'H1' },
+        url: undefined
+      } as unknown as PerformanceEntry
+    ]);
+
+    expect(observer.snapshot().third_party?.pre_lcp_script_share_pct).toBe(0);
+  });
+
+  it('captures the worst long-animation-frame with dominant script cause', () => {
+    setupObserverTest();
+
+    const observer = observeVitals();
+    emitEntries('long-animation-frame', [
+      {
+        duration: 180,
+        startTime: 100,
+        renderStart: 250,
+        styleAndLayoutDuration: 40,
+        forcedStyleAndLayoutDuration: 10,
+        scripts: [{ duration: 120, sourceURL: 'https://cdn.example.net/app.js' }]
+      } as unknown as PerformanceEntry
+    ]);
+
+    expect(observer.snapshot().loaf).toEqual({
+      worst_duration_ms: 180,
+      dominant_cause: 'script',
+      script_origin_count: 1
+    });
+  });
+
+  it('retains only the highest-duration long-animation-frame (running max)', () => {
+    setupObserverTest();
+
+    const observer = observeVitals();
+    emitEntries('long-animation-frame', [
+      {
+        duration: 90,
+        startTime: 100,
+        renderStart: 150,
+        styleAndLayoutDuration: 20,
+        forcedStyleAndLayoutDuration: 5,
+        scripts: [{ duration: 60, sourceURL: 'https://cdn.example.net/a.js' }]
+      } as unknown as PerformanceEntry,
+      {
+        duration: 260,
+        startTime: 500,
+        renderStart: 700,
+        styleAndLayoutDuration: 180,
+        forcedStyleAndLayoutDuration: 10,
+        scripts: [{ duration: 40, sourceURL: 'https://cdn.example.net/b.js' }]
+      } as unknown as PerformanceEntry,
+      {
+        duration: 140,
+        startTime: 900,
+        renderStart: 1_000,
+        styleAndLayoutDuration: 50,
+        forcedStyleAndLayoutDuration: 10,
+        scripts: [{ duration: 80, sourceURL: 'https://cdn.example.net/c.js' }]
+      } as unknown as PerformanceEntry
+    ]);
+
+    // Middle frame (260ms, layout-dominated) must win.
+    expect(observer.snapshot().loaf).toEqual({
+      worst_duration_ms: 260,
+      dominant_cause: 'layout',
+      script_origin_count: 1
+    });
+  });
+
+  it('nulls dominant_cause when every substage input is missing', () => {
+    setupObserverTest();
+
+    const observer = observeVitals();
+    emitEntries('long-animation-frame', [
+      {
+        duration: 120,
+        startTime: 100
+      } as unknown as PerformanceEntry
+    ]);
+
+    expect(observer.snapshot().loaf).toEqual({
+      worst_duration_ms: 120,
+      dominant_cause: null,
+      script_origin_count: null
+    });
+  });
+
+  it('returns null third_party when LCP never fires (Safari/Firefox boundary)', () => {
+    setupObserverTest({
+      navigation: { startTime: 0, activationStart: 0, responseStart: 180, requestStart: 120 },
+      resources: [
+        {
+          name: 'https://cdn.third.party/tag.js',
+          initiatorType: 'script',
+          startTime: 100,
+          transferSize: 50_000,
+          encodedBodySize: 50_000
+        }
+      ] as Partial<PerformanceResourceTiming>[]
+    });
+
+    const observer = observeVitals();
+    // No LCP emitted.
+    expect(observer.snapshot().third_party).toBeNull();
   });
 });

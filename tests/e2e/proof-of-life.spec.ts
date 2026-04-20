@@ -36,8 +36,51 @@ test('proof-of-life flow flushes one payload into the collector and dataLayer', 
   await page.goto(previewHref);
   await expect(page.locator('.sr-hero')).toContainText('localhost:4173');
   await expect(page.locator('.sr-act[data-act="3"]')).toContainText('Where does performance become poor?');
-  await expect(page.locator('.sr-act[data-act="4"]')).toContainText('What deeper layer exists beyond this?');
+  await expect(page.locator('.sr-act[data-act="4"]')).toContainText('What this costs the business');
   await expect(page.locator('.sr-act[data-act="4"]')).toContainText('Rapid Fix Plan');
+});
+
+test('Act 1 context strip narrates measured audience signals with tooltips', async ({ page, request }) => {
+  await request.post('http://localhost:4173/api/reset');
+  await page.goto('http://localhost:4173/');
+  await page.getByRole('button', { name: 'Flush this page load now' }).click();
+
+  await expect.poll(async () => (await readCollectorEvents(request)).length).toBe(1);
+
+  // Use a known-good fixture URL that carries full context data so the
+  // strip renders. The proof-of-life collector flow is too small to yield
+  // narratable context shares, so we navigate directly to a QA scene.
+  const previewLink = page.locator('#preview-link');
+  const previewHref = await previewLink.getAttribute('href');
+  if (!previewHref) throw new Error('Expected preview href');
+
+  // Build a QA URL off the signal-report dev server with a fixture that
+  // carries the strip-worthy context story (strong LCP coverage fixture
+  // includes save_data + cellular + 3g constrained cohort).
+  const reportUrl = new URL('http://localhost:4174/r/');
+  const params = new URL(previewHref).searchParams;
+  for (const [k, v] of params) reportUrl.searchParams.set(k, v);
+  // Inject context_story via csd/cmr/ccs/cet directly — exercises decode path.
+  reportUrl.searchParams.set('csd', '40');
+  reportUrl.searchParams.set('cmr', '180');
+  reportUrl.searchParams.set('ccs', '55');
+  reportUrl.searchParams.set('cet', '3g');
+
+  await page.goto(reportUrl.toString());
+  const strip = page.locator('.sr-act1-ctx');
+  await expect(strip).toBeVisible();
+  await expect(strip).toContainText(/Data Saver/);
+  await expect(strip).toContainText(/round-trip time/);
+  await expect(strip).toContainText(/cellular networks/);
+
+  // Tooltip reveal on hover — verifies the "what this means for you" read
+  // reaches the user without relying on JavaScript event listeners.
+  const firstHint = strip.locator('.sr-act1-ctx-row-hint').first();
+  await firstHint.hover();
+  await expect(firstHint).toHaveAttribute('data-tooltip', /Save-Data|audience|link|mobile/);
+
+  // No literal null / undefined / NaN ever leaks into the rendered surface.
+  await expect(page.getByText(/\b(undefined|NaN|null)\b/)).toHaveCount(0);
 });
 
 test('multi-page spike flow preserves collector truth and preview url semantics', async ({ page, request }) => {
@@ -122,7 +165,7 @@ test('strong fixture renders the four-act report experience end to end', async (
   await expect(page.locator('.sr-act[data-act="1"]')).toContainText('Who are your users?');
   await expect(page.locator('.sr-act[data-act="2"]')).toContainText('How far apart are their experiences?');
   await expect(page.locator('.sr-act[data-act="3"]')).toContainText('Where does performance become poor?');
-  await expect(page.locator('.sr-act[data-act="4"]')).toContainText('What deeper layer exists beyond this?');
+  await expect(page.locator('.sr-act[data-act="4"]')).toContainText('What this costs the business');
   await expect(page.locator('.sr-act[data-act="4"]')).toContainText('Performance Intelligence');
   await expect(page.locator('.sr-act[data-act="3"]')).toContainText('Interaction becomes ready');
 });
@@ -211,7 +254,7 @@ test('affirming fixture keeps the same four-act structure with calmer measured l
 
   await expect(page.locator('.sr-root')).toHaveAttribute('data-mood', 'affirming');
   await expect(page.locator('.sr-act[data-act="3"]')).toContainText('The cliff still exists');
-  await expect(page.locator('.sr-act[data-act="4"]')).toContainText('What deeper layer exists beyond this?');
+  await expect(page.locator('.sr-act[data-act="4"]')).toContainText('What this costs the business');
 });
 
 test('builder keeps mixed lifecycle fixtures load-shaped by default', async ({ page }) => {

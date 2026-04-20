@@ -1,23 +1,37 @@
 import type {
   SignalAggregateV1,
   SignalComparisonTier,
+  SignalContextStory,
   SignalDeviceDistribution,
   SignalDeviceHardware,
+  SignalEffectiveTypeDominant,
   SignalEnvironment,
   SignalEventV1,
   SignalExperienceFunnel,
   SignalExperienceStage,
   SignalExperienceStageSummary,
   SignalFormFactorDistribution,
+  SignalInpPhase,
+  SignalInpStory,
+  SignalLcpCulpritKind,
+  SignalLcpStory,
+  SignalLcpSubpart,
+  SignalLoafCause,
+  SignalLoafStory,
   SignalMetricSelectionInput,
   SignalMetricSelectionResult,
   SignalNetworkSignals,
   SignalNetworkTier,
   SignalQuartiles,
+  SignalThirdPartyStory,
+  SignalThirdPartyTier,
   SignalTierDistribution,
   SignalTierMetricSummary
 } from './types.js';
 import {
+  SIGNAL_COVERAGE_MARGINAL_THRESHOLD_OBS,
+  SIGNAL_COVERAGE_MARGINAL_THRESHOLD_PCT,
+  SIGNAL_COVERAGE_MARGINAL_WARNING,
   SIGNAL_EVENT_VERSION,
   SIGNAL_FUNNEL_FCP_POOR_THRESHOLD,
   SIGNAL_FUNNEL_INP_POOR_THRESHOLD,
@@ -53,6 +67,16 @@ const POOR_STAGE_THRESHOLDS: Record<SignalExperienceStage, number> = {
 
 function isLoadShapedEvent(event: SignalEventV1): boolean {
   return event.meta.navigation_type !== 'restore' && event.meta.navigation_type !== 'prerender';
+}
+
+// Background-tab filter (§2.6). Events captured while the tab was hidden
+// have throttled timers and deprioritized paint — folding them into
+// foreground percentiles skews every narrative number. We drop them
+// before any accumulator runs so `sample_size` / coverage / p75 all share
+// one denominator. The excluded count is preserved on the aggregate
+// (`coverage.excluded_background_sessions`) for transparent narration.
+function isForegroundEvent(event: SignalEventV1): boolean {
+  return event.context.visibility_hidden_at_load !== true;
 }
 
 function asPercent(part: number, total: number): number {
@@ -410,6 +434,21 @@ export function deriveSignalAggregateWarnings(
   return warnings;
 }
 
+// §5.1 marginal-coverage caveat. Fires when the LCP race cohort lands
+// within the slack thresholds of the ship gates — the numbers are
+// defensible, but barely, and the view model uses this warning to tone
+// language down ("the measurable sessions we have" vs "measured
+// classified sessions").
+export function isCoverageMarginal(args: { lcpCoverage: number; lcpObservations: number }): boolean {
+  const pctSlack =
+    args.lcpCoverage >= SIGNAL_MIN_LCP_COVERAGE &&
+    args.lcpCoverage < SIGNAL_MIN_LCP_COVERAGE + SIGNAL_COVERAGE_MARGINAL_THRESHOLD_PCT;
+  const obsSlack =
+    args.lcpObservations >= SIGNAL_MIN_RACE_OBSERVATIONS &&
+    args.lcpObservations < SIGNAL_MIN_RACE_OBSERVATIONS + SIGNAL_COVERAGE_MARGINAL_THRESHOLD_OBS;
+  return pctSlack || obsSlack;
+}
+
 function computeTopPagePathFromCounts(counts: Map<string, number>): string | null {
   let topPath: string | null = null;
   let topCount = 0;
@@ -422,12 +461,354 @@ function computeTopPagePathFromCounts(counts: Map<string, number>): string | nul
   return topPath;
 }
 
+const LCP_SUBPARTS = [
+  'ttfb',
+  'resource_load_delay',
+  'resource_load_time',
+  'element_render_delay'
+] as const satisfies readonly SignalLcpSubpart[];
+
+const INP_PHASES = ['input_delay', 'processing', 'presentation'] as const satisfies readonly SignalInpPhase[];
+
+const ZERO_LCP_CULPRIT_COUNTS: Record<SignalLcpCulpritKind, number> = {
+  hero_image: 0,
+  headline_text: 0,
+  banner_image: 0,
+  product_image: 0,
+  video_poster: 0,
+  unknown: 0
+};
+
+interface LcpStoryAccumulator {
+  observations: number;
+  subpartSums: Record<SignalLcpSubpart, number>;
+  culpritCounts: Record<SignalLcpCulpritKind, number>;
+  culpritObservations: number;
+}
+
+interface InpStoryAccumulator {
+  observations: number;
+  phaseCounts: Record<SignalInpPhase, number>;
+}
+
+function createLcpStoryAccumulator(): LcpStoryAccumulator {
+  return {
+    observations: 0,
+    subpartSums: {
+      ttfb: 0,
+      resource_load_delay: 0,
+      resource_load_time: 0,
+      element_render_delay: 0
+    },
+    culpritCounts: { ...ZERO_LCP_CULPRIT_COUNTS },
+    culpritObservations: 0
+  };
+}
+
+function createInpStoryAccumulator(): InpStoryAccumulator {
+  return {
+    observations: 0,
+    phaseCounts: { input_delay: 0, processing: 0, presentation: 0 }
+  };
+}
+
+// Third-party pre-paint script weight story. Tier assignment mirrors the
+// capture-side bucketing so aggregation and GA4 label the same span of
+// shares the same way.
+const THIRD_PARTY_TIERS = ['none', 'light', 'moderate', 'heavy'] as const satisfies readonly SignalThirdPartyTier[];
+const ZERO_THIRD_PARTY_TIER_COUNTS: Record<SignalThirdPartyTier, number> = {
+  none: 0,
+  light: 0,
+  moderate: 0,
+  heavy: 0
+};
+
+export function classifyThirdPartyShareTier(share: number | null | undefined): SignalThirdPartyTier | null {
+  if (share == null || Number.isNaN(share) || share < 0) return null;
+  if (share === 0) return 'none';
+  if (share <= 15) return 'light';
+  if (share <= 40) return 'moderate';
+  return 'heavy';
+}
+
+interface ThirdPartyStoryAccumulator {
+  shareSamples: number[];
+  originSamples: number[];
+  tierCounts: Record<SignalThirdPartyTier, number>;
+  observations: number;
+}
+
+function createThirdPartyStoryAccumulator(): ThirdPartyStoryAccumulator {
+  return {
+    shareSamples: [],
+    originSamples: [],
+    tierCounts: { ...ZERO_THIRD_PARTY_TIER_COUNTS },
+    observations: 0
+  };
+}
+
+function ingestThirdPartyStoryEvent(acc: ThirdPartyStoryAccumulator, event: SignalEventV1): void {
+  const tp = event.vitals.third_party;
+  if (!tp) return;
+  const share = tp.pre_lcp_script_share_pct;
+  if (share == null) return;
+  const tier = classifyThirdPartyShareTier(share);
+  if (tier == null) return;
+
+  acc.observations += 1;
+  acc.shareSamples.push(share);
+  acc.tierCounts[tier] += 1;
+  if (tp.origin_count != null && tp.origin_count >= 0) {
+    acc.originSamples.push(tp.origin_count);
+  }
+}
+
+function median(values: readonly number[]): number | null {
+  if (values.length === 0) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  const upper = sorted[mid] ?? 0;
+  const raw = sorted.length % 2 === 0 ? ((sorted[mid - 1] ?? upper) + upper) / 2 : upper;
+  return Math.round(raw);
+}
+
+function finalizeThirdPartyStory(acc: ThirdPartyStoryAccumulator): SignalThirdPartyStory | undefined {
+  if (acc.observations < SIGNAL_MIN_RACE_OBSERVATIONS) return undefined;
+
+  let dominantTier: SignalThirdPartyTier = THIRD_PARTY_TIERS[0];
+  let dominantCount = acc.tierCounts[THIRD_PARTY_TIERS[0]];
+  for (const tier of THIRD_PARTY_TIERS) {
+    if (acc.tierCounts[tier] > dominantCount) {
+      dominantTier = tier;
+      dominantCount = acc.tierCounts[tier];
+    }
+  }
+
+  return {
+    median_share_pct: median(acc.shareSamples),
+    dominant_tier: dominantCount > 0 ? dominantTier : null,
+    dominant_tier_share_pct: asPercent(dominantCount, acc.observations),
+    median_origin_count: median(acc.originSamples)
+  };
+}
+
+// LoAF worst-frame story. `script | layout | style | paint` mirrors the
+// capture-side attribution so aggregation and SDK label the same frames
+// the same way. Gated on SIGNAL_MIN_RACE_OBSERVATIONS to avoid narrating
+// a single stray long frame.
+const LOAF_CAUSES = ['script', 'layout', 'style', 'paint'] as const satisfies readonly SignalLoafCause[];
+const ZERO_LOAF_CAUSE_COUNTS: Record<SignalLoafCause, number> = {
+  script: 0,
+  layout: 0,
+  style: 0,
+  paint: 0
+};
+
+interface LoafStoryAccumulator {
+  observations: number;
+  causeCounts: Record<SignalLoafCause, number>;
+  worstDurationSamples: number[];
+}
+
+function createLoafStoryAccumulator(): LoafStoryAccumulator {
+  return {
+    observations: 0,
+    causeCounts: { ...ZERO_LOAF_CAUSE_COUNTS },
+    worstDurationSamples: []
+  };
+}
+
+function ingestLoafStoryEvent(acc: LoafStoryAccumulator, event: SignalEventV1): void {
+  const loaf = event.vitals.loaf;
+  if (!loaf) return;
+  const cause = loaf.dominant_cause;
+  if (!cause) return;
+  acc.observations += 1;
+  acc.causeCounts[cause] += 1;
+  if (loaf.worst_duration_ms != null && Number.isFinite(loaf.worst_duration_ms) && loaf.worst_duration_ms >= 0) {
+    acc.worstDurationSamples.push(loaf.worst_duration_ms);
+  }
+}
+
+function percentile(values: readonly number[], ratio: number): number | null {
+  if (values.length === 0) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  const index = Math.max(0, Math.ceil(sorted.length * ratio) - 1);
+  const value = sorted[index];
+  return value == null ? null : Math.round(value);
+}
+
+// Act 1 context story — surfaces four already-captured signals
+// (save-data share, median RTT, cellular share, dominant effective_type)
+// as narrative audience reality. Does not gate on SIGNAL_MIN_RACE_OBSERVATIONS
+// because it piggybacks on the same per-session context already used to
+// compute `network_signals`; the view-model layer applies the narrate/omit
+// thresholds per field (see SIGNAL_SAVE_DATA_NARRATE_THRESHOLD_PCT and
+// SIGNAL_CELLULAR_NARRATE_THRESHOLD_PCT). Returns undefined only when the
+// sample carried zero contributing rows — below that every downstream
+// omission is enforced by line-level nullability, not block-level absence.
+function finalizeContextStory(input: {
+  total: number;
+  saveDataCount: number;
+  cellularCount: number;
+  rttMedianMs: number | null;
+  effectiveTypeCounters: SignalNetworkSignals['effective_type_hist'];
+}): SignalContextStory | undefined {
+  if (input.total <= 0) return undefined;
+
+  const { effectiveTypeCounters } = input;
+  const effectiveKeys: SignalEffectiveTypeDominant[] = ['4g', '3g', '2g', 'slow-2g', 'unknown'];
+  const counterByKey: Record<SignalEffectiveTypeDominant, number> = {
+    '4g': effectiveTypeCounters['4g'],
+    '3g': effectiveTypeCounters['3g'],
+    '2g': effectiveTypeCounters['2g'],
+    'slow-2g': effectiveTypeCounters.slow_2g,
+    unknown: effectiveTypeCounters.unknown
+  };
+
+  let dominantEffective: SignalEffectiveTypeDominant | null = null;
+  let dominantCount = 0;
+  for (const key of effectiveKeys) {
+    if (counterByKey[key] > dominantCount) {
+      dominantEffective = key;
+      dominantCount = counterByKey[key];
+    }
+  }
+
+  return {
+    save_data_share_pct: asPercent(input.saveDataCount, input.total),
+    median_rtt_ms: input.rttMedianMs,
+    cellular_share_pct: asPercent(input.cellularCount, input.total),
+    effective_type_dominant: dominantEffective
+  };
+}
+
+function finalizeLoafStory(acc: LoafStoryAccumulator): SignalLoafStory | undefined {
+  if (acc.observations < SIGNAL_MIN_RACE_OBSERVATIONS) return undefined;
+
+  let dominantCause: SignalLoafCause = LOAF_CAUSES[0];
+  let dominantCount = acc.causeCounts[LOAF_CAUSES[0]];
+  for (const cause of LOAF_CAUSES) {
+    if (acc.causeCounts[cause] > dominantCount) {
+      dominantCause = cause;
+      dominantCount = acc.causeCounts[cause];
+    }
+  }
+
+  return {
+    dominant_cause: dominantCount > 0 ? dominantCause : null,
+    dominant_cause_share_pct: asPercent(dominantCount, acc.observations),
+    worst_frame_ms_p75: percentile(acc.worstDurationSamples, 0.75)
+  };
+}
+
+function ingestLcpStoryEvent(acc: LcpStoryAccumulator, event: SignalEventV1): void {
+  const culprit = event.vitals.lcp_attribution?.culprit_kind;
+  if (culprit && culprit in acc.culpritCounts) {
+    acc.culpritCounts[culprit] += 1;
+    acc.culpritObservations += 1;
+  }
+
+  const breakdown = event.vitals.lcp_breakdown;
+  const ttfb = event.vitals.ttfb_ms;
+  if (!breakdown || ttfb == null) return;
+  const { resource_load_delay_ms, resource_load_time_ms, element_render_delay_ms } = breakdown;
+  if (resource_load_delay_ms == null || resource_load_time_ms == null || element_render_delay_ms == null) return;
+
+  acc.observations += 1;
+  acc.subpartSums.ttfb += ttfb;
+  acc.subpartSums.resource_load_delay += resource_load_delay_ms;
+  acc.subpartSums.resource_load_time += resource_load_time_ms;
+  acc.subpartSums.element_render_delay += element_render_delay_ms;
+}
+
+function ingestInpStoryEvent(acc: InpStoryAccumulator, event: SignalEventV1): void {
+  const phase = event.vitals.inp_attribution?.dominant_phase;
+  if (!phase) return;
+  acc.phaseCounts[phase] += 1;
+  acc.observations += 1;
+}
+
+function finalizeLcpStory(acc: LcpStoryAccumulator): SignalLcpStory | undefined {
+  if (acc.observations < SIGNAL_MIN_RACE_OBSERVATIONS) return undefined;
+
+  const total =
+    acc.subpartSums.ttfb +
+    acc.subpartSums.resource_load_delay +
+    acc.subpartSums.resource_load_time +
+    acc.subpartSums.element_render_delay;
+  if (total <= 0) return undefined;
+
+  const distribution = {
+    ttfb: asPercent(acc.subpartSums.ttfb, total),
+    resource_load_delay: asPercent(acc.subpartSums.resource_load_delay, total),
+    resource_load_time: asPercent(acc.subpartSums.resource_load_time, total),
+    element_render_delay: asPercent(acc.subpartSums.element_render_delay, total)
+  };
+
+  let dominantSubpart: SignalLcpSubpart = LCP_SUBPARTS[0];
+  let dominantShare = distribution[LCP_SUBPARTS[0]];
+  for (const subpart of LCP_SUBPARTS) {
+    if (distribution[subpart] > dominantShare) {
+      dominantSubpart = subpart;
+      dominantShare = distribution[subpart];
+    }
+  }
+
+  let dominantCulprit: SignalLcpCulpritKind | null = null;
+  let dominantCulpritCount = 0;
+  for (const kind of Object.keys(acc.culpritCounts) as SignalLcpCulpritKind[]) {
+    if (acc.culpritCounts[kind] > dominantCulpritCount) {
+      dominantCulprit = kind;
+      dominantCulpritCount = acc.culpritCounts[kind];
+    }
+  }
+
+  return {
+    dominant_subpart: dominantShare > 0 ? dominantSubpart : null,
+    dominant_subpart_share_pct: dominantShare > 0 ? dominantShare : null,
+    dominant_culprit_kind: dominantCulprit,
+    subpart_distribution_pct: distribution
+  };
+}
+
+function finalizeInpStory(acc: InpStoryAccumulator): SignalInpStory | undefined {
+  if (acc.observations < SIGNAL_MIN_RACE_OBSERVATIONS) return undefined;
+
+  const distribution = {
+    input_delay: asPercent(acc.phaseCounts.input_delay, acc.observations),
+    processing: asPercent(acc.phaseCounts.processing, acc.observations),
+    presentation: asPercent(acc.phaseCounts.presentation, acc.observations)
+  };
+
+  let dominantPhase: SignalInpPhase = INP_PHASES[0];
+  let dominantShare = distribution[INP_PHASES[0]];
+  for (const phase of INP_PHASES) {
+    if (distribution[phase] > dominantShare) {
+      dominantPhase = phase;
+      dominantShare = distribution[phase];
+    }
+  }
+
+  return {
+    dominant_phase: dominantShare > 0 ? dominantPhase : null,
+    dominant_phase_share_pct: dominantShare > 0 ? dominantShare : null,
+    phase_distribution_pct: distribution
+  };
+}
+
 export function aggregateSignalEvents(
   events: SignalEventV1[],
   mode: SignalAggregateV1['mode'] = 'preview',
   now = Date.now()
 ): SignalAggregateV1 {
-  const reportEvents = events.filter(isLoadShapedEvent);
+  const loadShaped = events.filter(isLoadShapedEvent);
+  // Pre-filter denominator preserved as `raw_sample_size` for the
+  // credibility strip; the post-filter `total` is canonical for every
+  // accumulator, percentile, and share in the aggregate.
+  const rawSampleSize = loadShaped.length;
+  const reportEvents = loadShaped.filter(isForegroundEvent);
+  const excludedBackgroundSessions = rawSampleSize - reportEvents.length;
   const total = reportEvents.length;
   const domain = reportEvents[0]?.host ?? events[0]?.host ?? 'unknown.local';
   let earliest = now;
@@ -448,6 +829,10 @@ export function aggregateSignalEvents(
   const effectiveTypeCounters = { ...ZERO_EFFECTIVE_TYPE_HIST };
   let effectiveTypeAvailableCount = 0;
   let saveDataCount = 0;
+  // `connection_type === 'cellular'` counter. Chromium-only NetworkInformation
+  // field; Safari / Firefox land as null and don't contribute either way.
+  // Feeds `context_story.cellular_share_pct`.
+  let cellularCount = 0;
   const downlinkSamples: number[] = [];
   const rttSamples: number[] = [];
   const browserCounters = { ...ZERO_BROWSER_HIST };
@@ -474,6 +859,10 @@ export function aggregateSignalEvents(
     inp: 0
   };
   const classifiedEvents: SignalEventV1[] = [];
+  const lcpStoryAcc = createLcpStoryAccumulator();
+  const inpStoryAcc = createInpStoryAccumulator();
+  const thirdPartyStoryAcc = createThirdPartyStoryAccumulator();
+  const loafStoryAcc = createLoafStoryAccumulator();
 
   for (const event of reportEvents) {
     if (!hasTimestamp) {
@@ -528,6 +917,7 @@ export function aggregateSignalEvents(
     effectiveTypeCounters[effectiveTypeBucket(event.context.effective_type)] += 1;
     if (event.context.effective_type != null) effectiveTypeAvailableCount += 1;
     if (event.context.save_data === true) saveDataCount += 1;
+    if (event.context.connection_type === 'cellular') cellularCount += 1;
     if (event.context.downlink_mbps != null) downlinkSamples.push(event.context.downlink_mbps);
     if (event.context.rtt_ms != null) rttSamples.push(event.context.rtt_ms);
 
@@ -543,6 +933,11 @@ export function aggregateSignalEvents(
       else formFactorCounters.desktop += 1;
       formFactorValidCount += 1;
     }
+
+    ingestLcpStoryEvent(lcpStoryAcc, event);
+    ingestInpStoryEvent(inpStoryAcc, event);
+    ingestThirdPartyStoryEvent(thirdPartyStoryAcc, event);
+    ingestLoafStoryEvent(loafStoryAcc, event);
   }
 
   const classifiedSampleSize = total - networkDistribution.unknown;
@@ -576,14 +971,37 @@ export function aggregateSignalEvents(
           ? comparison.lcp_coverage
           : metricChoice.race_metric === 'fcp'
             ? comparison.fcp_coverage
-            : comparison.ttfb_coverage
+            : comparison.ttfb_coverage,
+    raw_sample_size: rawSampleSize,
+    excluded_background_sessions: excludedBackgroundSessions
   };
+
+  // Aggregation-time invariant (§1.2). Dropped-event bookkeeping must
+  // reconcile: every event either made it into the canonical denominator
+  // or was counted as a background exclusion.
+  if (coverage.raw_sample_size !== total + coverage.excluded_background_sessions) {
+    throw new Error(
+      `Aggregation invariant violated: raw_sample_size (${coverage.raw_sample_size}) !== sample_size (${total}) + excluded_background_sessions (${coverage.excluded_background_sessions}).`
+    );
+  }
 
   const warnings = deriveSignalAggregateWarnings({
     mode,
     sample_size: total,
     race_metric: metricChoice.race_metric
   });
+
+  // §5.1 marginal-coverage caveat — only fires when an LCP race actually
+  // lands (lcp race_metric) and the cohort is within the slack window.
+  if (
+    metricChoice.race_metric === 'lcp' &&
+    isCoverageMarginal({
+      lcpCoverage: urban.lcp_coverage,
+      lcpObservations: urban.lcp_observations
+    })
+  ) {
+    warnings.push(SIGNAL_COVERAGE_MARGINAL_WARNING);
+  }
 
   const deviceHardware: SignalDeviceHardware = {
     cores_hist: distributePercent(coresCounters, total) as SignalDeviceHardware['cores_hist'],
@@ -598,6 +1016,18 @@ export function aggregateSignalEvents(
     downlink_mbps: quartiles(downlinkSamples),
     rtt_ms: quartiles(rttSamples)
   };
+
+  // `context_story` reuses the same samples the network_signals block
+  // summarises, but in editorial shape for Act 1. Median RTT rounds to
+  // integer ms (quartiles() returns tenth-ms precision — surplus for a
+  // narrated "median round-trip time is 180 milliseconds" line).
+  const contextStory = finalizeContextStory({
+    total,
+    saveDataCount,
+    cellularCount,
+    rttMedianMs: networkSignals.rtt_ms ? Math.round(networkSignals.rtt_ms.p50) : null,
+    effectiveTypeCounters
+  });
 
   const environment: SignalEnvironment = {
     browser_hist: distributePercent(browserCounters, total) as SignalEnvironment['browser_hist']
@@ -648,6 +1078,11 @@ export function aggregateSignalEvents(
     network_signals: networkSignals,
     environment,
     form_factor_distribution: formFactorDistribution,
+    lcp_story: finalizeLcpStory(lcpStoryAcc),
+    inp_story: finalizeInpStory(inpStoryAcc),
+    third_party_story: finalizeThirdPartyStory(thirdPartyStoryAcc),
+    loaf_story: finalizeLoafStory(loafStoryAcc),
+    context_story: contextStory,
     top_page_path: computeTopPagePathFromCounts(topPathCounts),
     warnings
   };

@@ -213,7 +213,6 @@ describe('signal runtime integration', () => {
     controller.flushNow();
 
     expect(sink.handle).toHaveBeenCalledTimes(1);
-    expect(sink.handle.mock.calls[0]?.[0].meta.nav_type).toBe('reload');
     expect(sink.handle.mock.calls[0]?.[0].meta.navigation_type).toBe('reload');
   });
 

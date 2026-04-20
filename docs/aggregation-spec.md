@@ -80,13 +80,64 @@ The following fields were considered and **cut** because they fail the usefulnes
 - `navigator.userAgentData.mobile` — Chromium-only boolean. Would give a slightly more accurate form-factor signal on Chromium (catches iPad Pro 12.9" landscape) but at the cost of an additional SDK capture field. Rejected for 0.1 because `device_screen_w` is universal and gives a strong-enough signal; the edge cases are below the noise floor.
 - `navigator.connection.type` (wifi / cellular) — redundant with `effective_type`.
 - TCP handshake quartiles — already abstracted into `net_tier`.
-- `nav_type` histogram — interesting but does not unlock a specific product action.
+- Navigation-type histogram — interesting but does not unlock a specific product action. (`meta.nav_type` was removed in 0.1.x; `meta.navigation_type` remains for per-event filtering but is not aggregated.)
 
 If a future iteration wants to add any of these back, it must first name the concrete product-team decision the field unlocks, prove the decision isn't already actionable from existing analytics, and prove it isn't derivable at runtime.
 
 ### Backward compatibility
 
 All three blocks are additive. `rv=1` URLs without these blocks decode cleanly and return `undefined` for the missing fields — the report surfaces the fields only when they are present.
+
+## Background-Tab Visibility Filter (PR-6)
+
+Events where `context.visibility_hidden_at_load === true` are pre-filtered before any accumulator runs. Background-tab loads produce non-user-facing vitals (deprioritized throttling, long `hidden → visible` gaps, missing LCP) that would drag every percentile and share downward if included.
+
+**Denominator semantics (locked).** Every post-filter metric — `sample_size`, `coverage.*`, all percentiles, funnel shares, race observations, and the credibility strip number — is computed against the *post-filter* cohort. The pre-filter count is preserved separately:
+
+- `coverage.raw_sample_size` — total observed rows before the visibility filter
+- `coverage.excluded_background_sessions` — rows dropped by the filter
+
+Invariant (asserted at aggregation time): `raw_sample_size === sample_size + excluded_background_sessions`. A mismatch throws — denominator drift is a bug, not a silent degradation.
+
+When `excluded_background_sessions > 0`, the report credibility strip appends a transparent segment (e.g. *"· 187 background-tab loads excluded"*). When zero, silence is the correct signal — no segment is rendered.
+
+## Marginal-Coverage Warning (PR-6)
+
+When the LCP cohort lands within a small margin of the ship thresholds — `SIGNAL_COVERAGE_MARGINAL_THRESHOLD_PCT = 10` (i.e. 50% ≤ `lcp_coverage` < 60%) or `SIGNAL_COVERAGE_MARGINAL_THRESHOLD_OBS = 10` (i.e. 25 ≤ `lcp_observations` < 35) — aggregation appends a `coverage_marginal` warning. The report credibility strip renders *"coverage at the defensible edge"* so readers can temper their read rather than being handed a falsely confident narrative. Pure additive signal — no aggregate math changes.
+
+## Save-Data Narration Threshold (PR-6)
+
+`SIGNAL_SAVE_DATA_NARRATE_THRESHOLD_PCT = 1` controls when the Data Saver line is rendered in Act 1. Shares below 1% round to 0% and the line is omitted entirely — zero users on Data Saver is not an interesting story. The constant lives in `packages/signal-contracts/src/types.ts` and is imported wherever the narration gate applies.
+
+## Report URL Byte Budget (PR-6)
+
+`encodeSignalReportUrl` asserts the encoded URL size to prevent silent transport failures:
+
+- Soft limit: `SIGNAL_REPORT_URL_SOFT_LIMIT_BYTES = 2048`. Breach pushes `signal_report_url_exceeds_soft_limit:<bytes>` onto the returned `warnings[]` array; the URL still emits.
+- Hard limit: `SIGNAL_REPORT_URL_HARD_LIMIT_BYTES = 4096`. Breach throws — emitting a truncated or corrupted URL is strictly worse than failing loudly.
+
+Size is measured via `TextEncoder` (browser) or `Buffer.byteLength` (Node) for UTF-8 byte accuracy. The budget exists because enriching the aggregate with many optional story blocks could push structurally-valid payloads past common URL-length limits.
+
+## LoAF Story (PR-7)
+
+Chromium 123+ emits `PerformanceObserver` entries of type `long-animation-frame`. Each frame carries a `duration`, `scripts[]` with per-script timing and `sourceURL`, `styleAndLayoutDuration`, `forcedStyleAndLayoutDuration`, and a `renderStart` boundary. Signal retains only the **worst-duration frame per session** (running max) — unbounded accumulation would be a memory regression on janky pages. The stored event carries `vitals.loaf = { worst_duration_ms, dominant_cause, script_origin_count }`.
+
+`dominant_cause` is the argmax across four substages derived per §2.5 of the 0.1.x plan:
+
+- `script_time = Σ scripts[].duration`
+- `layout_time = styleAndLayoutDuration − forcedStyleAndLayoutDuration`
+- `style_time = forcedStyleAndLayoutDuration`
+- `paint_time = duration − (renderStart − startTime)` when `renderStart > 0`
+
+Any substage missing its inputs is excluded from the argmax. If every candidate is null (partial early-beta Chrome 123 entries), `dominant_cause = null` rather than guessing.
+
+`script_origin_count` is the number of distinct hosts appearing in `scripts[].sourceURL`. Inline scripts, `blob:` URLs, and unparseable URLs are silently skipped — they contribute no origin count rather than inflating it.
+
+Aggregation gates the `loaf_story` block on `SIGNAL_MIN_RACE_OBSERVATIONS = 25`. When fewer than 25 sessions carry a non-null `dominant_cause`, the story is `undefined` — the report omits the line entirely. When ≥25 sessions land and a single cause exceeds `SIGNAL_STORY_HEDGED_THRESHOLD_PCT = 35`, the narrative names it; otherwise the line is hedged (*"no single cause dominates the slowest frame"*). `worst_frame_ms_p75` is the p75 of per-session `worst_duration_ms` values — used only for internal sanity; not surfaced in copy.
+
+Safari and Firefox sessions carry `vitals.loaf = null` and contribute no observations. Chromium < 123 behaves the same way.
+
+The Act 3 view-model gates LoAF narration on the INP funnel stage being active — LoAF is never claimed when the INP story itself could not be defended.
 
 ## Comparison Tier
 

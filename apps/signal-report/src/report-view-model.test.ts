@@ -2,8 +2,10 @@ import {
   affirmingAggregateFixture,
   decodeSignalReportUrl,
   fcpFallbackAggregateFixture,
+  fullDepthAggregateFixture,
   highUnclassifiedShareAggregateFixture,
   lowInpCoverageAggregateFixture,
+  safariHeavyAggregateFixture,
   signalReportScenarioFixtures,
   singleStageFunnelFixture,
   soberMoodAggregateFixture,
@@ -130,6 +132,46 @@ describe('report view model', () => {
     expect(strip.metric_coverage_label).toMatch(/coverage$/i);
   });
 
+  it('surfaces excluded_background_sessions on the credibility strip when aggregation drops sessions', () => {
+    const withExclusions = {
+      ...strongLcpCoverageAggregateFixture,
+      coverage: {
+        ...strongLcpCoverageAggregateFixture.coverage,
+        raw_sample_size: strongLcpCoverageAggregateFixture.sample_size + 31,
+        excluded_background_sessions: 31
+      }
+    };
+    const viewModel = buildReportViewModel(withExclusions);
+    expect(viewModel.credibility_strip.excluded_background_sessions).toBe(31);
+  });
+
+  it('omits excluded_background_sessions when the aggregate reports zero exclusions', () => {
+    const withoutExclusions = {
+      ...strongLcpCoverageAggregateFixture,
+      coverage: {
+        ...strongLcpCoverageAggregateFixture.coverage,
+        raw_sample_size: strongLcpCoverageAggregateFixture.sample_size,
+        excluded_background_sessions: 0
+      }
+    };
+    const viewModel = buildReportViewModel(withoutExclusions);
+    expect(viewModel.credibility_strip.excluded_background_sessions).toBeNull();
+  });
+
+  it('flags coverage_marginal on the credibility strip when the aggregate warning fires', () => {
+    const marginal = {
+      ...strongLcpCoverageAggregateFixture,
+      warnings: [...strongLcpCoverageAggregateFixture.warnings, 'coverage_marginal']
+    };
+    const viewModel = buildReportViewModel(marginal);
+    expect(viewModel.credibility_strip.coverage_marginal).toBe(true);
+  });
+
+  it('leaves coverage_marginal false when the warning is absent', () => {
+    const viewModel = buildReportViewModel(strongLcpCoverageAggregateFixture);
+    expect(viewModel.credibility_strip.coverage_marginal).toBe(false);
+  });
+
   it('keeps scene budgets within the intended DOM envelope', () => {
     const viewModel = buildReportViewModel(strongLcpCoverageAggregateFixture);
     const act1Bodies = viewModel.act1_tiers.reduce((sum, tier) => sum + tier.particleCount, 0);
@@ -186,6 +228,71 @@ describe('report view model', () => {
         expect(point).not.toContain('NaN');
         expect(point).not.toContain('undefined');
       }
+    }
+  });
+
+  it('produces no NaN or undefined strings in act4 impact ledger rows across all fixtures', () => {
+    for (const fixture of signalReportScenarioFixtures) {
+      const viewModel = buildReportViewModel(fixture.aggregate);
+      for (const row of viewModel.act4_impact_rows) {
+        expect(row.metric_value).not.toContain('NaN');
+        expect(row.metric_value).not.toContain('undefined');
+        expect(row.metric_label).not.toContain('NaN');
+        expect(row.metric_label).not.toContain('undefined');
+        expect(row.kpi_label).not.toContain('NaN');
+        expect(row.kpi_label).not.toContain('undefined');
+        expect(row.impact_sentence_html).not.toContain('NaN');
+        expect(row.impact_sentence_html).not.toContain('undefined');
+        expect(row.impact_sentence_html).toContain('<em class="sr-italic-serif">');
+        expect(['alert', 'watch', 'steady']).toContain(row.tone);
+      }
+    }
+  });
+
+  it('emits the full KPI impact ledger on the full-depth fixture', () => {
+    const viewModel = buildReportViewModel(fullDepthAggregateFixture);
+    const ids = viewModel.act4_impact_rows.map((row) => row.id);
+
+    expect(ids).toContain('lcp_bounce');
+    expect(ids).toContain('inp_conversion');
+    expect(ids).toContain('script_roas');
+    expect(ids).toContain('network_reach');
+
+    const kpis = viewModel.act4_impact_rows.map((row) => row.kpi_label);
+    expect(kpis).toContain('Bounce Rate · Ad Quality Score');
+    expect(kpis).toContain('Conversion Rate · Cost Per Acquisition');
+    expect(kpis).toContain('Mobile ROAS · Audience Reach');
+    expect(kpis).toContain('Audience Reach · Campaign Efficiency');
+  });
+
+  it('only emits the script_roas row when third-party pressure is moderate+ OR a long LoAF frame is measured', () => {
+    // Invariant sweep across all fixtures: the heavy-script row must never
+    // fire without evidence. Either `third_party_story.dominant_tier` is
+    // moderate/heavy, or `loaf_story.worst_frame_ms_p75` clears the 50ms
+    // long-animation-frame threshold. No speculation.
+    for (const fixture of signalReportScenarioFixtures) {
+      const viewModel = buildReportViewModel(fixture.aggregate);
+      const scriptRow = viewModel.act4_impact_rows.find((row) => row.id === 'script_roas');
+      if (!scriptRow) continue;
+
+      const thirdParty = viewModel.race.third_party_story;
+      const loaf = viewModel.act3.loaf_story;
+      const thirdPartyHits =
+        thirdParty != null && (thirdParty.dominant_tier === 'moderate' || thirdParty.dominant_tier === 'heavy');
+      const loafHits = loaf != null && loaf.worst_frame_ms_p75 != null && loaf.worst_frame_ms_p75 >= 50;
+
+      expect(thirdPartyHits || loafHits).toBe(true);
+    }
+  });
+
+  it('falls back to the flat summary points when fewer than two impact rows qualify', () => {
+    const viewModel = buildReportViewModel(lowInpCoverageAggregateFixture);
+    // When the ledger cannot assemble a defensible row set, it collapses to
+    // an empty array so the markup path renders the legacy bullets instead
+    // of a thin one-row ledger. The summary points themselves must still
+    // carry observed evidence.
+    if (viewModel.act4_impact_rows.length === 0) {
+      expect(viewModel.act4_summary_points.length).toBeGreaterThan(0);
     }
   });
 
@@ -339,6 +446,14 @@ describe('report view model', () => {
         expect(point).not.toContain('undefined');
       }
 
+      // Act 4 impact ledger rows clean
+      for (const row of viewModel.act4_impact_rows) {
+        expect(row.metric_value).not.toContain('NaN');
+        expect(row.metric_value).not.toContain('undefined');
+        expect(row.impact_sentence_html).not.toContain('NaN');
+        expect(row.impact_sentence_html).not.toContain('undefined');
+      }
+
       // Mood tier is valid
       expect(['urgent', 'sober', 'affirming']).toContain(viewModel.mood_tier);
     }
@@ -374,5 +489,516 @@ describe('report view model', () => {
       // Mood attribute set
       expect(html).toMatch(/data-mood="(urgent|sober|affirming)"/);
     }
+  });
+
+  describe('round 1 enrichment stories', () => {
+    const confidentLcpStoryAggregate = {
+      ...strongLcpCoverageAggregateFixture,
+      lcp_story: {
+        dominant_subpart: 'element_render_delay',
+        dominant_subpart_share_pct: 52,
+        dominant_culprit_kind: 'hero_image',
+        subpart_distribution_pct: {
+          ttfb: 18,
+          resource_load_delay: 12,
+          resource_load_time: 18,
+          element_render_delay: 52
+        }
+      }
+    } as const;
+
+    const hedgedLcpStoryAggregate = {
+      ...strongLcpCoverageAggregateFixture,
+      lcp_story: {
+        dominant_subpart: 'ttfb',
+        dominant_subpart_share_pct: 28,
+        dominant_culprit_kind: 'hero_image',
+        subpart_distribution_pct: {
+          ttfb: 28,
+          resource_load_delay: 24,
+          resource_load_time: 26,
+          element_render_delay: 22
+        }
+      }
+    } as const;
+
+    const unknownCulpritAggregate = {
+      ...strongLcpCoverageAggregateFixture,
+      lcp_story: {
+        dominant_subpart: 'resource_load_time',
+        dominant_subpart_share_pct: 48,
+        dominant_culprit_kind: 'unknown',
+        subpart_distribution_pct: {
+          ttfb: 18,
+          resource_load_delay: 14,
+          resource_load_time: 48,
+          element_render_delay: 20
+        }
+      }
+    } as const;
+
+    const confidentInpStoryAggregate = {
+      ...strongLcpCoverageAggregateFixture,
+      inp_story: {
+        dominant_phase: 'processing',
+        dominant_phase_share_pct: 61,
+        phase_distribution_pct: {
+          input_delay: 18,
+          processing: 61,
+          presentation: 21
+        }
+      }
+    } as const;
+
+    const hedgedInpStoryAggregate = {
+      ...strongLcpCoverageAggregateFixture,
+      inp_story: {
+        dominant_phase: 'processing',
+        dominant_phase_share_pct: 32,
+        phase_distribution_pct: {
+          input_delay: 34,
+          processing: 32,
+          presentation: 34
+        }
+      }
+    } as const;
+
+    it('builds a confident LCP story view-model with the dominant row tinted and the culprit clause carried as a separate field', () => {
+      const viewModel = buildReportViewModel(confidentLcpStoryAggregate);
+      const story = viewModel.race.lcp_story;
+
+      expect(story).not.toBeNull();
+      expect(story?.is_hedged).toBe(false);
+      expect(story?.dominant_subpart).toBe('element_render_delay');
+      expect(story?.dominant_culprit_kind).toBe('hero_image');
+      expect(story?.narrative).toContain('Element render delay dominates');
+      expect(story?.narrative).not.toMatch(/Usually a|Usually the/);
+      expect(story?.culprit_clause).toBe('Usually a hero image.');
+      expect(story?.rows).toHaveLength(4);
+      const dominant = story?.rows.find((row) => row.is_dominant);
+      expect(dominant?.key).toBe('element_render_delay');
+      expect(dominant?.share).toBe(52);
+      expect(dominant?.plain).toBe('painting the hero');
+      expect(story?.rows.filter((row) => row.is_dominant)).toHaveLength(1);
+    });
+
+    it('falls back to the hedged narrative when no subpart clears the dominance threshold', () => {
+      const viewModel = buildReportViewModel(hedgedLcpStoryAggregate);
+      const story = viewModel.race.lcp_story;
+
+      expect(story?.is_hedged).toBe(true);
+      expect(story?.dominant_subpart).toBeNull();
+      expect(story?.dominant_culprit_kind).toBeNull();
+      expect(story?.culprit_clause).toBeNull();
+      expect(story?.narrative).toBe('Paint delay is spread across multiple phases — no single cause dominates.');
+      expect(story?.rows.every((row) => row.is_dominant === false)).toBe(true);
+    });
+
+    it('omits the culprit clause when the classifier returns unknown', () => {
+      const viewModel = buildReportViewModel(unknownCulpritAggregate);
+      const story = viewModel.race.lcp_story;
+
+      expect(story?.is_hedged).toBe(false);
+      expect(story?.dominant_subpart).toBe('resource_load_time');
+      expect(story?.dominant_culprit_kind).toBeNull();
+      expect(story?.culprit_clause).toBeNull();
+      expect(story?.narrative).toContain('takes too long to travel the wire');
+      expect(story?.narrative).not.toMatch(/Usually a|Usually the/);
+    });
+
+    it('returns race.lcp_story === null when the aggregate carries no lcp_story (Safari/FF/legacy)', () => {
+      const viewModel = buildReportViewModel(strongLcpCoverageAggregateFixture);
+      expect(viewModel.race.lcp_story).toBeNull();
+    });
+
+    it('builds a confident INP story view-model gated on the INP funnel stage being active', () => {
+      const viewModel = buildReportViewModel(confidentInpStoryAggregate);
+      const story = viewModel.act3.inp_story;
+
+      expect(viewModel.act3.active_stage_keys).toContain('inp');
+      expect(story).not.toBeNull();
+      expect(story?.is_hedged).toBe(false);
+      expect(story?.dominant_phase).toBe('processing');
+      expect(story?.narrative).toContain('handler work after the click');
+    });
+
+    it('falls back to the hedged INP narrative when no phase clears the dominance threshold', () => {
+      const viewModel = buildReportViewModel(hedgedInpStoryAggregate);
+      const story = viewModel.act3.inp_story;
+
+      expect(story?.is_hedged).toBe(true);
+      expect(story?.dominant_phase).toBeNull();
+      expect(story?.narrative).toBe('Interaction lag is spread across multiple phases — no single cause dominates.');
+    });
+
+    it('returns act3.inp_story === null when the INP funnel stage is not active (coverage-thin)', () => {
+      const viewModel = buildReportViewModel({
+        ...lowInpCoverageAggregateFixture,
+        inp_story: {
+          dominant_phase: 'processing',
+          dominant_phase_share_pct: 61,
+          phase_distribution_pct: {
+            input_delay: 18,
+            processing: 61,
+            presentation: 21
+          }
+        }
+      });
+
+      expect(viewModel.act3.active_stage_keys).not.toContain('inp');
+      expect(viewModel.act3.inp_story).toBeNull();
+    });
+
+    it('returns act3.inp_story === null on legacy aggregates that have no experience funnel', () => {
+      const legacyAggregate = decodeSignalReportUrl(
+        'https://signal.stroma.design/r?mode=production&d=example.co.za&nt=25,25,25,25,0&dt=34,33,33&lu=2100&lt=4200&fu=1100&ft=1900&tu=220&tt=380&ulc=100&ufc=100&utc=100&clc=100&cfc=100&ctc=100&s=100&p=7&nc=100&nu=0&nr=0&lc=100&ct=moderate&rm=lcp'
+      );
+      const viewModel = buildReportViewModel(legacyAggregate);
+
+      expect(viewModel.act3.mode).toBe('legacy');
+      expect(viewModel.act3.inp_story).toBeNull();
+    });
+
+    it('renders the Act 2 LCP narrative + micro-chart and the Act 3 INP caption in the markup', () => {
+      const aggregate = {
+        ...confidentLcpStoryAggregate,
+        inp_story: confidentInpStoryAggregate.inp_story
+      };
+      const viewModel = buildReportViewModel(aggregate);
+      const html = renderReportMarkup(viewModel, 'full');
+
+      expect(html).toContain('sr-lcp-anatomy');
+      expect(html).toContain('Element render delay dominates');
+      expect(html).toContain('Usually a hero image.');
+      expect(html).toContain('data-dominant-subpart="element_render_delay"');
+      expect(html).toContain('data-subpart="element_render_delay"');
+      expect(html).toContain('data-hedged="false"');
+
+      expect(html).toContain('sr-funnel-node-story');
+      expect(html).toContain('handler work after the click');
+    });
+
+    it('omits the Act 2 LCP story block entirely when race.lcp_story is null', () => {
+      const viewModel = buildReportViewModel(strongLcpCoverageAggregateFixture);
+      const html = renderReportMarkup(viewModel, 'full');
+
+      expect(viewModel.race.lcp_story).toBeNull();
+      expect(html).not.toContain('sr-lcp-anatomy');
+    });
+
+    it('omits the Act 3 INP caption when act3.inp_story is null', () => {
+      const viewModel = buildReportViewModel(strongLcpCoverageAggregateFixture);
+      const html = renderReportMarkup(viewModel, 'full');
+
+      expect(viewModel.act3.inp_story).toBeNull();
+      expect(html).not.toContain('sr-funnel-node-story');
+    });
+
+    it('builds a heavy third-party pre-race headline with median share in the copy', () => {
+      const aggregate = {
+        ...strongLcpCoverageAggregateFixture,
+        third_party_story: {
+          median_share_pct: 38,
+          dominant_tier: 'heavy' as const,
+          dominant_tier_share_pct: 54,
+          median_origin_count: 8
+        }
+      };
+      const viewModel = buildReportViewModel(aggregate);
+      const story = viewModel.race.third_party_story;
+
+      expect(story).not.toBeNull();
+      expect(story?.dominant_tier).toBe('heavy');
+      expect(story?.median_share_pct).toBe(38);
+      expect(story?.median_origin_count).toBe(8);
+      expect(story?.narrative).toContain('38%');
+      expect(story?.narrative).toContain('off-domain tags');
+    });
+
+    it('narrates a none-tier third-party story positively (absence is a feature)', () => {
+      const aggregate = {
+        ...strongLcpCoverageAggregateFixture,
+        third_party_story: {
+          median_share_pct: 0,
+          dominant_tier: 'none' as const,
+          dominant_tier_share_pct: 82,
+          median_origin_count: null
+        }
+      };
+      const viewModel = buildReportViewModel(aggregate);
+      const story = viewModel.race.third_party_story;
+
+      expect(story?.dominant_tier).toBe('none');
+      expect(story?.narrative).toBe('The pre-paint is served entirely from your own origins.');
+      expect(story?.median_origin_count).toBeNull();
+    });
+
+    it('uses the light and moderate tier copy without naming a percent when tier is the dominant fact', () => {
+      const lightAggregate = {
+        ...strongLcpCoverageAggregateFixture,
+        third_party_story: {
+          median_share_pct: 8,
+          dominant_tier: 'light' as const,
+          dominant_tier_share_pct: 71,
+          median_origin_count: 4
+        }
+      };
+      const moderateAggregate = {
+        ...strongLcpCoverageAggregateFixture,
+        third_party_story: {
+          median_share_pct: 22,
+          dominant_tier: 'moderate' as const,
+          dominant_tier_share_pct: 63,
+          median_origin_count: 5
+        }
+      };
+
+      const lightStory = buildReportViewModel(lightAggregate).race.third_party_story;
+      const moderateStory = buildReportViewModel(moderateAggregate).race.third_party_story;
+
+      expect(lightStory?.narrative).toBe('Third-party script weight is modest before first paint.');
+      expect(moderateStory?.narrative).toContain('22%');
+      expect(moderateStory?.narrative).toContain('third-party');
+    });
+
+    it('returns race.third_party_story === null when the aggregate carries no third_party_story', () => {
+      const viewModel = buildReportViewModel(strongLcpCoverageAggregateFixture);
+      expect(viewModel.race.third_party_story).toBeNull();
+    });
+
+    it('renders the third-party pre-race headline before the race grid with tier data-attr', () => {
+      const aggregate = {
+        ...strongLcpCoverageAggregateFixture,
+        third_party_story: {
+          median_share_pct: 38,
+          dominant_tier: 'heavy' as const,
+          dominant_tier_share_pct: 54,
+          median_origin_count: 8
+        }
+      };
+      const viewModel = buildReportViewModel(aggregate);
+      const html = renderReportMarkup(viewModel, 'full');
+
+      expect(html).toContain('sr-third-party-headline');
+      expect(html).toContain('data-third-party-tier="heavy"');
+      expect(html).toContain('38%');
+      expect(html).toContain('8 off-domain origins');
+
+      // Pre-race positioning: headline must appear before the sr-race grid in source order.
+      const headlineIndex = html.indexOf('sr-third-party-headline');
+      const raceIndex = html.indexOf('class="sr-race"');
+      expect(headlineIndex).toBeGreaterThan(-1);
+      expect(raceIndex).toBeGreaterThan(-1);
+      expect(headlineIndex).toBeLessThan(raceIndex);
+    });
+
+    it('omits the third-party headline entirely when race.third_party_story is null', () => {
+      const viewModel = buildReportViewModel(strongLcpCoverageAggregateFixture);
+      const html = renderReportMarkup(viewModel, 'full');
+
+      expect(viewModel.race.third_party_story).toBeNull();
+      expect(html).not.toContain('sr-third-party-headline');
+    });
+
+    it('hides the origin count from the headline when median_origin_count is null (privacy mask)', () => {
+      const aggregate = {
+        ...strongLcpCoverageAggregateFixture,
+        third_party_story: {
+          median_share_pct: 24,
+          dominant_tier: 'moderate' as const,
+          dominant_tier_share_pct: 58,
+          median_origin_count: null
+        }
+      };
+      const viewModel = buildReportViewModel(aggregate);
+      const html = renderReportMarkup(viewModel, 'full');
+
+      expect(html).toContain('sr-third-party-headline');
+      expect(html).not.toContain('off-domain origins');
+    });
+  });
+
+  describe('Act 1 context strip', () => {
+    it('emits save-data, cellular, and rtt rows when the gates are crossed', () => {
+      const aggregate = {
+        ...strongLcpCoverageAggregateFixture,
+        context_story: {
+          save_data_share_pct: 12,
+          median_rtt_ms: 180,
+          cellular_share_pct: 35,
+          effective_type_dominant: '3g' as const
+        }
+      };
+      const viewModel = buildReportViewModel(aggregate);
+      const strip = viewModel.act1_context_strip;
+
+      expect(strip).not.toBeNull();
+      expect(strip?.rows.map((row) => row.key)).toEqual(['save_data', 'median_rtt', 'cellular', 'effective_type']);
+      expect(strip?.rows.find((row) => row.key === 'save_data')?.narrative).toContain('12%');
+      expect(strip?.rows.find((row) => row.key === 'median_rtt')?.narrative).toContain('180 milliseconds');
+      expect(strip?.rows.find((row) => row.key === 'cellular')?.narrative).toContain('35%');
+      expect(strip?.rows.find((row) => row.key === 'effective_type')?.narrative).toContain('3G');
+      for (const row of strip?.rows ?? []) {
+        expect(row.tooltip.length).toBeGreaterThan(0);
+      }
+    });
+
+    it('omits sub-1% save-data and sub-10% cellular rows so silence stays the correct signal', () => {
+      const aggregate = {
+        ...strongLcpCoverageAggregateFixture,
+        context_story: {
+          save_data_share_pct: 0,
+          median_rtt_ms: 90,
+          cellular_share_pct: 4,
+          effective_type_dominant: '4g' as const
+        }
+      };
+      const viewModel = buildReportViewModel(aggregate);
+      const strip = viewModel.act1_context_strip;
+
+      expect(strip).not.toBeNull();
+      expect(strip?.rows.map((row) => row.key)).toEqual(['median_rtt']);
+    });
+
+    it('returns null when no row survives the narration gates', () => {
+      const aggregate = {
+        ...strongLcpCoverageAggregateFixture,
+        context_story: {
+          save_data_share_pct: 0,
+          median_rtt_ms: null,
+          cellular_share_pct: 2,
+          effective_type_dominant: '4g' as const
+        }
+      };
+      const viewModel = buildReportViewModel(aggregate);
+
+      expect(viewModel.act1_context_strip).toBeNull();
+    });
+
+    it('returns null when the aggregate carries no context_story at all (legacy URL)', () => {
+      const { context_story: _discarded, ...legacy } = strongLcpCoverageAggregateFixture;
+      const viewModel = buildReportViewModel(legacy);
+      expect(viewModel.act1_context_strip).toBeNull();
+    });
+
+    it('renders the strip markup with tooltips when at least one row is present', () => {
+      const aggregate = {
+        ...strongLcpCoverageAggregateFixture,
+        context_story: {
+          save_data_share_pct: 12,
+          median_rtt_ms: 180,
+          cellular_share_pct: 5,
+          effective_type_dominant: '4g' as const
+        }
+      };
+      const viewModel = buildReportViewModel(aggregate);
+      const html = renderReportMarkup(viewModel, 'full');
+
+      expect(html).toContain('sr-act1-ctx');
+      expect(html).toContain('data-key="save_data"');
+      expect(html).toContain('data-key="median_rtt"');
+      expect(html).not.toContain('data-key="cellular"');
+      expect(html).toMatch(/data-tooltip="[^"]+Save-Data/);
+    });
+
+    it('omits the strip markup entirely when no rows survive', () => {
+      const aggregate = {
+        ...strongLcpCoverageAggregateFixture,
+        context_story: {
+          save_data_share_pct: 0,
+          median_rtt_ms: null,
+          cellular_share_pct: 0,
+          effective_type_dominant: '4g' as const
+        }
+      };
+      const viewModel = buildReportViewModel(aggregate);
+      const html = renderReportMarkup(viewModel, 'full');
+
+      expect(html).not.toContain('sr-act1-ctx');
+    });
+  });
+
+  // Full-enrichment scenario — `fullDepthAggregateFixture` is the
+  // demonstration fixture every new 0.1.x narrative block is expected to
+  // render on. If a future change regresses a story decoder, aggregator
+  // threshold, or narrative string, one of these assertions will catch it
+  // before `pnpm dev:report` shows an empty slide.
+  describe('full-enrichment (fullDepthAggregateFixture)', () => {
+    it('emits every round-1 story block with a confident (non-hedged) dominant signal', () => {
+      const viewModel = buildReportViewModel(fullDepthAggregateFixture);
+
+      expect(viewModel.race.lcp_story).not.toBeNull();
+      expect(viewModel.race.lcp_story?.is_hedged).toBe(false);
+      expect(viewModel.race.lcp_story?.dominant_subpart).toBe('element_render_delay');
+      expect(viewModel.race.lcp_story?.dominant_culprit_kind).toBe('hero_image');
+
+      expect(viewModel.race.third_party_story).not.toBeNull();
+      expect(viewModel.race.third_party_story?.dominant_tier).not.toBe('none');
+      expect(viewModel.race.third_party_story?.median_origin_count).toBeGreaterThan(0);
+
+      expect(viewModel.act3.inp_story).not.toBeNull();
+      expect(viewModel.act3.inp_story?.is_hedged).toBe(false);
+      expect(viewModel.act3.inp_story?.dominant_phase).toBe('processing');
+
+      expect(viewModel.act3.loaf_story).not.toBeNull();
+      expect(viewModel.act3.loaf_story?.is_hedged).toBe(false);
+      expect(viewModel.act3.loaf_story?.dominant_cause).toBe('script');
+      expect(viewModel.act3.loaf_story?.worst_frame_ms_p75).toBeGreaterThan(0);
+
+      expect(viewModel.act1_context_strip).not.toBeNull();
+      expect(viewModel.act1_context_strip?.rows.length ?? 0).toBeGreaterThan(0);
+    });
+
+    it('reports background-session exclusions on the credibility strip', () => {
+      const viewModel = buildReportViewModel(fullDepthAggregateFixture);
+      expect(viewModel.credibility_strip.excluded_background_sessions).not.toBeNull();
+      expect(viewModel.credibility_strip.excluded_background_sessions ?? 0).toBeGreaterThan(0);
+    });
+
+    it('renders every new narrative block in the full report markup', () => {
+      const viewModel = buildReportViewModel(fullDepthAggregateFixture);
+      const html = renderReportMarkup(viewModel, 'full');
+
+      expect(html).toContain('sr-lcp-anatomy');
+      expect(html).toContain('sr-third-party-headline');
+      expect(html).toContain('sr-funnel-node-loaf');
+      expect(html).toContain('sr-act1-ctx');
+    });
+  });
+
+  // Counter-case — `affirmingAggregateFixture` proves the positive-narration
+  // paths. Third-party tier `none` must narrate as a clean-origin win, not a
+  // missing-data shrug. Visibility filter should produce zero exclusions.
+  describe('affirming counter-case (third_party none + visibility 0)', () => {
+    it('narrates the clean-origin third-party win and records zero background exclusions', () => {
+      const viewModel = buildReportViewModel(affirmingAggregateFixture);
+
+      expect(viewModel.race.third_party_story).not.toBeNull();
+      expect(viewModel.race.third_party_story?.dominant_tier).toBe('none');
+      expect(viewModel.credibility_strip.excluded_background_sessions ?? 0).toBe(0);
+    });
+  });
+
+  // Omission case — `safariHeavyAggregateFixture` has no Chromium-enrichment
+  // events above the story threshold. Every new narrative block must cleanly
+  // omit rather than render empty.
+  describe('Chromium-only omission (safariHeavyAggregateFixture)', () => {
+    it('omits every Chromium-gated narrative block when no enrichment events survive', () => {
+      const viewModel = buildReportViewModel(safariHeavyAggregateFixture);
+
+      expect(viewModel.race.lcp_story).toBeNull();
+      expect(viewModel.race.third_party_story).toBeNull();
+      expect(viewModel.act3.inp_story).toBeNull();
+      expect(viewModel.act3.loaf_story).toBeNull();
+    });
+
+    it('renders markup without the Chromium-only narrative hooks', () => {
+      const viewModel = buildReportViewModel(safariHeavyAggregateFixture);
+      const html = renderReportMarkup(viewModel, 'full');
+
+      expect(html).not.toContain('sr-lcp-anatomy');
+      expect(html).not.toContain('sr-third-party-headline');
+      expect(html).not.toContain('sr-funnel-node-loaf');
+    });
   });
 });

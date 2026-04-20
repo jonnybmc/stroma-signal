@@ -1,4 +1,14 @@
-import type { SignalAggregateV1, SignalExperienceStage, SignalNetworkTier, SignalRaceMetric } from './types.js';
+import type {
+  SignalAggregateV1,
+  SignalEffectiveTypeDominant,
+  SignalExperienceStage,
+  SignalInpPhase,
+  SignalLcpCulpritKind,
+  SignalLcpSubpart,
+  SignalNetworkTier,
+  SignalRaceMetric,
+  SignalThirdPartyTier
+} from './types.js';
 
 const TIER_LABELS: Record<SignalNetworkTier | 'unknown', string> = {
   urban: 'Urban',
@@ -25,6 +35,43 @@ const METRIC_LABELS: Record<SignalRaceMetric, string> = {
   fcp: 'FCP',
   ttfb: 'TTFB',
   none: 'None'
+};
+
+const LCP_SUBPART_LABELS: Record<SignalLcpSubpart, string> = {
+  ttfb: 'TTFB',
+  resource_load_delay: 'Load delay',
+  resource_load_time: 'Load time',
+  element_render_delay: 'Render delay'
+};
+
+const LCP_CULPRIT_LABELS: Record<SignalLcpCulpritKind, string> = {
+  hero_image: 'Hero image',
+  headline_text: 'Headline text',
+  banner_image: 'Banner image',
+  product_image: 'Product image',
+  video_poster: 'Video poster',
+  unknown: 'Unknown'
+};
+
+const INP_PHASE_LABELS: Record<SignalInpPhase, string> = {
+  input_delay: 'Input delay',
+  processing: 'Processing',
+  presentation: 'Presentation'
+};
+
+const THIRD_PARTY_TIER_LABELS: Record<SignalThirdPartyTier, string> = {
+  none: 'None',
+  light: 'Light',
+  moderate: 'Moderate',
+  heavy: 'Heavy'
+};
+
+const EFFECTIVE_TYPE_LABELS: Record<SignalEffectiveTypeDominant, string> = {
+  '4g': '4G',
+  '3g': '3G',
+  '2g': '2G',
+  'slow-2g': 'slow-2G',
+  unknown: 'Unknown'
 };
 
 function bar(share: number, width: number = 20): string {
@@ -117,6 +164,98 @@ export function formatSignalSummary(aggregate: SignalAggregateV1): string {
     lines.push(`  ${compLabel} p75: ${ms(compMs)}`);
     if (delta != null) {
       lines.push(`  Wait delta: +${ms(delta)}`);
+    }
+  }
+
+  // LCP story
+  if (aggregate.lcp_story) {
+    const story = aggregate.lcp_story;
+    lines.push(section('LCP story'));
+    if (story.dominant_subpart && story.dominant_subpart_share_pct != null) {
+      lines.push(
+        `  Dominant:     ${LCP_SUBPART_LABELS[story.dominant_subpart]} (${pct(story.dominant_subpart_share_pct)})`
+      );
+    } else {
+      lines.push('  Dominant:     no clear dominant subpart');
+    }
+    if (story.dominant_culprit_kind && story.dominant_culprit_kind !== 'unknown') {
+      lines.push(`  Culprit:      ${LCP_CULPRIT_LABELS[story.dominant_culprit_kind]}`);
+    }
+    if (story.subpart_distribution_pct) {
+      const dist = story.subpart_distribution_pct;
+      const rows: Array<[SignalLcpSubpart, number]> = [
+        ['ttfb', dist.ttfb],
+        ['resource_load_delay', dist.resource_load_delay],
+        ['resource_load_time', dist.resource_load_time],
+        ['element_render_delay', dist.element_render_delay]
+      ];
+      for (const [key, share] of rows) {
+        lines.push(`  ${pad(LCP_SUBPART_LABELS[key], 13)} ${pad(pct(share), 5)} ${bar(share)}`);
+      }
+    }
+  }
+
+  // INP story
+  if (aggregate.inp_story) {
+    const story = aggregate.inp_story;
+    lines.push(section('INP story'));
+    if (story.dominant_phase && story.dominant_phase_share_pct != null) {
+      lines.push(`  Dominant:     ${INP_PHASE_LABELS[story.dominant_phase]} (${pct(story.dominant_phase_share_pct)})`);
+    } else {
+      lines.push('  Dominant:     no clear dominant phase');
+    }
+    if (story.phase_distribution_pct) {
+      const dist = story.phase_distribution_pct;
+      const rows: Array<[SignalInpPhase, number]> = [
+        ['input_delay', dist.input_delay],
+        ['processing', dist.processing],
+        ['presentation', dist.presentation]
+      ];
+      for (const [key, share] of rows) {
+        lines.push(`  ${pad(INP_PHASE_LABELS[key], 13)} ${pad(pct(share), 5)} ${bar(share)}`);
+      }
+    }
+  }
+
+  // Third-party story
+  if (aggregate.third_party_story) {
+    const story = aggregate.third_party_story;
+    lines.push(section('Third-party'));
+    if (story.dominant_tier) {
+      const tierLabel = THIRD_PARTY_TIER_LABELS[story.dominant_tier];
+      const share = story.dominant_tier_share_pct != null ? ` (${pct(story.dominant_tier_share_pct)} of sessions)` : '';
+      lines.push(`  Dominant:       ${tierLabel}${share}`);
+    }
+    if (story.median_share_pct != null) {
+      lines.push(`  Median share:   ${pct(story.median_share_pct)}`);
+    }
+    if (story.median_origin_count != null) {
+      lines.push(`  Median origins: ${story.median_origin_count}`);
+    }
+  }
+
+  // Audience context story
+  if (aggregate.context_story) {
+    const story = aggregate.context_story;
+    const hasNarratable =
+      (story.save_data_share_pct != null && story.save_data_share_pct > 0) ||
+      story.median_rtt_ms != null ||
+      (story.cellular_share_pct != null && story.cellular_share_pct > 0) ||
+      (story.effective_type_dominant != null && story.effective_type_dominant !== 'unknown');
+    if (hasNarratable) {
+      lines.push(section('Audience context'));
+      if (story.save_data_share_pct != null && story.save_data_share_pct > 0) {
+        lines.push(`  Save-Data:      ${pct(story.save_data_share_pct)} of sessions`);
+      }
+      if (story.median_rtt_ms != null) {
+        lines.push(`  Median RTT:     ${story.median_rtt_ms}ms`);
+      }
+      if (story.cellular_share_pct != null && story.cellular_share_pct > 0) {
+        lines.push(`  Cellular:       ${pct(story.cellular_share_pct)} of sessions`);
+      }
+      if (story.effective_type_dominant != null && story.effective_type_dominant !== 'unknown') {
+        lines.push(`  Conn. class:    ${EFFECTIVE_TYPE_LABELS[story.effective_type_dominant]} dominant`);
+      }
     }
   }
 

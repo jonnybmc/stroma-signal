@@ -150,7 +150,6 @@ The GTM / GA4 path emits this compact report-and-debug subset:
 - `fcp_ms`
 - `ttfb_ms`
 - `browser`
-- `nav_type`
 - `navigation_type`
 - `lcp_load_state`
 - `lcp_element_type`
@@ -159,8 +158,14 @@ The GTM / GA4 path emits this compact report-and-debug subset:
 - `input_delay_ms`
 - `processing_duration_ms`
 - `presentation_delay_ms`
+- `lcp_culprit_kind`
+- `lcp_dominant_subpart`
+- `inp_dominant_phase`
+- `third_party_weight_tier`
 
 These fields stay under the standard GA4 event parameter cap and are enough for the provided GTM recipe, GA4 BigQuery validation, and URL-builder SQL.
+
+> **Deprecated in 0.1.x:** the legacy `nav_type` GA4 parameter has been removed. Use `navigation_type` (identical semantics, wider browser coverage).
 
 These fields are commonly useful in GA4 custom definitions:
 
@@ -186,7 +191,6 @@ These fields are kept mainly for DebugView or BigQuery validation and are not go
 - `url`
 - `net_tcp_ms`
 - `net_tcp_source`
-- `nav_type`
 
 The GTM / GA4 path does not emit these warehouse-only fields in v0.1:
 

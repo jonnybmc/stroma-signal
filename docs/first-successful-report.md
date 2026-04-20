@@ -86,7 +86,7 @@ Paste the URL into a browser. You should land on the hosted four-act artifact at
 1. Act 1 — who your users are (network and device shape)
 2. Act 2 — how far apart their experiences are
 3. Act 3 — where performance crosses poor thresholds
-4. Act 4 — the boundary of this artifact and the handoff to deeper work
+4. Act 4 — what this costs the business (KPI impact ledger) and the handoff to deeper work
 
 If the URL renders as "Invalid report URL", the aggregate failed guard validation. Open the same URL at `/build` instead (change `/r?` to `/build?`) — the builder surfaces the specific guard issue.
 

@@ -6,16 +6,33 @@ import { type IconName, renderIcon } from './report-icons';
 import {
   extractMotionPayload,
   formatMetricDuration,
+  type ReportAct4ImpactRow,
   type ReportActionableSignalsViewModel,
+  type ReportContextStripViewModel,
   type ReportDeviceTierVisual,
   type ReportExperienceStageViewModel,
   type ReportFormFactorViewModel,
+  type ReportInpStoryViewModel,
+  type ReportLcpStoryViewModel,
+  type ReportLoafStoryViewModel,
   type ReportMotionMode,
   type ReportPersonaContrast,
   type ReportPersonaProfile,
+  type ReportThirdPartyStoryViewModel,
   type ReportTierVisual,
-  type ReportViewModel
+  type ReportViewModel,
+  splitValueUnit
 } from './report-view-model';
+
+// Renders a hero number with the trailing unit wrapped in an italic-serif
+// span — the editorial "premium" accent ported from the Stroma Landing
+// `.report-value .unit` treatment. Returns escaped HTML; safe to inline
+// inside any hero-number slot (wait delta, lane time, takeaway counter).
+function renderHeroValue(text: string): string {
+  const { value, unit } = splitValueUnit(text);
+  if (!unit) return escapeHtml(value);
+  return `${escapeHtml(value)}<span class="sr-unit" aria-hidden="true">${escapeHtml(unit)}</span>`;
+}
 
 type SeverityTone = 'steady' | 'watch' | 'alert';
 
@@ -26,22 +43,6 @@ const FOOTER_FALLBACK_COPY: Record<SignalRaceFallbackReason, string> = {
   fcp_unavailable: 'TTFB race (FCP unavailable)',
   insufficient_comparable_data: 'No race (no comparable cohort)'
 };
-
-/**
- * Radial severity gauge (LogRocket health-score pattern). One circular
- * track plus a coloured arc whose length telegraphs the tone on a 3-step
- * spectrum. A Lucide icon sits inside the centre hole.
- */
-function renderSeverityGauge(tone: SeverityTone, label: string): string {
-  return `
-    <span class="sr-severity-gauge" data-tone="${tone}" role="img" aria-label="${escapeHtml(label)}">
-      <svg viewBox="0 0 36 36" aria-hidden="true">
-        <circle class="sr-severity-gauge-track" cx="18" cy="18" r="15.915" />
-        <circle class="sr-severity-gauge-fill" cx="18" cy="18" r="15.915" pathLength="100" />
-      </svg>
-    </span>
-  `;
-}
 
 /**
  * Stage label → Lucide icon map. Each cliff stage gets a discreet visual
@@ -406,6 +407,44 @@ function renderPersonaCards(contrast: ReportPersonaContrast): string {
 }
 
 /**
+ * Act 1 context strip — narrative sentences (not data rows) derived from
+ * already-captured NetworkInformation signals. Each row carries a tooltip
+ * that translates the number into the "what this means for you" read for
+ * non-technical buyers. Hidden entirely when no rows crossed the narration
+ * gates (see buildContextStripViewModel). Laid out as a single vertical
+ * column with a leading eyebrow rule so it reads as editorial voice
+ * rather than a KPI tile.
+ */
+function renderAct1ContextStrip(strip: ReportContextStripViewModel | null): string {
+  if (!strip || strip.rows.length === 0) return '';
+  const rowsMarkup = strip.rows
+    .map(
+      (row, index) => `
+        <li class="sr-act1-ctx-row" data-key="${row.key}" data-reveal style="--reveal-order:${index + 2}">
+          <p class="sr-act1-ctx-row-body">
+            <span class="sr-act1-ctx-row-narrative" aria-label="${escapeHtml(row.label)}">${escapeHtml(row.narrative)}</span>
+            <button
+              type="button"
+              class="sr-act1-ctx-row-hint"
+              aria-label="What this means for you"
+              data-tooltip="${escapeHtml(row.tooltip)}"
+            >?</button>
+          </p>
+        </li>
+      `
+    )
+    .join('');
+  return `
+    <aside class="sr-act1-ctx" aria-label="Audience context" data-reveal style="--reveal-order:1">
+      <p class="sr-eyebrow sr-act1-ctx-eyebrow">This audience</p>
+      <ul class="sr-act1-ctx-list">
+        ${rowsMarkup}
+      </ul>
+    </aside>
+  `;
+}
+
+/**
  * Act 1 form-factor block — appears below the persona grid when the
  * aggregate carries form_factor_distribution. Three-up numeric display
  * with a proportional bar below, monochromatic opacity ramp on --sr-fg so
@@ -534,6 +573,126 @@ function renderLaneSampleLine(coverage: number | null, tierLabel: string): strin
   `;
 }
 
+/**
+ * Act 2 "Where the gap lives" anatomy band — the third beat of Act 2.
+ * Replaces the legacy LCP P75 comparison rail (which only restated the
+ * per-lane numbers already shown at the top of each race card) with a
+ * diagnostic band that answers "where in the paint pipeline does the
+ * gap actually live?" — the claim nothing else in Act 2 makes.
+ *
+ * Structure, top to bottom:
+ *   - Header: "Where the gap lives" eyebrow + "LCP subpart composition ·
+ *     p75" secondary eyebrow on the right.
+ *   - Lede: the mechanism sentence (plain English, no jargon, no
+ *     prescription) + the optional culprit clause as a trailing muted
+ *     line. Hedged cohorts get the honest "spread across every phase"
+ *     sentence with no culprit.
+ *   - Bar: a single stacked horizontal bar where each segment is sized
+ *     by its share of the p75 LCP. The dominant segment takes the mood
+ *     accent; non-dominant segments stay muted. Composition, not four
+ *     unrelated bars, is the story.
+ *   - Legend: four-column row pairing share · technical label · plain-
+ *     language verb ("server replies", "painting the hero") so a non-
+ *     technical CMO can brief an engineering lead without translating.
+ *
+ * Returns an empty string when the aggregate carries no LCP story
+ * (Safari / Firefox / below race-observation threshold / no defensible
+ * subpart breakdown) — the slide falls back to race + wait aside alone
+ * rather than rendering an empty band.
+ */
+function renderAct2LcpAnatomy(story: ReportLcpStoryViewModel | null): string {
+  if (!story) return '';
+  const ariaSummary = story.rows.map((row) => `${row.label} ${row.share}%`).join(', ');
+  const segments = story.rows
+    .map(
+      (row) => `
+        <span
+          class="sr-lcp-anatomy-segment"
+          data-subpart="${escapeHtml(row.key)}"
+          data-dominant="${row.is_dominant ? 'true' : 'false'}"
+          style="--share:${row.share}"
+          aria-hidden="true"
+        ></span>
+      `
+    )
+    .join('');
+  const legend = story.rows
+    .map(
+      (row) => `
+        <li
+          class="sr-lcp-anatomy-legend-item"
+          data-subpart="${escapeHtml(row.key)}"
+          data-dominant="${row.is_dominant ? 'true' : 'false'}"
+          data-tooltip="${escapeHtml(row.label)} — ${escapeHtml(row.plain)}"
+          style="--share:${row.share}"
+          tabindex="0"
+        >
+          <span class="sr-lcp-anatomy-legend-share sr-mono">${row.share}%</span>
+          <span class="sr-lcp-anatomy-legend-label">${escapeHtml(row.label)}</span>
+        </li>
+      `
+    )
+    .join('');
+  const culprit = story.culprit_clause
+    ? `<span class="sr-lcp-anatomy-culprit">${escapeHtml(story.culprit_clause)}</span>`
+    : '';
+  return `
+    <section
+      class="sr-lcp-anatomy"
+      data-reveal
+      style="--reveal-order:3"
+      data-hedged="${story.is_hedged ? 'true' : 'false'}"
+      ${story.dominant_subpart ? `data-dominant-subpart="${escapeHtml(story.dominant_subpart)}"` : ''}
+      aria-labelledby="sr-lcp-anatomy-title"
+    >
+      <header class="sr-lcp-anatomy-header">
+        <p class="sr-eyebrow sr-lcp-anatomy-eyebrow" id="sr-lcp-anatomy-title">Where the gap lives</p>
+        <p class="sr-eyebrow sr-lcp-anatomy-meta">LCP subpart composition · p75</p>
+      </header>
+      <p class="sr-lcp-anatomy-lede">
+        <span class="sr-lcp-anatomy-mechanism">${escapeHtml(story.narrative)}</span>
+        ${culprit}
+      </p>
+      <div class="sr-lcp-anatomy-bar" role="img" aria-label="LCP subpart composition: ${escapeHtml(ariaSummary)}">
+        ${segments}
+      </div>
+      <ol class="sr-lcp-anatomy-legend" aria-hidden="true">
+        ${legend}
+      </ol>
+    </section>
+  `;
+}
+
+/**
+ * Act 2 third-party pre-race headline — a single inline line that frames
+ * the external cause *before* the race gauge quantifies its effect. When
+ * `dominant_tier === 'none'` the copy narrates absence positively ("the
+ * pre-paint is served entirely from your own origins") rather than
+ * omitting the line — zero third-party weight is a feature of the page,
+ * not missing data.
+ *
+ * Returns an empty string when the aggregate carries no third-party
+ * story (Safari / Firefox / no LCP anchor) so the pre-race rhythm is
+ * unchanged on browsers without resource-timing coverage.
+ */
+function renderAct2ThirdPartyHeadline(story: ReportThirdPartyStoryViewModel | null): string {
+  if (!story) return '';
+  const originSuffix =
+    story.median_origin_count != null && story.dominant_tier !== 'none'
+      ? ` <span class="sr-third-party-headline-origins sr-mono sr-mono-sm">· ${story.median_origin_count} off-domain origins</span>`
+      : '';
+  return `
+    <p
+      class="sr-third-party-headline"
+      data-third-party-tier="${escapeHtml(story.dominant_tier)}"
+      data-reveal
+      style="--reveal-order:1"
+    >
+      <span class="sr-third-party-headline-body">${escapeHtml(story.narrative)}</span>${originSuffix}
+    </p>
+  `;
+}
+
 function renderAct2(viewModel: ReportViewModel): string {
   const race = viewModel.race;
 
@@ -544,6 +703,7 @@ function renderAct2(viewModel: ReportViewModel): string {
         <h2 class="sr-act-title">How far apart are their experiences?</h2>
         <p class="sr-act-lede">${escapeHtml(race.race_story)}</p>
       </header>
+      ${renderAct2ThirdPartyHeadline(race.third_party_story)}
       <div class="sr-race-fallback" data-reveal style="--reveal-order:2">
         <p class="sr-eyebrow">Not enough data yet</p>
         <h3 class="sr-fallback-title">There isn't enough comparable data for a defensible race.</h3>
@@ -553,8 +713,6 @@ function renderAct2(viewModel: ReportViewModel): string {
   }
 
   const tone = severityToneForWaitDelta(race.wait_delta_ms);
-  const severityLabel =
-    tone === 'alert' ? 'Critical wait gap' : tone === 'watch' ? 'Meaningful wait gap' : 'Controlled wait gap';
   const ratio =
     race.urban_ms != null && race.comparison_ms != null && race.urban_ms > 0
       ? Math.round((race.comparison_ms / race.urban_ms) * 100)
@@ -567,6 +725,8 @@ function renderAct2(viewModel: ReportViewModel): string {
       <p class="sr-act-lede">${escapeHtml(race.race_story)}</p>
     </header>
 
+    ${renderAct2ThirdPartyHeadline(race.third_party_story)}
+
     <div class="sr-race" data-reveal style="--reveal-order:2">
       <article class="sr-lane sr-lane-urban" data-tone="urban">
         <header class="sr-lane-header">
@@ -575,16 +735,15 @@ function renderAct2(viewModel: ReportViewModel): string {
         </header>
         ${renderDevice('premium', 'urban-progress')}
         <strong class="sr-mono sr-lane-time" data-role="urban-time">
-          ${escapeHtml(formatMetricDuration(race.urban_ms))}
+          ${renderHeroValue(formatMetricDuration(race.urban_ms))}
         </strong>
       </article>
 
       <aside class="sr-wait" aria-live="polite" data-tone="${tone}">
-        ${renderSeverityGauge(tone, severityLabel)}
         <p class="sr-eyebrow sr-wait-eyebrow">Wait delta</p>
         <strong class="sr-mono sr-wait-value" data-role="wait-delta" data-wait-final="${escapeHtml(
           race.wait_delta_seconds
-        )}">${escapeHtml(race.wait_delta_seconds)}</strong>
+        )}">${renderHeroValue(race.wait_delta_seconds)}</strong>
         <div class="sr-delta-chip" data-tone="${tone}">
           ${renderIcon('trendingUp', 'sr-icon sr-icon-sm')}
           <span class="sr-delta-chip-abs sr-mono">+${escapeHtml(race.wait_delta_seconds)}</span>
@@ -605,49 +764,19 @@ function renderAct2(viewModel: ReportViewModel): string {
         </header>
         ${renderDevice('budget', 'comparison-progress')}
         <strong class="sr-mono sr-lane-time" data-role="comparison-time">
-          ${escapeHtml(formatMetricDuration(race.comparison_ms))}
+          ${renderHeroValue(formatMetricDuration(race.comparison_ms))}
         </strong>
       </article>
     </div>
 
-    ${renderAct2Timeline(race)}
-  `;
-}
-
-function renderAct2Timeline(race: ReportViewModel['race']): string {
-  if (!race.race_available || race.urban_ms == null || race.comparison_ms == null) return '';
-  const maxMs = Math.max(race.urban_ms, race.comparison_ms, 1);
-  const urbanPct = Math.max(4, Math.round((race.urban_ms / maxMs) * 100));
-  const comparisonPct = Math.max(4, Math.round((race.comparison_ms / maxMs) * 100));
-  return `
-    <div class="sr-timeline-compare" data-reveal style="--reveal-order:3" aria-hidden="true">
-      <p class="sr-eyebrow sr-timeline-title">${escapeHtml(race.metric_label)} p75 comparison</p>
-      <div class="sr-timeline-tracks">
-        <div class="sr-timeline-row" data-tone="urban">
-          <span class="sr-timeline-label sr-mono sr-mono-sm">Urban</span>
-          <div class="sr-timeline-bar">
-            <span class="sr-timeline-fill" style="width: ${urbanPct}%"></span>
-            <span class="sr-timeline-marker" style="left: ${urbanPct}%"></span>
-          </div>
-          <span class="sr-timeline-value sr-mono sr-mono-sm">${escapeHtml(formatMetricDuration(race.urban_ms))}</span>
-        </div>
-        <div class="sr-timeline-row" data-tone="comparison">
-          <span class="sr-timeline-label sr-mono sr-mono-sm">${escapeHtml(race.comparison_label)}</span>
-          <div class="sr-timeline-bar">
-            <span class="sr-timeline-fill" style="width: ${comparisonPct}%"></span>
-            <span class="sr-timeline-marker" style="left: ${comparisonPct}%"></span>
-          </div>
-          <span class="sr-timeline-value sr-mono sr-mono-sm">${escapeHtml(formatMetricDuration(race.comparison_ms))}</span>
-        </div>
-      </div>
-    </div>
+    ${renderAct2LcpAnatomy(race.lcp_story)}
   `;
 }
 
 function renderDevice(variant: 'premium' | 'budget', progressRole: string): string {
-  const network = variant === 'premium' ? '5G' : '3G';
-  const signalLevel = variant === 'premium' ? 4 : 1;
-  const batteryLevel = variant === 'premium' ? 82 : 64;
+  const network = variant === 'premium' ? '3G' : '5G';
+  const signalLevel = variant === 'premium' ? 1 : 4;
+  const batteryLevel = variant === 'premium' ? 64 : 82;
   const bars = [1, 2, 3, 4]
     .map((index) => `<span class="sr-device-signal-bar" data-active="${index <= signalLevel}"></span>`)
     .join('');
@@ -669,8 +798,8 @@ function renderDevice(variant: 'premium' | 'budget', progressRole: string): stri
 
           ${
             variant === 'premium'
-              ? '<div class="sr-device-island" aria-hidden="true"></div>'
-              : '<div class="sr-device-punchhole" aria-hidden="true"></div>'
+              ? '<div class="sr-device-punchhole" aria-hidden="true"></div>'
+              : '<div class="sr-device-island" aria-hidden="true"></div>'
           }
 
           <div class="sr-device-content">
@@ -743,7 +872,12 @@ function renderFunnelWaterfall(act3: ReportViewModel['act3']): string {
     }
     const stage = byKey.get(key);
     if (stage) {
-      parts.push(renderFunnelNodeActive(stage, tooltip));
+      // The INP node receives an inline phase-story caption when the
+      // aggregate carries a defensible INP story (see §3.3 / §4.1).
+      // Other nodes pass `null` so the active-node renderer stays generic.
+      const inpStoryForNode = stage.key === 'inp' ? act3.inp_story : null;
+      const loafStoryForNode = stage.key === 'inp' ? act3.loaf_story : null;
+      parts.push(renderFunnelNodeActive(stage, tooltip, inpStoryForNode, loafStoryForNode));
       previousActive = stage;
     } else {
       parts.push(renderFunnelNodeInactive(key, label, caption, tooltip));
@@ -758,8 +892,28 @@ function renderFunnelWaterfall(act3: ReportViewModel['act3']): string {
   `;
 }
 
-function renderFunnelNodeActive(stage: ReportExperienceStageViewModel, tooltip: string): string {
+function renderFunnelNodeActive(
+  stage: ReportExperienceStageViewModel,
+  tooltip: string,
+  inpStory: ReportInpStoryViewModel | null = null,
+  loafStory: ReportLoafStoryViewModel | null = null
+): string {
   const tone = stageToneForShare(stage.weighted_poor_share);
+  // Inline INP-phase caption under the threshold line. The caption stays
+  // inside the existing node card so the funnel waterfall keeps its
+  // three-column rhythm — no new box, no new section (§3.3 of the plan).
+  const inpCaption =
+    inpStory && stage.key === 'inp'
+      ? `<p class="sr-funnel-node-story" data-hedged="${inpStory.is_hedged ? 'true' : 'false'}">${escapeHtml(inpStory.narrative)}</p>`
+      : '';
+  // LoAF inline caption sits below the INP phase line — second-layer
+  // interaction diagnosis when Chromium 123+ long-animation-frame data
+  // is present. Omitted on Safari / Firefox / older Chromium and when the
+  // aggregate's LoAF story is hedged without a clear dominant cause.
+  const loafCaption =
+    loafStory && stage.key === 'inp'
+      ? `<p class="sr-funnel-node-story sr-funnel-node-loaf" data-hedged="${loafStory.is_hedged ? 'true' : 'false'}">${escapeHtml(loafStory.narrative)}</p>`
+      : '';
   return `
     <article
       class="sr-funnel-node"
@@ -774,6 +928,8 @@ function renderFunnelNodeActive(stage: ReportExperienceStageViewModel, tooltip: 
       </header>
       <strong class="sr-funnel-node-metric sr-mono">${stage.weighted_poor_share}%</strong>
       <p class="sr-funnel-node-threshold sr-mono sr-mono-sm">${escapeHtml(stage.threshold_label)}</p>
+      ${inpCaption}
+      ${loafCaption}
     </article>
   `;
 }
@@ -873,18 +1029,8 @@ function renderAct3(viewModel: ReportViewModel): string {
   const hasCoverage = act3.measured_session_coverage != null;
   const poorShare = hasPoor ? (act3.poor_session_share as number) : 0;
   const coverage = hasCoverage ? (act3.measured_session_coverage as number) : 0;
-  // Tone computation only trusts a measured share. Absent data defaults to
-  // 'steady' (neutral) rather than 'alert' (which would imply risk).
-  const tone = hasPoor ? stageToneForShare(poorShare) : 'steady';
-  const severityLabel = !hasPoor
-    ? 'Performance cliff unmeasurable'
-    : tone === 'alert'
-      ? 'Critical performance cliff'
-      : tone === 'watch'
-        ? 'Measurable performance cliff'
-        : 'Controlled performance cliff';
   const heroNumber = hasPoor
-    ? `<strong class="sr-takeaway-number sr-counter sr-mono" data-role="counter" data-counter-final="${poorShare}">${poorShare}%</strong>`
+    ? `<strong class="sr-takeaway-number sr-counter sr-mono" data-role="counter" data-counter-final="${poorShare}">${poorShare}<span class="sr-unit" aria-hidden="true">%</span></strong>`
     : '<strong class="sr-takeaway-number sr-mono sr-takeaway-absent" aria-label="No measured poor-session share available">—</strong>';
   const heroCaption = hasPoor
     ? 'of classified sessions crossed a poor-performance threshold.'
@@ -907,7 +1053,6 @@ function renderAct3(viewModel: ReportViewModel): string {
       style="--reveal-order:1"
       title="${titleAttr}"
     >
-      ${renderSeverityGauge(tone, severityLabel)}
       <div class="sr-act3-hero-body">
         ${heroNumber}
         <p class="sr-act3-hero-caption">${heroCaption}</p>
@@ -924,25 +1069,19 @@ function renderAct4(viewModel: ReportViewModel): string {
   return `
     <header class="sr-act-header" data-reveal style="--reveal-order:0">
       <p class="sr-eyebrow">Act 4</p>
-      <h2 class="sr-act-title">What deeper layer exists beyond this?</h2>
+      <h2 class="sr-act-title">What this costs the business</h2>
       <p class="sr-act-lede">${escapeHtml(viewModel.act4_lede)}</p>
     </header>
 
     <div class="sr-act4-body" data-reveal style="--reveal-order:1">
       <div class="sr-act4-findings">
-        <p class="sr-act4-findings-eyebrow sr-eyebrow">What you now know</p>
-        ${
-          viewModel.act4_summary_points.length > 0
-            ? `<ul class="sr-act4-findings-list">${viewModel.act4_summary_points
-                .map((point) => `<li>${escapeHtml(point)}</li>`)
-                .join('')}</ul>`
-            : `<p class="sr-act4-findings-empty">This sample did not produce enough measured signal for a defensible summary — Acts 1 and 2 carry the observed evidence.</p>`
-        }
+        <p class="sr-act4-findings-eyebrow sr-eyebrow">Where the numbers land in your KPIs</p>
+        ${renderAct4FindingsBody(viewModel)}
       </div>
 
       <div class="sr-act4-horizon">
-        <p class="sr-eyebrow">The boundary of this artifact</p>
-        <p class="sr-act4-horizon-body">This report proves the existence and shape of the experience gap. It does not explain root cause, quantify business exposure, or prescribe remediation.</p>
+        <p class="sr-eyebrow">If you want to go deeper</p>
+        <p class="sr-act4-horizon-body">This report proves the shape of the gap. Root cause, business exposure, and fix order are the next read.</p>
         <div class="sr-offers">
           ${viewModel.offer_cards
             .map(
@@ -961,6 +1100,37 @@ function renderAct4(viewModel: ReportViewModel): string {
         </div>
       </div>
     </div>
+  `;
+}
+
+function renderAct4FindingsBody(viewModel: ReportViewModel): string {
+  if (viewModel.act4_impact_rows.length > 0) {
+    return `<ul class="sr-act4-impact-ledger">${viewModel.act4_impact_rows
+      .map((row, index) => renderAct4ImpactRow(row, index))
+      .join('')}</ul>`;
+  }
+
+  if (viewModel.act4_summary_points.length > 0) {
+    return `<ul class="sr-act4-findings-list">${viewModel.act4_summary_points
+      .map((point) => `<li>${escapeHtml(point)}</li>`)
+      .join('')}</ul>`;
+  }
+
+  return `<p class="sr-act4-findings-empty">This sample did not produce enough measured signal for a defensible summary — Acts 1 and 2 carry the observed evidence.</p>`;
+}
+
+function renderAct4ImpactRow(row: ReportAct4ImpactRow, index: number): string {
+  return `
+    <li class="sr-act4-impact-row" data-tone="${escapeHtml(row.tone)}" data-reveal style="--reveal-order:${index + 2}">
+      <div class="sr-act4-impact-metric">
+        <span class="sr-act4-impact-metric-value">${escapeHtml(row.metric_value)}</span>
+        <span class="sr-act4-impact-metric-label">${escapeHtml(row.metric_label)}</span>
+      </div>
+      <div class="sr-act4-impact-chain">
+        <span class="sr-act4-impact-kpi" data-tone="${escapeHtml(row.tone)}">${escapeHtml(row.kpi_label)}</span>
+        <p class="sr-act4-impact-sentence">${row.impact_sentence_html}</p>
+      </div>
+    </li>
   `;
 }
 
@@ -1001,6 +1171,22 @@ function renderCredibilityStrip(viewModel: ReportViewModel): string {
           : ''
       }
       ${
+        viewModel.credibility_strip.excluded_background_sessions != null
+          ? `
+        <span class="sr-credibility-sep" aria-hidden="true">·</span>
+        <span class="sr-credibility-item" data-role="excluded-background">${viewModel.credibility_strip.excluded_background_sessions.toLocaleString()} background-tab loads excluded</span>
+      `
+          : ''
+      }
+      ${
+        viewModel.credibility_strip.coverage_marginal
+          ? `
+        <span class="sr-credibility-sep" aria-hidden="true">·</span>
+        <span class="sr-credibility-item" data-role="coverage-marginal">coverage at the defensible edge</span>
+      `
+          : ''
+      }
+      ${
         viewModel.freshness_known
           ? `
         <span class="sr-credibility-sep" aria-hidden="true">·</span>
@@ -1015,7 +1201,6 @@ function renderCredibilityStrip(viewModel: ReportViewModel): string {
 function renderFooter(viewModel: ReportViewModel): string {
   return `
     <footer class="sr-landing-footer" data-role="persistent-footer">
-      <p class="sr-landing-boundary">${escapeHtml(viewModel.boundary_statement)}</p>
       ${renderCredibilityStrip(viewModel)}
       ${viewModel.warnings.length > 0 ? `<div class="sr-warnings">${viewModel.warnings.map((w) => `<p class="sr-warning">${escapeHtml(w)}</p>`).join('')}</div>` : ''}
       <div class="sr-landing-brand">
@@ -1215,6 +1400,7 @@ function renderFullReport(viewModel: ReportViewModel, motionMode: ReportMotionMo
           </header>
 
           ${renderPersonaCards(viewModel.persona_contrast)}
+          ${renderAct1ContextStrip(viewModel.act1_context_strip)}
           ${renderAct1FormFactor(viewModel.form_factor)}
         </section>
 

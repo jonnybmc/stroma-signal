@@ -26,10 +26,12 @@ Event payloads may now include additive diagnostic context:
 - `meta.navigation_type` for normalized navigation semantics
 - `vitals.lcp_attribution` for LCP load state, target, and resource hints
 - `vitals.inp_attribution` for load state, interaction type, and timing split hints
+- `vitals.loaf` — Long Animation Frame attribution (Chromium 123+). `worst_duration_ms` records the most severe frame observed in the session; `dominant_cause` tags whether the frame was stalled by `script`, `layout`, `style`, or `paint`; `script_origin_count` is the number of distinct hosts executing script during that frame. Null on browsers without `PerformanceObserver` `long-animation-frame` support or on sessions with no LoAF entries.
+- `context.visibility_hidden_at_load` — `true` when `document.visibilityState === 'hidden'` at event creation; `false` otherwise. Default report aggregation pre-filters `visibility_hidden_at_load = true` rows to exclude background-tab loads from every accumulator, percentile, and share
 
 These fields are optional, nullable, and capability-gated. Unsupported browsers should continue to store null or absent values without backfilling.
 
-`restore` and `prerender` lifecycle rows should stay queryable in raw warehouse data even though the default report aggregation excludes them.
+`restore`, `prerender`, and background-tab (`context.visibility_hidden_at_load = true`) rows should stay queryable in raw warehouse data even though the default report aggregation excludes them.
 
 This endpoint should be same-origin where possible to minimize CSP and ad-blocker friction.
 
