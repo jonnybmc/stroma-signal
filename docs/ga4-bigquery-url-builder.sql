@@ -1,4 +1,4 @@
--- Signal by Stroma
+-- Signal
 -- GA4 BigQuery URL builder using perf_tier_report
 -- Default report math excludes non-load-shaped restore/prerender rows.
 -- Canonical production window = the last 7 complete calendar days,

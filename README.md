@@ -1,294 +1,158 @@
-<img src="./docs/images/signal-stroma-logo.png" alt="Signal by Stroma logo" width="270" />
+<img src="./docs/images/signal-stroma-logo.png" alt="Signal" width="270" />
 
 [![CI](https://github.com/jonnybmc/stroma-signal/actions/workflows/ci.yml/badge.svg)](https://github.com/jonnybmc/stroma-signal/actions/workflows/ci.yml)
-[![npm](https://img.shields.io/npm/v/@stroma-labs/signal)](https://www.npmjs.com/package/@stroma-labs/signal)
+[![npm @next](https://img.shields.io/npm/v/@stroma-labs/signal/next?label=npm%20%40next)](https://www.npmjs.com/package/@stroma-labs/signal)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
-[![Bundle Size](https://img.shields.io/bundlephobia/minzip/@stroma-labs/signal)](https://bundlephobia.com/package/@stroma-labs/signal)
 
-Native-first browser instrumentation for measuring real-user network, device, and performance tiers without forcing teams into a single analytics stack.
+> 🧪 **Release Candidate** — `0.1.0-rc.2` on the `next` dist-tag. The `0.x` line is pre-stable; the API can change before `1.0`.
+
+**Other RUM tools tell you what your average user experiences. Signal tells you _who_ is getting which experience — and lets you act on it.**
+
+A small browser library that classifies every page load by the user's real network and device conditions, captures Web Vitals against those conditions, and delivers the data to your own analytics. Field evidence per session, not lab averages or coarse vendor buckets.
+
+## Why Signal
+
+| You're already using…                  | What it gives you                                | What it doesn't tell you                                                       |
+| -------------------------------------- | ------------------------------------------------ | ------------------------------------------------------------------------------ |
+| **GA4 / GTM**                          | Event capture, attribution, funnels              | Whether the user was on fibre or a congested 4G tower (both report as "4g")    |
+| **Lighthouse**                         | Lab Web Vitals on a single test device            | What real users on real networks actually feel                                 |
+| **CrUX**                               | Aggregated Chrome field data                      | Per-session detail, attribution, your own segmentation                         |
+| **Datadog RUM / NewRelic / SpeedCurve** | Dashboards, alerting, vendor opinions             | Honest segmentation by real network tier; you also pay enterprise pricing      |
+| **Signal**                             | Real-user network + device tier per page load, joined to your own warehouse, in a 4 KB SDK | A dashboard (we don't ship one — you bring your own analytics)                 |
+
+Signal sits one layer beneath every option above: it produces the per-session evidence the others can't or won't capture, and you wire it into whatever you already use.
 
 ## Install
 
 ```bash
-pnpm add @stroma-labs/signal
+pnpm add @stroma-labs/signal@next
 ```
 
-`@stroma-labs/signal` is published as an ESM-only package.
+ESM-only. Works in any modern browser. Zero runtime dependencies.
 
-Signal is event-first and analytics-agnostic. Pick the sink that matches your environment.
+## Quickstart — pick one
 
-## What Ships On npm
-
-The published npm surface is the browser package and its public helper subpaths:
-
-- `@stroma-labs/signal`
-- `@stroma-labs/signal/ga4`
-- `@stroma-labs/signal/report`
-- `@stroma-labs/signal/summary`
-
-For most teams, the shortest path is:
-
-- `@stroma-labs/signal` for the runtime and sinks
-- `@stroma-labs/signal/ga4` if you already use GTM / GA4
-
-`@stroma-labs/signal/report` is optional. It is a helper surface for preview/report workflows, not part of the minimum instrumentation setup.
-`@stroma-labs/signal/summary` is optional. It is a local summary/export helper for plain-text, JSON, and CSV workflows.
-
-## Choose Your Role
-
-### I need the shareable report URL
-
-Use this if: you own launch, martech, analytics, or product ops and want the shortest path from installed Signal to an always-current hosted report URL.
-
-Start here:
-
-- [marketer quickstart](./docs/marketer-quickstart.md)
-- [production report automation](./docs/production-report-automation.md)
-
-### I need to implement Signal
-
-Use this if: you are the engineer wiring Signal into app code, GTM, or a warehouse flow.
-
-Start here:
-
-- [choose your setup](./docs/client-integrations.md)
-- [framework recipes](./docs/framework-recipes.md)
-
-## What Signal Automates
-
-Signal automates browser-side collection and gives you canonical SQL templates for the final hosted report URL.
-
-Your team still configures the warehouse refresh once:
-
-- GTM / GA4 or your own collector must land rows in BigQuery
-- your team saves or schedules the provided URL-builder query
-- the final artifact is a hosted `signal_report_url` that you can share internally
-
-Signal does not create BigQuery scheduled queries, persistence tables, or dashboards for you in v0.1.
-
-The Tier Report is not a diagnostic, attribution, or commercial modelling artifact. It is the measured proof layer that makes audience shape (including mobile / tablet / desktop form-factor split), experience gap, and poor-performance progression visible enough to act on.
-
-## Companion Tooling In This Repo
-
-This monorepo also includes companion tooling that supports QA, demos, and contributor workflows:
-
-- `apps/signal-spike-lab`: local proof-of-life harness
-- `apps/signal-report` at `/r`: hosted report shell
-- `apps/signal-report` at `/build`: zero-code builder and validator
-
-These are useful repo assets, but they are not required for basic npm package adoption.
-
-## Choose Your Setup
-
-### I already have GTM / GA4
-
-Use this if: your site already uses GTM and you want Signal to emit a compact GA4-safe subset into `window.dataLayer`.
-
-Exact import:
-
-```ts
-import { init } from '@stroma-labs/signal';
-import { createDataLayerSink } from '@stroma-labs/signal/ga4';
-```
+### Already on GTM and GA4 (most common)
 
 ```ts
 import { init } from '@stroma-labs/signal';
 import { createDataLayerSink } from '@stroma-labs/signal/ga4';
 
-init({
-  sinks: [createDataLayerSink()]
-});
+init({ sinks: [createDataLayerSink()] });
 ```
 
-Success check: `perf_tier_report` appears in GTM Preview, then in GA4 DebugView.
+✅ Success: `perf_tier_report` appears in GTM Preview, then GA4 DebugView. → [Marketer quickstart](./docs/marketer-quickstart.md) for the rest of the path to a shareable report URL.
 
-Next doc: [marketer quickstart](./docs/marketer-quickstart.md)
-
-### I want to send to my own endpoint
-
-Use this if: you already have a collector or backend endpoint and want warehouse truth without GTM.
-
-Exact import:
-
-```ts
-import { init, createBeaconSink } from '@stroma-labs/signal';
-```
+### Have your own collector / endpoint
 
 ```ts
 import { init, createBeaconSink } from '@stroma-labs/signal';
 
-init({
-  sinks: [createBeaconSink({ endpoint: '/rum/signal' })]
-});
+init({ sinks: [createBeaconSink({ endpoint: '/rum/signal' })] });
 ```
 
-Success check: one request lands at your collector and the payload contains `event_id`.
+✅ Success: one POST hits your endpoint with an `event_id`. → [Collector contract](./docs/collector-contract.md) for the schema you'll receive.
 
-Next doc: [collector contract](./docs/collector-contract.md)
-
-### I want full control in app code
-
-Use this if: you already have an internal analytics wrapper or want to decide in app code what happens to each canonical event.
-
-Exact import:
-
-```ts
-import { init, createCallbackSink } from '@stroma-labs/signal';
-```
+### Want app-level control
 
 ```ts
 import { init, createCallbackSink } from '@stroma-labs/signal';
 
 init({
-  sinks: [
-    createCallbackSink({
-      onReport(event) {
-        console.log(event.event_id);
-      }
-    })
-  ]
+  sinks: [createCallbackSink({
+    onReport(event) { /* your code */ }
+  })]
 });
 ```
 
-Success check: your callback fires once and exposes the canonical event object.
+✅ Success: your callback fires with the event object. → [Warehouse schema](./docs/warehouse-schema.md) for field definitions.
 
-Next doc: [warehouse schema](./docs/warehouse-schema.md)
+You can run several sinks at once — e.g., dataLayer for GA4 plus a beacon to your warehouse.
 
-## First 5 Minutes
+## What you get back
 
-1. Choose your integration mode.
-2. Paste the matching snippet into app code.
-3. Verify one event locally.
-4. Verify GTM / GA4 or endpoint landing.
-5. Generate the first report URL.
+One event per page load with:
 
-## Report URL Paths
+- **Network tier** — `urban`, `moderate`, `constrained_moderate`, `constrained` from the actual TCP handshake (not the coarse browser label)
+- **Device tier** — `low`, `mid`, `high` from real hardware signals
+- **Web Vitals** — LCP, INP, CLS, FCP, TTFB with attribution (which element was slow, which interaction phase dominated, which third-party scripts loaded before paint)
+- **Long Animation Frame** story on Chromium 123+
+- **Background-tab filter** so percentiles aren't poisoned by hidden-tab loads
 
-- GTM / GA4 path: validate rows with [ga4-bigquery-validation.sql](./docs/ga4-bigquery-validation.sql), then generate the hosted report with [ga4-bigquery-url-builder.sql](./docs/ga4-bigquery-url-builder.sql).
-- Own endpoint and full-control paths: validate rows with [normalized-bigquery-validation.sql](./docs/normalized-bigquery-validation.sql), then generate the hosted report with [normalized-bigquery-url-builder.sql](./docs/normalized-bigquery-url-builder.sql).
-- [`/build`](https://signal.stroma.design/build) stays the optional QA and fallback path, not the primary launch automation flow.
+No PII. No cookies set by us. The runtime is opinionated about what *not* to capture — see [why-signal.md](./docs/why-signal.md) for the deliberate exclusions.
 
-If you want the plain-English production operating model for the BigQuery step, use [production report automation](./docs/production-report-automation.md).
+## From SDK to shareable report URL
 
-The validation queries show raw rows, including `navigation_type = restore` and `navigation_type = prerender`. The URL-builder queries exclude those non-load-shaped rows by default so shared reports stay tied to normal load performance.
+The SDK is just collection. The full path to a shareable URL:
 
-## Framework Recipes
+1. **Install Signal** (above)
+2. **Land events** in BigQuery via GA4 + automatic export, or in your own warehouse via the beacon
+3. **Run the URL-builder query** — we ship the SQL templates ([GA4](./docs/ga4-bigquery-url-builder.sql), [normalized warehouse](./docs/normalized-bigquery-url-builder.sql))
+4. **Share the resulting `signal_report_url`** — recipients see your real-user performance gap at `signal.stroma.design/r/...`, no login required
 
-Signal is framework-agnostic. These recipes cover where to initialise, SSR guards, and duplicate-init safety for each environment:
+For the production operating model (manual vs scheduled refresh, where to surface the URL, what to do when rows lag), see [production-report-automation.md](./docs/production-report-automation.md).
 
-- [Vanilla / React / Next.js / Vue / Nuxt / Angular / Svelte / SvelteKit](./docs/framework-recipes.md)
-- [SPA and SSR caveats](./docs/spa-ssr-caveats.md)
+## Where to go next
 
-## Deeper Docs
+**Non-technical / launch ops:**
+- [Marketer quickstart](./docs/marketer-quickstart.md) — GTM-first, plain English, end-to-end
+- [Production report automation](./docs/production-report-automation.md) — keeping the URL fresh
+- [Launch troubleshooting](./docs/launch-troubleshooting.md) — common gotchas
 
-- [first successful report](./docs/first-successful-report.md) — the single linear walkthrough
-- [why Signal exists](./docs/why-signal.md)
-- [tier report design spec](./docs/tier-report-design-spec.md)
-- [choose your setup](./docs/client-integrations.md)
-- [public API freeze (v0.1)](./docs/public-api-v0.1.md)
-- [signal technical reference](./docs/signal-technical-reference.md)
-- [aggregation spec](./docs/aggregation-spec.md)
-- [marketer quickstart](./docs/marketer-quickstart.md)
-- [production report automation](./docs/production-report-automation.md)
-- [GTM recipe](./docs/gtm-recipe.md)
-- [collector contract](./docs/collector-contract.md)
-- [warehouse schema](./docs/warehouse-schema.md)
-- [BigQuery saved query setup](./docs/bigquery-saved-query-setup.md)
-- [release deployment checklist](./docs/release-deployment-checklist.md)
-- [launch troubleshooting](./docs/launch-troubleshooting.md)
+**Engineers:**
+- [Setup guide](./docs/client-integrations.md) — the three paths above with detail
+- [Framework recipes](./docs/framework-recipes.md) — React, Next.js, Vue, Nuxt, Angular, Svelte, SvelteKit
+- [SPA / SSR caveats](./docs/spa-ssr-caveats.md)
+- [GTM recipe](./docs/gtm-recipe.md) + [workspace template](./docs/gtm-workspace-template.json)
 
-## Additional Diagnostics
+**Reference / contracts:**
+- [Public API (v0.1)](./docs/public-api-v0.1.md) — every export
+- [Technical reference](./docs/signal-technical-reference.md) — schemas, thresholds, browser support
+- [Aggregation spec](./docs/aggregation-spec.md) — how the warehouse rules work
+- [Tier Report design spec](./docs/tier-report-design-spec.md) — what the hosted report shows and why
+- [Why Signal exists](./docs/why-signal.md) — the philosophical bit
 
-Signal also emits additive, capability-gated diagnostics for richer warehouse analysis:
+## Verification
 
-- `meta.navigation_type` for normalized navigation lifecycle analysis
-- `vitals.lcp_attribution` for load-state, target, and resource context
-- `vitals.inp_attribution` for load-state and interaction timing splits
-
-These fields stay optional and nullable, and the launch report schema remains unchanged.
-
-`restore` and `prerender` events are preserved in raw runtime and warehouse data, but the default report SQL excludes them from paint and network percentile calculations in v0.1.
-
-## Launch Automation Pack
-
-For v0.1 launch, the primary automation path is:
-
-- Signal deployed with automatic collection
-- client-owned warehouse receives rows
-- a BigQuery URL-builder query returns a final hosted `signal_report_url`
-- the user team decides whether that query is rerun manually or on a schedule
-- that URL is the shareable internal asset
-
-Start here:
-
-- [marketer quickstart](./docs/marketer-quickstart.md)
-- [production report automation](./docs/production-report-automation.md)
-- [GTM workspace template](./docs/gtm-workspace-template.json)
-- [BigQuery saved query setup](./docs/bigquery-saved-query-setup.md)
-- [launch troubleshooting](./docs/launch-troubleshooting.md)
-
-## Workspace Layout
-
-- `packages/signal-contracts`
-  - canonical `SignalEventV1`, `SignalAggregateV1`, URL codec, aggregation rules, fixtures
-- `packages/signal`
-  - published package `@stroma-labs/signal`
-  - subpath exports `./ga4` and `./report`
-- `apps/signal-spike-lab`
-  - local proof-of-life harness with a collector endpoint
-- `apps/signal-report`
-  - companion report shell at `/r` and optional builder at `/build`
-
-## Local Development
+Every release ships with [npm provenance attestation](https://docs.npmjs.com/generating-provenance-statements). After install:
 
 ```bash
-pnpm install
-pnpm test:unit
-pnpm build
+npm audit signatures
+# → "1 package has a verified attestation"
 ```
 
-Run the proof-of-life apps in separate terminals:
+That confirms the tarball was built by [this repository's publish workflow](https://github.com/jonnybmc/stroma-signal/actions/workflows/publish.yml) on the exact commit referenced in the release notes.
+
+---
+
+## For contributors
+
+Local development (you don't need this to use the SDK):
 
 ```bash
-pnpm dev:report
-pnpm dev:spike
+git clone https://github.com/jonnybmc/stroma-signal.git
+cd stroma-signal
+pnpm install --frozen-lockfile
+pnpm test:unit       # full unit suite
+pnpm dev:report      # /r and /build at localhost:4174
+pnpm dev:spike       # local proof-of-life harness at localhost:4173
 ```
 
-By default the spike lab assumes the report shell is available at `http://localhost:4174/r`.
-If you set `VITE_SIGNAL_GA4_MEASUREMENT_ID`, the spike lab will also boot a spike-lab-only live GA4 transport outside browser automation, so the same local harness can validate:
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for tone, commit conventions, and the public/private boundary contributors should know about.
 
-- callback/runtime truth
-- beacon/local collector landing
-- `dataLayer` flattening
-- real `gtag` delivery into your dev GA4 property
+### Workspace
 
-During Playwright runs, the live GA4 transport is intentionally skipped so browser tests stay deterministic.
-`pnpm test:e2e:smoke` is the Chromium functional smoke lane used in merge CI, while `pnpm test:e2e:visual` and `pnpm test:e2e:visual:update` are local-only visual regression helpers with platform-specific baselines.
-The local spike lab enables `debug: true` so the browser console shows raw FCP/LCP observations, the flush reason, and the final payload before sink emission.
+| Path                          | What it is                                                       |
+| ----------------------------- | ---------------------------------------------------------------- |
+| `packages/signal`             | The published `@stroma-labs/signal` SDK                          |
+| `packages/signal-contracts`   | Shared types, URL codec, aggregation rules, fixtures, SQL templates |
+| `apps/signal-report`          | Renders the hosted Tier Report at `/r` and the zero-code builder at `/build` |
+| `apps/signal-spike-lab`       | Local proof-of-life harness used for SDK validation              |
 
-## v0.1 Scope
+### Release process
 
-- one published package: `@stroma-labs/signal`
-- dataLayer/GTM integration via `@stroma-labs/signal/ga4`
-- preview/report builder via `@stroma-labs/signal/report`
-- production truth from analytics-derived aggregation
-- preview explicitly limited to sanity-check use
-- report hostname standardized to `https://signal.stroma.design`
+The publish workflow runs on every GitHub Release tagged `vX.Y.Z`. Stable tags publish to `latest`; pre-release tags (`-rc.N`, `-beta.N`) publish to `next`. Auth is via [npm Trusted Publishing](https://docs.npmjs.com/trusted-publishers) — no long-lived `NPM_TOKEN` required.
 
-## Release Boundary
+## License
 
-The v0.1 release boundary is:
-
-- one canonical public package contract
-- one verified GTM / GA4 launch pack
-- one proven GA4 -> BigQuery -> hosted report URL path
-- one published npm package and tagged GitHub release
-
-Until the warehouse-derived report URL matches fixture semantics exactly, the repo should be treated as release-candidate software rather than a fully closed 0.1 release.
-
-The release-facing launch docs are a coordinated public surface and should stay aligned:
-
-- `README.md`
-- `docs/marketer-quickstart.md`
-- `docs/production-report-automation.md`
-- `docs/bigquery-saved-query-setup.md`
+MIT — see [LICENSE](./LICENSE).

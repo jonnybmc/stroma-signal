@@ -1,6 +1,6 @@
 # Why Signal Exists
 
-<img src="./images/signal-stroma-logo.png" alt="Signal by Stroma logo" width="320" />
+<img src="./images/signal-stroma-logo.png" alt="Signal" width="320" />
 
 **Attribution tools tell you which channel got credit. Server-side tracking makes sure the event was captured. Signal tells you whether the click landed in conditions where conversion ever stood a fair chance — and what to change when it didn't.**
 

@@ -2,7 +2,7 @@
   "name": "stroma-signal",
   "private": true,
   "version": "0.1.0",
-  "description": "Signal by Stroma monorepo",
+  "description": "Signal — measure what real users experience and bring the data to your own analytics.",
   "packageManager": "pnpm@10.28.2",
   "engines": {
     "node": ">=22.0.0"

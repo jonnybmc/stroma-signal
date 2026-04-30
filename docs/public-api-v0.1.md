@@ -108,7 +108,7 @@ The data-layer payload is intentionally a compact GA4-safe subset, not the full 
 
 ## Frozen event and integration names
 
-- Product brand: `Signal by Stroma`
+- Product brand: `Signal`
 - Canonical GTM / GA4 event name: `perf_tier_report`
 - Hosted report route: `https://signal.stroma.design/r`
 - Hosted builder route: `https://signal.stroma.design/build`

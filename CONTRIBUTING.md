@@ -1,4 +1,4 @@
-# Contributing to Signal by Stroma
+# Contributing to Signal
 
 Thanks for your interest in contributing! This guide covers the basics.
 
