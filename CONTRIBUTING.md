@@ -4,34 +4,37 @@ Thanks for your interest in contributing! This guide covers the basics.
 
 ## Public/private boundary
 
-Stroma maintains a private companion repository (mounted in this repo as a git submodule at `internal/`) for work that is not yet public. **You do not need access to that submodule to contribute to Signal.** Without the submodule mounted, the public workspace builds the SDK, contracts, `/r`, and `/build` cleanly and the full free-tier test suite passes. Public code is forbidden from importing `@stroma-labs/signal-pi` (the private workspace member); `scripts/check-boundaries.mjs` enforces the rule on every CI run.
+Stroma maintains a private companion repository for work that is not yet public. The public repo intentionally does not reference it as a git submodule (that triggered Cloudflare Pages clone failures because the deploy environment has no access to the private repo). Instead, the path `internal/` is gitignored — Stroma maintainers manually clone the private repo into that location.
 
-Files matching `pi-*.ts`, `pi-*.html`, or `pi-*.md` must not be committed to the public tree under any path other than `internal/`. The boundary script hard-fails CI on violations.
+**You do not need access to the private repo to contribute to Signal.** The public workspace builds the SDK, contracts, `/r`, and `/build` cleanly without `internal/` populated. Public code is forbidden from importing `@stroma-labs/signal-pi`; `scripts/check-boundaries.mjs` enforces the rule on every CI run.
+
+Files matching `pi-*.ts`, `pi-*.html`, or `pi-*.md` must not be committed to the public tree under any path other than `internal/` (which is gitignored). The boundary script hard-fails CI on violations.
 
 ## Getting Started
 
-Standard contributor flow (no submodule access required):
+Standard contributor flow:
 
 ```bash
 git clone https://github.com/jonnybmc/stroma-signal.git
 cd stroma-signal
-pnpm install --no-frozen-lockfile  # tolerates the federated lockfile entries
+pnpm install --frozen-lockfile
 pnpm test:unit
 pnpm build
-```
-
-If you have submodule access (Stroma maintainers only):
-
-```bash
-git submodule update --init --recursive
-pnpm install                       # respects the federated lockfile
-pnpm test:unit                     # full test suite, federated workspace
 ```
 
 Requires Node >= 22 and pnpm 10.28+.
 The monorepo uses Node 22 for contributors and release automation, while the published `@stroma-labs/signal` package intentionally keeps consumer support at Node >= 18.
 
-The lockfile (`pnpm-lock.yaml`) currently reflects the federated state. Public contributors pass `--no-frozen-lockfile` to `pnpm install` to tolerate the missing submodule workspace entries. Tracked as a known papercut.
+If you are a Stroma maintainer with private-repo access, additionally clone the companion repository into the gitignored `internal/` directory:
+
+```bash
+# from the repo root, after the standard install above
+git clone https://github.com/stromalab/stroma-signal-pi.git internal
+pnpm install --no-frozen-lockfile  # picks up the now-present internal/* workspace members
+pnpm test:unit                     # runs the full federated suite
+```
+
+The `--no-frozen-lockfile` is required because adding `internal/*` workspace members modifies the lockfile. Do not commit that regenerated lockfile back to public main — the public lockfile must remain free of `internal/*` entries so CI and Cloudflare Pages can install cleanly.
 
 ## Development
 
