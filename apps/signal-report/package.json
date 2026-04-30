@@ -10,6 +10,6 @@
   },
   "dependencies": {
     "@stroma-labs/signal-contracts": "workspace:*",
-    "lucide-static": "^0.460.0"
+    "lucide-static": "^1.8.0"
   }
 }
