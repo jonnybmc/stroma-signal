@@ -18,7 +18,7 @@ Signal reads browser APIs (`navigator`, `document`, `performance`). It must not 
 
 Worked examples for each framework are in [framework-recipes.md](./framework-recipes.md).
 
-If you forget the guard, the import will throw during SSR. Signal does not include a server-side no-op — it is designed to fail fast rather than silently run in the wrong environment.
+Importing the package on the server is safe — module evaluation does not touch browser APIs. But calling `init()` from a code path that the server bundle reaches will attach lifecycle listeners to a `globalThis.document` that is `undefined` on Node, leaving you with a runtime that captures nothing and a global singleton that lingers across requests. Signal does not include a server-side polyfill; the client-only guard above is the supported pattern.
 
 ## SPA: one event per real navigation
 
@@ -34,7 +34,7 @@ This is intentional. Soft navigation support is not first-class in v0.1. The per
 
 ## Duplicate init is safe
 
-Signal uses a `Symbol.for` global singleton. If `init()` is called more than once — by React Strict Mode, hot module replacement, or multiple entry points — the second call returns the existing controller without creating a new runtime.
+Signal stores its runtime under a `Symbol.for('stroma.signal.runtime')` global singleton. If `init()` is called more than once — by React Strict Mode, hot module replacement, or multiple entry points — the second call returns the existing controller without creating a new runtime.
 
 You do not need:
 - A `useRef` guard
@@ -47,10 +47,12 @@ Just call `init()`. It is idempotent.
 
 Signal detects `pageshow` events with `event.persisted === true` (back/forward cache restores). On a bfcache restore, Signal resets the event ID and re-observes vitals, producing a fresh raw event for the restored page view.
 
-In v0.1, that restore event is preserved in raw data but treated as non-load-shaped by default:
+That restore event is preserved in raw data but treated as non-load-shaped by default:
 
 - `meta.navigation_type` is `restore`
-- load-shaped timing fields such as `lcp_ms`, `fcp_ms`, `ttfb_ms`, `net_tier`, and `net_tcp_ms` are emitted as `null`
+- load-shaped timing fields are emitted as `null`: `lcp_ms`, `fcp_ms`, `ttfb_ms`, `net_tier`, `net_tcp_ms`
+- attribution / breakdown / third-party blocks are also nulled: `lcp_attribution`, `lcp_breakdown`, `third_party`
+- `net_tcp_source` is forced to `unavailable_missing_timing`
 - the default report SQL excludes restore rows from coverage and percentile calculations
 
 This works automatically across all frameworks.
@@ -59,10 +61,12 @@ This works automatically across all frameworks.
 
 Signal detects pages that start in a prerendered state (Speculation Rules API). It defers observation until `prerenderingchange` fires, then begins normal collection.
 
-In v0.1, prerender navigations are also preserved as raw lifecycle rows but treated as non-load-shaped by default:
+Prerender navigations are also preserved as raw lifecycle rows but treated as non-load-shaped by default:
 
 - `meta.navigation_type` is `prerender`
-- load-shaped timing fields such as `lcp_ms`, `fcp_ms`, `ttfb_ms`, `net_tier`, and `net_tcp_ms` are emitted as `null`
+- load-shaped timing fields are emitted as `null`: `lcp_ms`, `fcp_ms`, `ttfb_ms`, `net_tier`, `net_tcp_ms`
+- attribution / breakdown / third-party blocks are also nulled: `lcp_attribution`, `lcp_breakdown`, `third_party`
+- `net_tcp_source` is forced to `unavailable_missing_timing`
 - the default report SQL excludes prerender rows from coverage and percentile calculations
 
 No framework-specific handling needed.
