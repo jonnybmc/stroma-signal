@@ -309,89 +309,156 @@ function encodeEnvironment(params: URLSearchParams, env: SignalEnvironment): voi
   );
 }
 
+// Top-level encode/decode pairs. Each pair owns one block of the aggregate
+// shape and is colocated so a contract change has one place to update both
+// sides. Histograms use exhaustive tuple destructuring — `parseInts` already
+// throws on length mismatch, so the previous `?? 0` defaults were unreachable
+// and have been removed.
+
+function encodeNetworkDistribution(params: URLSearchParams, dist: SignalAggregateV1['network_distribution']): void {
+  params.set('nt', joinInts([dist.urban, dist.moderate, dist.constrained_moderate, dist.constrained, dist.unknown]));
+}
+
+function decodeNetworkDistribution(params: URLSearchParams): SignalAggregateV1['network_distribution'] {
+  const [urban, moderate, constrained_moderate, constrained, unknown] = parseInts(params.get('nt'), 5) as [
+    number,
+    number,
+    number,
+    number,
+    number
+  ];
+  return { urban, moderate, constrained_moderate, constrained, unknown };
+}
+
+function encodeDeviceDistribution(params: URLSearchParams, dist: SignalAggregateV1['device_distribution']): void {
+  params.set('dt', joinInts([dist.low, dist.mid, dist.high]));
+}
+
+function decodeDeviceDistribution(params: URLSearchParams): SignalAggregateV1['device_distribution'] {
+  const [low, mid, high] = parseInts(params.get('dt'), 3) as [number, number, number];
+  return { low, mid, high };
+}
+
+function encodeVitals(params: URLSearchParams, vitals: SignalAggregateV1['vitals']): void {
+  params.set('lu', metricValue(vitals.urban, 'lcp_ms'));
+  params.set('lt', metricValue(vitals.comparison, 'lcp_ms'));
+  params.set('fu', metricValue(vitals.urban, 'fcp_ms'));
+  params.set('ft', metricValue(vitals.comparison, 'fcp_ms'));
+  params.set('tu', metricValue(vitals.urban, 'ttfb_ms'));
+  params.set('tt', metricValue(vitals.comparison, 'ttfb_ms'));
+  params.set('ulc', String(vitals.urban.lcp_coverage));
+  params.set('ufc', String(vitals.urban.fcp_coverage));
+  params.set('utc', String(vitals.urban.ttfb_coverage));
+  params.set('clc', String(vitals.comparison.lcp_coverage));
+  params.set('cfc', String(vitals.comparison.fcp_coverage));
+  params.set('ctc', String(vitals.comparison.ttfb_coverage));
+}
+
+function decodeVitals(params: URLSearchParams): SignalAggregateV1['vitals'] {
+  return {
+    urban: toMetricSummary({
+      observations: 0,
+      lcp_observations: 0,
+      fcp_observations: 0,
+      ttfb_observations: 0,
+      lcp_ms: readNumberParam(params, 'lu') || null,
+      fcp_ms: readNumberParam(params, 'fu') || null,
+      ttfb_ms: readNumberParam(params, 'tu') || null,
+      lcp_coverage: readNumberParam(params, 'ulc'),
+      fcp_coverage: readNumberParam(params, 'ufc'),
+      ttfb_coverage: readNumberParam(params, 'utc')
+    }),
+    comparison: toMetricSummary({
+      observations: 0,
+      lcp_observations: 0,
+      fcp_observations: 0,
+      ttfb_observations: 0,
+      lcp_ms: readNumberParam(params, 'lt') || null,
+      fcp_ms: readNumberParam(params, 'ft') || null,
+      ttfb_ms: readNumberParam(params, 'tt') || null,
+      lcp_coverage: readNumberParam(params, 'clc'),
+      fcp_coverage: readNumberParam(params, 'cfc'),
+      ttfb_coverage: readNumberParam(params, 'ctc')
+    })
+  };
+}
+
+function encodeCoverage(params: URLSearchParams, coverage: SignalAggregateV1['coverage']): void {
+  params.set('nc', String(coverage.network_coverage));
+  params.set('nu', String(coverage.unclassified_network_share));
+  params.set('nr', String(coverage.connection_reuse_share));
+  params.set('lc', String(coverage.lcp_coverage));
+  if (coverage.selected_metric_urban_coverage != null) {
+    params.set('ruc', String(coverage.selected_metric_urban_coverage));
+  }
+  if (coverage.selected_metric_comparison_coverage != null) {
+    params.set('rcc', String(coverage.selected_metric_comparison_coverage));
+  }
+  // Denominator bookkeeping. Emit only when present so older aggregates
+  // (without raw / excluded counts) round-trip unchanged.
+  if (coverage.raw_sample_size != null) {
+    params.set('rs', String(coverage.raw_sample_size));
+  }
+  if (coverage.excluded_background_sessions != null) {
+    params.set('xb', String(coverage.excluded_background_sessions));
+  }
+}
+
+function decodeCoverage(params: URLSearchParams, networkCoverage: number): SignalAggregateV1['coverage'] {
+  return {
+    network_coverage: networkCoverage,
+    unclassified_network_share: readNumberParam(params, 'nu'),
+    connection_reuse_share: readNumberParam(params, 'nr'),
+    lcp_coverage: readNumberParam(params, 'lc'),
+    selected_metric_urban_coverage: params.get('ruc') == null ? null : readNumberParam(params, 'ruc'),
+    selected_metric_comparison_coverage: params.get('rcc') == null ? null : readNumberParam(params, 'rcc'),
+    ...(params.get('rs') == null ? {} : { raw_sample_size: readNumberParam(params, 'rs') }),
+    ...(params.get('xb') == null ? {} : { excluded_background_sessions: readNumberParam(params, 'xb') })
+  };
+}
+
+function encodeFormFactor(params: URLSearchParams, ff: SignalFormFactorDistribution): void {
+  params.set('ff', joinInts([ff.mobile, ff.tablet, ff.desktop]));
+}
+
 function encodeAggregate(aggregate: SignalAggregateV1): URLSearchParams {
   const params = new URLSearchParams();
+
+  // Identity + provenance
   params.set('rv', String(aggregate.rv));
   params.set('mode', aggregate.mode);
   params.set('d', aggregate.domain);
-  params.set(
-    'nt',
-    joinInts([
-      aggregate.network_distribution.urban,
-      aggregate.network_distribution.moderate,
-      aggregate.network_distribution.constrained_moderate,
-      aggregate.network_distribution.constrained,
-      aggregate.network_distribution.unknown
-    ])
-  );
-  params.set(
-    'dt',
-    joinInts([aggregate.device_distribution.low, aggregate.device_distribution.mid, aggregate.device_distribution.high])
-  );
-  params.set('lu', metricValue(aggregate.vitals.urban, 'lcp_ms'));
-  params.set('lt', metricValue(aggregate.vitals.comparison, 'lcp_ms'));
-  params.set('fu', metricValue(aggregate.vitals.urban, 'fcp_ms'));
-  params.set('ft', metricValue(aggregate.vitals.comparison, 'fcp_ms'));
-  params.set('tu', metricValue(aggregate.vitals.urban, 'ttfb_ms'));
-  params.set('tt', metricValue(aggregate.vitals.comparison, 'ttfb_ms'));
-  params.set('ulc', String(aggregate.vitals.urban.lcp_coverage));
-  params.set('ufc', String(aggregate.vitals.urban.fcp_coverage));
-  params.set('utc', String(aggregate.vitals.urban.ttfb_coverage));
-  params.set('clc', String(aggregate.vitals.comparison.lcp_coverage));
-  params.set('cfc', String(aggregate.vitals.comparison.fcp_coverage));
-  params.set('ctc', String(aggregate.vitals.comparison.ttfb_coverage));
   params.set('s', String(aggregate.sample_size));
   params.set('p', String(aggregate.period_days));
-  params.set('nc', String(aggregate.coverage.network_coverage));
-  params.set('nu', String(aggregate.coverage.unclassified_network_share));
-  params.set('nr', String(aggregate.coverage.connection_reuse_share));
-  params.set('lc', String(aggregate.coverage.lcp_coverage));
+  params.set('ga', String(aggregate.generated_at));
+
+  // Distributions
+  encodeNetworkDistribution(params, aggregate.network_distribution);
+  encodeDeviceDistribution(params, aggregate.device_distribution);
+
+  // Per-tier vitals + coverage
+  encodeVitals(params, aggregate.vitals);
+  encodeCoverage(params, aggregate.coverage);
+
+  // Race classification
   params.set('ct', aggregate.comparison_tier);
   params.set('rm', aggregate.race_metric);
   if (aggregate.race_fallback_reason) params.set('rr', aggregate.race_fallback_reason);
-  if (aggregate.coverage.selected_metric_urban_coverage != null) {
-    params.set('ruc', String(aggregate.coverage.selected_metric_urban_coverage));
-  }
-  if (aggregate.coverage.selected_metric_comparison_coverage != null) {
-    params.set('rcc', String(aggregate.coverage.selected_metric_comparison_coverage));
-  }
-  if (aggregate.experience_funnel) {
-    encodeExperienceFunnel(params, aggregate.experience_funnel);
-  }
-  if (aggregate.device_hardware) {
-    encodeDeviceHardware(params, aggregate.device_hardware);
-  }
-  if (aggregate.network_signals) {
-    encodeNetworkSignals(params, aggregate.network_signals);
-  }
-  if (aggregate.environment) {
-    encodeEnvironment(params, aggregate.environment);
-  }
-  if (aggregate.form_factor_distribution) {
-    params.set(
-      'ff',
-      joinInts([
-        aggregate.form_factor_distribution.mobile,
-        aggregate.form_factor_distribution.tablet,
-        aggregate.form_factor_distribution.desktop
-      ])
-    );
-  }
+
+  // Additive optional blocks
+  if (aggregate.experience_funnel) encodeExperienceFunnel(params, aggregate.experience_funnel);
+  if (aggregate.device_hardware) encodeDeviceHardware(params, aggregate.device_hardware);
+  if (aggregate.network_signals) encodeNetworkSignals(params, aggregate.network_signals);
+  if (aggregate.environment) encodeEnvironment(params, aggregate.environment);
+  if (aggregate.form_factor_distribution) encodeFormFactor(params, aggregate.form_factor_distribution);
   if (aggregate.lcp_story) encodeLcpStory(params, aggregate.lcp_story);
   if (aggregate.inp_story) encodeInpStory(params, aggregate.inp_story);
   if (aggregate.third_party_story) encodeThirdPartyStory(params, aggregate.third_party_story);
   if (aggregate.loaf_story) encodeLoafStory(params, aggregate.loaf_story);
   if (aggregate.context_story) encodeContextStory(params, aggregate.context_story);
-  // Denominator bookkeeping. Emit only when present so older aggregates
-  // (without raw / excluded counts) round-trip unchanged.
-  if (aggregate.coverage.raw_sample_size != null) {
-    params.set('rs', String(aggregate.coverage.raw_sample_size));
-  }
-  if (aggregate.coverage.excluded_background_sessions != null) {
-    params.set('xb', String(aggregate.coverage.excluded_background_sessions));
-  }
+
   if (aggregate.top_page_path) params.set('v', aggregate.top_page_path);
-  params.set('ga', String(aggregate.generated_at));
+
   return params;
 }
 
@@ -538,47 +605,43 @@ function readOptionalExperienceFunnel(params: URLSearchParams): SignalExperience
 
 function readOptionalDeviceHardware(params: URLSearchParams): SignalDeviceHardware | undefined {
   if (params.get('dhc') == null) return undefined;
-  const cores = parseInts(params.get('dhc'), 6);
-  const memory = parseInts(params.get('dhm'), 6);
+  // `parseInts` validates length === 6 and finiteness — destructure
+  // exhaustively instead of indexing with `?? 0` defaults that can
+  // never fire.
+  const [c1, c2, c4, c6, c8, c12] = parseInts(params.get('dhc'), 6) as [number, number, number, number, number, number];
+  const [m05, m1, m2, m4, m8, mUnknown] = parseInts(params.get('dhm'), 6) as [
+    number,
+    number,
+    number,
+    number,
+    number,
+    number
+  ];
   return {
-    cores_hist: {
-      '1': cores[0] ?? 0,
-      '2': cores[1] ?? 0,
-      '4': cores[2] ?? 0,
-      '6': cores[3] ?? 0,
-      '8': cores[4] ?? 0,
-      '12_plus': cores[5] ?? 0
-    },
-    memory_gb_hist: {
-      '0_5': memory[0] ?? 0,
-      '1': memory[1] ?? 0,
-      '2': memory[2] ?? 0,
-      '4': memory[3] ?? 0,
-      '8_plus': memory[4] ?? 0,
-      unknown: memory[5] ?? 0
-    },
+    cores_hist: { '1': c1, '2': c2, '4': c4, '6': c6, '8': c8, '12_plus': c12 },
+    memory_gb_hist: { '0_5': m05, '1': m1, '2': m2, '4': m4, '8_plus': m8, unknown: mUnknown },
     memory_coverage: readNumberParam(params, 'dhv')
   };
 }
 
 function readOptionalNetworkSignals(params: URLSearchParams): SignalNetworkSignals | undefined {
   if (params.get('nse') == null) return undefined;
-  const effective = parseInts(params.get('nse'), 5);
-  const downlinkRaw = parseDecimals(params.get('nsl'), 3);
+  const [eSlow2g, e2g, e3g, e4g, eUnknown] = parseInts(params.get('nse'), 5) as [
+    number,
+    number,
+    number,
+    number,
+    number
+  ];
+  const downlinkRaw = parseDecimals(params.get('nsl'), 3) as [number, number, number] | null;
   const nsrValue = params.get('nsr');
-  const rttRaw = nsrValue == null || nsrValue === '' ? null : parseInts(nsrValue, 3);
+  const rttRaw = nsrValue == null || nsrValue === '' ? null : (parseInts(nsrValue, 3) as [number, number, number]);
   const downlink: SignalQuartiles | null = downlinkRaw
-    ? { p25: downlinkRaw[0] ?? 0, p50: downlinkRaw[1] ?? 0, p75: downlinkRaw[2] ?? 0 }
+    ? { p25: downlinkRaw[0], p50: downlinkRaw[1], p75: downlinkRaw[2] }
     : null;
-  const rtt: SignalQuartiles | null = rttRaw ? { p25: rttRaw[0] ?? 0, p50: rttRaw[1] ?? 0, p75: rttRaw[2] ?? 0 } : null;
+  const rtt: SignalQuartiles | null = rttRaw ? { p25: rttRaw[0], p50: rttRaw[1], p75: rttRaw[2] } : null;
   return {
-    effective_type_hist: {
-      slow_2g: effective[0] ?? 0,
-      '2g': effective[1] ?? 0,
-      '3g': effective[2] ?? 0,
-      '4g': effective[3] ?? 0,
-      unknown: effective[4] ?? 0
-    },
+    effective_type_hist: { slow_2g: eSlow2g, '2g': e2g, '3g': e3g, '4g': e4g, unknown: eUnknown },
     effective_type_coverage: readNumberParam(params, 'nsv'),
     save_data_share: readNumberParam(params, 'nsd'),
     downlink_mbps: downlink,
@@ -588,16 +651,14 @@ function readOptionalNetworkSignals(params: URLSearchParams): SignalNetworkSigna
 
 function readOptionalEnvironment(params: URLSearchParams): SignalEnvironment | undefined {
   if (params.get('eb') == null) return undefined;
-  const browsers = parseInts(params.get('eb'), 5);
-  return {
-    browser_hist: {
-      chrome: browsers[0] ?? 0,
-      safari: browsers[1] ?? 0,
-      firefox: browsers[2] ?? 0,
-      edge: browsers[3] ?? 0,
-      other: browsers[4] ?? 0
-    }
-  };
+  const [chrome, safari, firefox, edge, other] = parseInts(params.get('eb'), 5) as [
+    number,
+    number,
+    number,
+    number,
+    number
+  ];
+  return { browser_hist: { chrome, safari, firefox, edge, other } };
 }
 
 function readOptionalLcpStory(params: URLSearchParams): SignalLcpStory | undefined {
@@ -742,29 +803,26 @@ function readOptionalContextStory(params: URLSearchParams): SignalContextStory |
 
 function readOptionalFormFactor(params: URLSearchParams): SignalFormFactorDistribution | undefined {
   if (params.get('ff') == null) return undefined;
-  const shares = parseInts(params.get('ff'), 3);
-  return {
-    mobile: shares[0] ?? 0,
-    tablet: shares[1] ?? 0,
-    desktop: shares[2] ?? 0
-  };
+  const [mobile, tablet, desktop] = parseInts(params.get('ff'), 3) as [number, number, number];
+  return { mobile, tablet, desktop };
 }
 
 export function decodeSignalReportUrl(value: string | URL): SignalAggregateV1 {
   const url = typeof value === 'string' ? new URL(value) : value;
   const params = url.searchParams;
-  const network = parseInts(params.get('nt'), 5);
-  const devices = parseInts(params.get('dt'), 3);
 
+  // Required scalars
   const sampleSize = readRequiredNumberParam(params, 's');
   const networkCoverage = readRequiredNumberParam(params, 'nc');
   const periodDays = readRequiredNumberParam(params, 'p');
 
+  // Race classification (closed enums)
   const comparisonTier = readEnumParam(params, 'ct', VALID_COMPARISON_TIERS, 'none');
   const raceMetric = readEnumParam(params, 'rm', VALID_RACE_METRICS, 'none');
   const raceFallbackReason = readOptionalEnumParam(params, 'rr', VALID_RACE_FALLBACK_REASONS);
 
-  // Semantic validation
+  // Semantic validation — short-circuit before assembling the rest of the
+  // object so error messages name the original cause.
   if (sampleSize < 0) throw new Error('Invalid report URL: sample size cannot be negative.');
   if (periodDays < 0) throw new Error('Invalid report URL: period days cannot be negative.');
   if (raceMetric !== 'none' && comparisonTier === 'none') {
@@ -774,13 +832,11 @@ export function decodeSignalReportUrl(value: string | URL): SignalAggregateV1 {
     throw new Error('Invalid report URL: primary LCP race should not have a fallback reason.');
   }
 
+  // Freshness + warnings derivation
   const gaRaw = params.get('ga');
   const generatedAt = gaRaw != null ? readRequiredNumberParam(params, 'ga') : 0;
-  const warnings = deriveSignalAggregateWarnings({
-    mode: params.get('mode') === 'production' ? 'production' : 'preview',
-    sample_size: sampleSize,
-    race_metric: raceMetric
-  });
+  const mode: SignalAggregateV1['mode'] = params.get('mode') === 'production' ? 'production' : 'preview';
+  const warnings = deriveSignalAggregateWarnings({ mode, sample_size: sampleSize, race_metric: raceMetric });
   if (!generatedAt) {
     warnings.push(SIGNAL_FRESHNESS_UNKNOWN_WARNING);
   }
@@ -788,63 +844,19 @@ export function decodeSignalReportUrl(value: string | URL): SignalAggregateV1 {
   const aggregate: SignalAggregateV1 = {
     v: 1,
     rv: 1,
-    mode: params.get('mode') === 'production' ? 'production' : 'preview',
+    mode,
     generated_at: generatedAt || Date.now(),
     domain: params.get('d') ?? 'unknown.local',
     sample_size: sampleSize,
     classified_sample_size: Math.round((sampleSize * networkCoverage) / 100),
     period_days: periodDays,
-    network_distribution: {
-      urban: network[0] ?? 0,
-      moderate: network[1] ?? 0,
-      constrained_moderate: network[2] ?? 0,
-      constrained: network[3] ?? 0,
-      unknown: network[4] ?? 0
-    },
-    device_distribution: {
-      low: devices[0] ?? 0,
-      mid: devices[1] ?? 0,
-      high: devices[2] ?? 0
-    },
+    network_distribution: decodeNetworkDistribution(params),
+    device_distribution: decodeDeviceDistribution(params),
     comparison_tier: comparisonTier,
     race_metric: raceMetric,
     race_fallback_reason: raceFallbackReason,
-    coverage: {
-      network_coverage: networkCoverage,
-      unclassified_network_share: readNumberParam(params, 'nu'),
-      connection_reuse_share: readNumberParam(params, 'nr'),
-      lcp_coverage: readNumberParam(params, 'lc'),
-      selected_metric_urban_coverage: params.get('ruc') == null ? null : readNumberParam(params, 'ruc'),
-      selected_metric_comparison_coverage: params.get('rcc') == null ? null : readNumberParam(params, 'rcc'),
-      ...(params.get('rs') == null ? {} : { raw_sample_size: readNumberParam(params, 'rs') }),
-      ...(params.get('xb') == null ? {} : { excluded_background_sessions: readNumberParam(params, 'xb') })
-    },
-    vitals: {
-      urban: toMetricSummary({
-        observations: 0,
-        lcp_observations: 0,
-        fcp_observations: 0,
-        ttfb_observations: 0,
-        lcp_ms: readNumberParam(params, 'lu') || null,
-        fcp_ms: readNumberParam(params, 'fu') || null,
-        ttfb_ms: readNumberParam(params, 'tu') || null,
-        lcp_coverage: readNumberParam(params, 'ulc'),
-        fcp_coverage: readNumberParam(params, 'ufc'),
-        ttfb_coverage: readNumberParam(params, 'utc')
-      }),
-      comparison: toMetricSummary({
-        observations: 0,
-        lcp_observations: 0,
-        fcp_observations: 0,
-        ttfb_observations: 0,
-        lcp_ms: readNumberParam(params, 'lt') || null,
-        fcp_ms: readNumberParam(params, 'ft') || null,
-        ttfb_ms: readNumberParam(params, 'tt') || null,
-        lcp_coverage: readNumberParam(params, 'clc'),
-        fcp_coverage: readNumberParam(params, 'cfc'),
-        ttfb_coverage: readNumberParam(params, 'ctc')
-      })
-    },
+    coverage: decodeCoverage(params, networkCoverage),
+    vitals: decodeVitals(params),
     experience_funnel: readOptionalExperienceFunnel(params),
     device_hardware: readOptionalDeviceHardware(params),
     network_signals: readOptionalNetworkSignals(params),
