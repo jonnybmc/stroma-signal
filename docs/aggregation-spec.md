@@ -29,7 +29,7 @@ For the canonical production artifact generated from the provided warehouse SQL,
 - additive `form_factor_distribution` (mobile / tablet / desktop shares) derived from `device_screen_w`
 - report version `rv=1`
 
-## Actionable Signal Blocks (Iteration 6)
+## Actionable Signal Blocks
 
 The aggregator preserves histograms and quartiles of the signals the SDK already captures per session. Every field has to pass the usefulness filter — it must unlock a concrete product-team decision, not duplicate data the team already has from GA / APM, and not be derivable at runtime. "Because we can" is not a reason.
 
@@ -88,7 +88,7 @@ If a future iteration wants to add any of these back, it must first name the con
 
 All three blocks are additive. `rv=1` URLs without these blocks decode cleanly and return `undefined` for the missing fields — the report surfaces the fields only when they are present.
 
-## Background-Tab Visibility Filter (PR-6)
+## Background-Tab Visibility Filter
 
 Events where `context.visibility_hidden_at_load === true` are pre-filtered before any accumulator runs. Background-tab loads produce non-user-facing vitals (deprioritized throttling, long `hidden → visible` gaps, missing LCP) that would drag every percentile and share downward if included.
 
@@ -101,15 +101,15 @@ Invariant (asserted at aggregation time): `raw_sample_size === sample_size + exc
 
 When `excluded_background_sessions > 0`, the report credibility strip appends a transparent segment (e.g. *"· 187 background-tab loads excluded"*). When zero, silence is the correct signal — no segment is rendered.
 
-## Marginal-Coverage Warning (PR-6)
+## Marginal-Coverage Warning
 
 When the LCP cohort lands within a small margin of the ship thresholds — `SIGNAL_COVERAGE_MARGINAL_THRESHOLD_PCT = 10` (i.e. 50% ≤ `lcp_coverage` < 60%) or `SIGNAL_COVERAGE_MARGINAL_THRESHOLD_OBS = 10` (i.e. 25 ≤ `lcp_observations` < 35) — aggregation appends a `coverage_marginal` warning. The report credibility strip renders *"coverage at the defensible edge"* so readers can temper their read rather than being handed a falsely confident narrative. Pure additive signal — no aggregate math changes.
 
-## Save-Data Narration Threshold (PR-6)
+## Save-Data Narration Threshold
 
 `SIGNAL_SAVE_DATA_NARRATE_THRESHOLD_PCT = 1` controls when the Data Saver line is rendered in Act 1. Shares below 1% round to 0% and the line is omitted entirely — zero users on Data Saver is not an interesting story. The constant lives in `packages/signal-contracts/src/types.ts` and is imported wherever the narration gate applies.
 
-## Report URL Byte Budget (PR-6)
+## Report URL Byte Budget
 
 `encodeSignalReportUrl` asserts the encoded URL size to prevent silent transport failures:
 
@@ -118,11 +118,11 @@ When the LCP cohort lands within a small margin of the ship thresholds — `SIGN
 
 Size is measured via `TextEncoder` (browser) or `Buffer.byteLength` (Node) for UTF-8 byte accuracy. The budget exists because enriching the aggregate with many optional story blocks could push structurally-valid payloads past common URL-length limits.
 
-## LoAF Story (PR-7)
+## LoAF Story
 
 Chromium 123+ emits `PerformanceObserver` entries of type `long-animation-frame`. Each frame carries a `duration`, `scripts[]` with per-script timing and `sourceURL`, `styleAndLayoutDuration`, `forcedStyleAndLayoutDuration`, and a `renderStart` boundary. Signal retains only the **worst-duration frame per session** (running max) — unbounded accumulation would be a memory regression on janky pages. The stored event carries `vitals.loaf = { worst_duration_ms, dominant_cause, script_origin_count }`.
 
-`dominant_cause` is the argmax across four substages derived per §2.5 of the 0.1.x plan:
+`dominant_cause` is the argmax across four substages:
 
 - `script_time = Σ scripts[].duration`
 - `layout_time = styleAndLayoutDuration − forcedStyleAndLayoutDuration`

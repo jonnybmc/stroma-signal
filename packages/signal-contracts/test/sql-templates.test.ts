@@ -407,4 +407,48 @@ describe('bigquery sql templates', () => {
       expect(templateFieldNames.has(fieldName)).toBe(false);
     }
   });
+
+  it('keeps the GA4-safe field list in public-api-v0.1.md aligned with flattenSignalEventForGa4()', () => {
+    const doc = fs.readFileSync(path.join(docsDir, 'public-api-v0.1.md'), 'utf8');
+    // Slice between "### GA4-safe subset" and the next blank line followed by
+    // a non-bullet paragraph (the explanatory line after the bullet list).
+    const start = doc.indexOf('### GA4-safe subset');
+    if (start === -1) {
+      throw new Error('Expected "### GA4-safe subset" heading in public-api-v0.1.md');
+    }
+    const after = doc.slice(start);
+    // Bullet block is contiguous lines starting with `- \``. Stop at the
+    // first non-bullet, non-blank line.
+    const lines = after.split('\n');
+    const bullets: string[] = [];
+    let inBlock = false;
+    for (const line of lines) {
+      const match = line.match(/^- `([a-z_]+)`$/);
+      if (match) {
+        bullets.push(match[1]);
+        inBlock = true;
+      } else if (inBlock && line.trim() !== '') {
+        break;
+      }
+    }
+    expect(bullets.sort()).toEqual(ga4SafeFieldNames);
+  });
+
+  it('keeps the GA4-safe field list in signal-technical-reference.md aligned with flattenSignalEventForGa4()', () => {
+    const doc = fs.readFileSync(path.join(docsDir, 'signal-technical-reference.md'), 'utf8');
+    // The doc lists fields inline as backticked names. Restrict to the
+    // single sentence that opens "The GA4 compact subset includes ... fields:".
+    const match = doc.match(/The GA4 compact subset includes \d+ fields: ([^.]+\.)/);
+    if (!match) {
+      throw new Error('Expected "The GA4 compact subset includes N fields:" sentence in signal-technical-reference.md');
+    }
+    // Strip the trailing "plus the `event` name itself for 25 total" clause —
+    // `event` is the event_name, not a field in the safe-field map.
+    const fieldList = [...match[1].matchAll(/`([a-z_]+)`/g)]
+      .map((m) => m[1])
+      .filter((name) => name !== 'event')
+      .sort();
+
+    expect(fieldList).toEqual(ga4SafeFieldNames);
+  });
 });

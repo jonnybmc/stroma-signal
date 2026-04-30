@@ -146,6 +146,7 @@ The GTM / GA4 path emits this compact report-and-debug subset:
 - `net_tcp_ms`
 - `net_tcp_source`
 - `device_tier`
+- `device_screen_w`
 - `lcp_ms`
 - `fcp_ms`
 - `ttfb_ms`
@@ -163,9 +164,7 @@ The GTM / GA4 path emits this compact report-and-debug subset:
 - `inp_dominant_phase`
 - `third_party_weight_tier`
 
-These fields stay under the standard GA4 event parameter cap and are enough for the provided GTM recipe, GA4 BigQuery validation, and URL-builder SQL.
-
-> **Deprecated in 0.1.x:** the legacy `nav_type` GA4 parameter has been removed. Use `navigation_type` (identical semantics, wider browser coverage).
+24 user-defined parameters plus the `event` name = exactly 25, sitting at GA4's per-event custom-parameter cap. Enough for the GTM recipe, the BigQuery validation query, and the URL-builder query.
 
 These fields are commonly useful in GA4 custom definitions:
 
@@ -223,7 +222,7 @@ The additive report-layer change lives in `SignalAggregateV1`, which now include
 
 `SignalAggregateV1` also carries an additive optional `form_factor_distribution` field (mobile / tablet / desktop shares) derived from the `device_screen_w` event field at aggregation time. Emitted by both GA4 and normalized SQL paths as the `ff=` URL param. Backward-compatible: legacy decoded URLs without `ff=` leave the field undefined.
 
-The GA4-compact safe-field subset includes `device_screen_w` — the feature that unlocks `form_factor_distribution` on the GA4 path. Total safe-field count is 21, well under GA4's 25-custom-parameter-per-event cap.
+The GA4-compact safe-field subset includes `device_screen_w` — the field that unlocks `form_factor_distribution` on the GA4 path. The full subset is 24 user-defined parameters plus the `event` name, sitting exactly at GA4's 25-custom-parameter-per-event cap.
 
 The Tier Report uses this additive report contract to show:
 
