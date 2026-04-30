@@ -1307,18 +1307,16 @@ function buildAct4ImpactRows(
 }
 
 function buildOfferCards(): Array<{ title: string; body: string; href: string; cta: string }> {
+  // Single optional CTA. The report is a complete artifact — a team should be
+  // able to take it into a sprint review and act on it without engaging
+  // Stroma for help. This card exists for the teams that prefer hands-on
+  // execution support, not as a gate on the report's usefulness.
   return [
     {
       title: 'Rapid Fix Plan',
-      body: 'Trace the proven gap to the landing pages and routes causing the most drag, and get the sequenced fixes that close it fastest.',
+      body: 'Optional: if you want hands-on help executing on the gap, the Rapid Fix Plan traces it to the landing pages and routes causing the most drag and returns a sequenced fix order.',
       href: 'https://www.stroma.design/rapid-fix-plan',
       cta: 'Commission a plan'
-    },
-    {
-      title: 'Performance Intelligence',
-      body: 'Join measured user, device, and network conditions to GA4, Google Ads, Search Console, and warehouse context — see which campaigns, landing pages, and audience segments are most exposed.',
-      href: 'https://www.stroma.design/performance-intelligence',
-      cta: 'Explore the service'
     }
   ];
 }

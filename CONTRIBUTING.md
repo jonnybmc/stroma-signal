@@ -2,18 +2,36 @@
 
 Thanks for your interest in contributing! This guide covers the basics.
 
+## Public/private boundary
+
+Stroma maintains a private companion repository (mounted in this repo as a git submodule at `internal/`) for work that is not yet public. **You do not need access to that submodule to contribute to Signal.** Without the submodule mounted, the public workspace builds the SDK, contracts, `/r`, and `/build` cleanly and the full free-tier test suite passes. Public code is forbidden from importing `@stroma-labs/signal-pi` (the private workspace member); `scripts/check-boundaries.mjs` enforces the rule on every CI run.
+
+Files matching `pi-*.ts`, `pi-*.html`, or `pi-*.md` must not be committed to the public tree under any path other than `internal/`. The boundary script hard-fails CI on violations.
+
 ## Getting Started
+
+Standard contributor flow (no submodule access required):
 
 ```bash
 git clone https://github.com/jonnybmc/stroma-signal.git
 cd stroma-signal
-pnpm install
+pnpm install --no-frozen-lockfile  # tolerates the federated lockfile entries
 pnpm test:unit
 pnpm build
 ```
 
+If you have submodule access (Stroma maintainers only):
+
+```bash
+git submodule update --init --recursive
+pnpm install                       # respects the federated lockfile
+pnpm test:unit                     # full test suite, federated workspace
+```
+
 Requires Node >= 22 and pnpm 10.28+.
 The monorepo uses Node 22 for contributors and release automation, while the published `@stroma-labs/signal` package intentionally keeps consumer support at Node >= 18.
+
+The lockfile (`pnpm-lock.yaml`) currently reflects the federated state. Public contributors pass `--no-frozen-lockfile` to `pnpm install` to tolerate the missing submodule workspace entries. Tracked as a known papercut.
 
 ## Development
 

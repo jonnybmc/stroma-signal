@@ -57,4 +57,49 @@ if (packageJson.dependencies && Object.keys(packageJson.dependencies).length > 0
   throw new Error('packages/signal/package.json must not declare runtime dependencies.');
 }
 
+// Public/private boundary: public-tree surfaces must not import the
+// `@stroma-labs/signal-pi` package, which is a private workspace member
+// that lives outside the public source tree. This guard is the defensive
+// backstop so a stray import does not pull private code into a public
+// build artifact.
+const FREE_TIER_ROOTS = ['packages/signal/src', 'packages/signal-contracts/src', 'apps/signal-spike-lab/src'];
+const PI_IMPORT_PATTERNS = [
+  /from\s+['"]@stroma-labs\/signal-pi(?:['"/])/,
+  /from\s+['"][^'"]*\/signal-pi\//,
+  /import\s+['"]@stroma-labs\/signal-pi(?:['"/])/
+];
+for (const relRoot of FREE_TIER_ROOTS) {
+  const absRoot = path.join(root, relRoot);
+  const tierFiles = await readAllFiles(absRoot);
+  for (const file of tierFiles) {
+    if (!file.endsWith('.ts') && !file.endsWith('.mjs')) continue;
+    const content = await readFile(file, 'utf8');
+    assertNoMatch(
+      content,
+      PI_IMPORT_PATTERNS,
+      file,
+      'Public-tree surfaces must not import @stroma-labs/signal-pi (private companion package, lives outside the public source tree)'
+    );
+  }
+}
+
+// Same boundary at the package.json level — no free-tier package may
+// declare a dependency on @stroma-labs/signal-pi.
+const FREE_TIER_PACKAGE_JSONS = [
+  'packages/signal/package.json',
+  'packages/signal-contracts/package.json',
+  'apps/signal-spike-lab/package.json'
+];
+for (const rel of FREE_TIER_PACKAGE_JSONS) {
+  const pkg = JSON.parse(await readFile(path.join(root, rel), 'utf8'));
+  for (const block of ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies']) {
+    const deps = pkg[block];
+    if (deps && Object.hasOwn(deps, '@stroma-labs/signal-pi')) {
+      throw new Error(
+        `${rel} must not declare ${block}["@stroma-labs/signal-pi"] (private companion package, lives outside the public source tree).`
+      );
+    }
+  }
+}
+
 console.log('Import boundaries and runtime dependency policy passed.');

@@ -5,7 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.1.0] - Unreleased
+Pre-release identifiers (e.g. `-rc.N`) are published to the npm `next`
+dist-tag. The `latest` dist-tag is reserved for stable releases. To
+install a pre-release: `pnpm add @stroma-labs/signal@next` (or pin to
+the exact version, e.g. `@stroma-labs/signal@0.1.0-rc.1`).
+
+## [0.1.0-rc.1] - 2026-04-30
+
+First public release candidate. Published for pilot testing — feature-
+complete for the v0.1 scope, expected to graduate to `0.1.0` once
+warehouse-derived report URLs are validated against fixture semantics
+end-to-end on a live deployment.
 
 ### Added
 

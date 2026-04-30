@@ -211,6 +211,21 @@ export interface SignalEventV1 {
   vitals: SignalVitals;
   context: SignalContext;
   meta: SignalMeta;
+  // Optional identity / attribution fields. When populated by the host
+  // site or by an SDK extension, these enable warehouse-side joins
+  // between SignalEventV1 rows and other analytics or ad-platform data.
+  // All four are optional so events from sites that do not populate
+  // them round-trip through the contract unchanged.
+  //   ga_session_id          — GA4 session identifier (from `_ga_<id>`)
+  //   user_pseudo_id         — GA4 pseudonymous user identifier
+  //   gclid                  — Google Click ID, useful for ad joins
+  //   conversion_fingerprint — independent conversion event hash that
+  //                            does not depend on Meta Pixel, Google
+  //                            conversion tags, or ITP-gated cookies
+  ga_session_id?: string | null;
+  user_pseudo_id?: string | null;
+  gclid?: string | null;
+  conversion_fingerprint?: string | null;
 }
 
 export interface SignalWarehouseRowV1 {
@@ -264,6 +279,15 @@ export interface SignalWarehouseRowV1 {
   third_party_origin_count?: number | null;
   loaf_dominant_cause?: SignalLoafCause | null;
   context_visibility_hidden_at_load?: boolean | null;
+  // Identity layer columns (v6.2 PI planning). Optional so historical
+  // warehouse rows round-trip unchanged. SDK capture + ingest population
+  // is Phase 1 of PI work.
+  ga_session_id?: string | null;
+  user_pseudo_id?: string | null;
+  gclid?: string | null;
+  // Attribution-independent conversion fingerprint (v6.3). See mirror
+  // comment on SignalEventV1. Enables Signal-as-attribution-fact-checker.
+  conversion_fingerprint?: string | null;
 }
 
 export interface SignalTierDistribution {

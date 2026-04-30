@@ -22,13 +22,26 @@ jobs:
           cache: pnpm
           registry-url: https://registry.npmjs.org
       - run: pnpm install --frozen-lockfile
-      - run: pnpm ci
+      - run: pnpm run ci
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test:e2e:smoke
       - run: pnpm check:release
         env:
           RELEASE_PUBLISHED_AT: ${{ github.event.release.published_at }}
           RELEASE_TAG: ${{ github.event.release.tag_name }}
-      - run: pnpm --filter @stroma-labs/signal publish --provenance --access public --no-git-checks
+      - name: Resolve npm dist-tag from release type
+        id: npm_tag
+        # Pre-releases publish to the `next` dist-tag; stable releases
+        # publish to `latest`. The GitHub Release `prerelease` flag is
+        # the source of truth so the publish lane mirrors what was
+        # reviewed in the Release UI. A casual `pnpm add @stroma-labs/
+        # signal` always resolves to the latest stable, never to an RC.
+        run: |
+          if [[ "${{ github.event.release.prerelease }}" == "true" ]]; then
+            echo "tag=next" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=latest" >> "$GITHUB_OUTPUT"
+          fi
+      - run: pnpm --filter @stroma-labs/signal publish --provenance --access public --no-git-checks --tag ${{ steps.npm_tag.outputs.tag }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

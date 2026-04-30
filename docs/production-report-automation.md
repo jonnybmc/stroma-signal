@@ -124,7 +124,7 @@ The final `signal_report_url` can be surfaced anywhere your team already works, 
 
 - a BigQuery result table
 - an internal dashboard or analyst workbook
-- a Looker Studio data source
+- a Data Studio data source
 - a Slack handoff or email workflow
 - a CMS or internal launch checklist field
 
