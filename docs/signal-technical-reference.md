@@ -61,6 +61,7 @@ These fields enrich the core vitals with diagnostic context when the browser sup
 | `lcp_attribution.target` | `string \| null` | Human-readable LCP element description. |
 | `lcp_attribution.element_type` | `'image' \| 'text' \| null` | LCP element category. |
 | `lcp_attribution.resource_url` | `string \| null` | Normalized resource URL (sanitized, no signed CDN URLs or sensitive query strings). |
+| `lcp_attribution.culprit_kind` | `'hero_image' \| 'headline_text' \| 'banner_image' \| 'product_image' \| 'video_poster' \| 'unknown' \| null` | Classifier label for the LCP element's editorial role. Null when classification falls through or `element_type` is null. |
 
 **INP attribution:**
 
@@ -73,6 +74,24 @@ These fields enrich the core vitals with diagnostic context when the browser sup
 | `inp_attribution.input_delay_ms` | `number \| null` | Time waiting before handler execution. Chromium-only. |
 | `inp_attribution.processing_duration_ms` | `number \| null` | Time in handler execution. Chromium-only. |
 | `inp_attribution.presentation_delay_ms` | `number \| null` | Time waiting for next paint. Chromium-only. |
+| `inp_attribution.dominant_phase` | `'input_delay' \| 'processing' \| 'presentation' \| null` | Argmax of the three substages with the `processing > input_delay > presentation` tiebreak. Null when all three source values are null. |
+
+**LCP subpart breakdown** (Chromium-only; null on Safari/Firefox or when any input is missing):
+
+| Field | Type | Description |
+|---|---|---|
+| `vitals.lcp_breakdown.resource_load_delay_ms` | `number \| null` | Time between TTFB and resource fetch start. |
+| `vitals.lcp_breakdown.resource_load_time_ms` | `number \| null` | Time spent fetching the LCP resource. |
+| `vitals.lcp_breakdown.element_render_delay_ms` | `number \| null` | Time between resource ready and the LCP element painting. |
+
+The breakdown is all-or-nothing: if any of the three inputs is missing (opaque cross-origin resource timing, etc.), the entire `lcp_breakdown` block is null. Partial breakdowns mislead aggregation, so we enforce all-or-nothing.
+
+**Third-party script weight** (Chromium-only; requires an LCP anchor):
+
+| Field | Type | Description |
+|---|---|---|
+| `vitals.third_party.pre_lcp_script_share_pct` | `number \| null` | Share of off-domain script weight loaded before LCP, expressed as a 0–100 percentage. |
+| `vitals.third_party.origin_count` | `number \| null` | Distinct off-domain script origins loaded before LCP. Hidden when below 3 for small-site privacy posture. |
 
 **LoAF attribution** (Chromium 123+; null elsewhere):
 
@@ -93,6 +112,7 @@ These signals are collected for cross-reference but do not feed tier classificat
 | `context.rtt_ms` | `number \| null` | Chromium-only | Estimated round-trip time. Smoothed. Often diverges from TCP connect time. |
 | `context.save_data` | `boolean \| null` | Chromium-only | Whether the user has requested reduced data usage. |
 | `context.connection_type` | `string \| null` | Chromium Android only | Physical connection type: wifi, cellular, ethernet. Very limited availability. |
+| `context.visibility_hidden_at_load` | `boolean \| undefined` | Universal | `true` when `document.visibilityState === 'hidden'` at event creation (backgrounded tab, prerendered navigation). Default report aggregation pre-filters rows where this is `true` so background loads do not poison percentiles. |
 
 ### Metadata
 
@@ -101,6 +121,19 @@ These signals are collected for cross-reference but do not feed tier classificat
 | `meta.pkg_version` | `string` | Signal package version. |
 | `meta.browser` | `string` | Browser family. |
 | `meta.navigation_type` | `'navigate' \| 'reload' \| 'back-forward' \| 'prerender' \| 'restore'` | Normalized navigation lifecycle classification. |
+
+### Optional warehouse-join fields
+
+These four fields are not captured by the SDK. They are opt-in extension hooks: when the host site or an SDK extension populates them on the event, they round-trip through the contract and into the warehouse row, enabling joins between Signal data and other analytics or ad-platform data.
+
+| Field | Type | Description |
+|---|---|---|
+| `ga_session_id` | `string \| null` | GA4 session identifier (typically read from the `_ga_<id>` cookie). |
+| `user_pseudo_id` | `string \| null` | GA4 pseudonymous user identifier. |
+| `gclid` | `string \| null` | Google Click ID, useful for ad-platform joins. |
+| `conversion_fingerprint` | `string \| null` | Independent conversion event hash that does not depend on Meta Pixel, Google conversion tags, or ITP-gated cookies. |
+
+These fields are absent on events from sites that do not populate them — the contract round-trips cleanly either way.
 
 ---
 
@@ -311,6 +344,7 @@ The Tier Report is not a diagnostic, attribution, or commercial modelling artifa
 | **Base** | `@stroma-labs/signal` | Tier classification, vitals capture, beacon and callback sinks | < 4 KB gzipped |
 | **GA4 helper** | `@stroma-labs/signal/ga4` | dataLayer sink, GA4 event formatting | ~0.5 KB |
 | **Report builder** | `@stroma-labs/signal/report` | In-memory aggregation, `getReportUrl()`, URL encoding | ~1 KB |
+| **Summary helpers** | `@stroma-labs/signal/summary` | `formatSignalSummary`, JSON / CSV exports for events and aggregates | ~0.8 KB |
 
 Tree-shaking ensures unused modules are excluded from production builds. A minimal installation importing only the base package stays under 4 KB.
 
