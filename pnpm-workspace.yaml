@@ -1,3 +1,9 @@
 packages:
   - packages/*
   - apps/*
+  # Private PI packages live in the sibling stromalab/stroma-signal-pi
+  # repository, mounted as a git submodule at `internal/`. When the
+  # submodule is not checked out, these globs simply match nothing and
+  # the public workspace builds free-tier-only.
+  - internal/packages/*
+  - internal/apps/*

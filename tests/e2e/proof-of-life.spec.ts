@@ -166,7 +166,7 @@ test('strong fixture renders the four-act report experience end to end', async (
   await expect(page.locator('.sr-act[data-act="2"]')).toContainText('How far apart are their experiences?');
   await expect(page.locator('.sr-act[data-act="3"]')).toContainText('Where does performance become poor?');
   await expect(page.locator('.sr-act[data-act="4"]')).toContainText('What this costs the business');
-  await expect(page.locator('.sr-act[data-act="4"]')).toContainText('Performance Intelligence');
+  await expect(page.locator('.sr-act[data-act="4"]')).toContainText('Take this into a wider conversation');
   await expect(page.locator('.sr-act[data-act="3"]')).toContainText('Interaction becomes ready');
 });
 

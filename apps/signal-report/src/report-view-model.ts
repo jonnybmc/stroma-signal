@@ -1315,10 +1315,10 @@ function buildOfferCards(): Array<{ title: string; body: string; href: string; c
       cta: 'Commission a plan'
     },
     {
-      title: 'Performance Intelligence',
-      body: 'Join measured user, device, and network conditions to GA4, Google Ads, Search Console, and warehouse context — see which campaigns, landing pages, and audience segments are most exposed.',
-      href: 'https://www.stroma.design/performance-intelligence',
-      cta: 'Explore the service'
+      title: 'Take this into a wider conversation',
+      body: 'Bring this measured user-experience evidence into a deeper diagnostic conversation. Stroma works with growth, paid-media, and product teams to turn the proven gap into commercial decisions.',
+      href: 'https://www.stroma.design/',
+      cta: 'Talk to Stroma'
     }
   ];
 }

@@ -2,18 +2,40 @@
 
 Thanks for your interest in contributing! This guide covers the basics.
 
+## Public/private boundary
+
+Stroma's paid Performance Intelligence layer (the `/pi` artifact) lives in a separate **private** repository at `stromalab/stroma-signal-pi` and is mounted in this repo as a git submodule at `internal/`. **You do not need access to the private submodule to develop the free tier.** Without the submodule mounted, the public workspace builds the SDK, contracts, /r, and /build cleanly. Free-tier code is forbidden from importing `@stroma-labs/signal-pi`; this is enforced by `scripts/check-boundaries.mjs` on every CI run.
+
+Files matching `pi-*.ts`, `pi-*.html`, or `pi-*.md` must not be committed to the public tree under any path other than `internal/`. The boundary script hard-fails CI on violations.
+
 ## Getting Started
+
+Without submodule access (free-tier development):
 
 ```bash
 git clone https://github.com/jonnybmc/stroma-signal.git
 cd stroma-signal
-pnpm install
-pnpm test:unit
+pnpm install --no-frozen-lockfile  # tolerates missing PI workspace deps
+pnpm test:unit                     # runs free-tier tests only
 pnpm build
+```
+
+With submodule access (Stroma maintainers + paid-product collaborators):
+
+```bash
+git clone https://github.com/jonnybmc/stroma-signal.git
+cd stroma-signal
+git submodule update --init --recursive
+pnpm install                       # respects the federated lockfile
+pnpm test:unit                     # runs all 506 tests across both tiers
+pnpm dev:report                                        # /r + /build on 4174
+pnpm --filter @stroma-labs/signal-report-pi-app dev    # /pi on 4175
 ```
 
 Requires Node >= 22 and pnpm 10.28+.
 The monorepo uses Node 22 for contributors and release automation, while the published `@stroma-labs/signal` package intentionally keeps consumer support at Node >= 18.
+
+The lockfile (`pnpm-lock.yaml`) reflects the federated state because it was last updated with the submodule mounted. Free-tier contributors should pass `--no-frozen-lockfile` to `pnpm install` until we split the lockfile. Tracked as a known papercut.
 
 ## Development
 

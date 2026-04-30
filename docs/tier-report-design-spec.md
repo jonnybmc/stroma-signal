@@ -22,7 +22,7 @@ It is the measured proof layer that sits between:
 
 - the browser instrumentation package
 - the warehouse and URL-builder workflow
-- deeper Stroma offers such as Rapid Fix Plan and Performance Intelligence
+- the broader Stroma engagement layer, where the proven gap is taken into commercial and remediation work
 
 ## Narrative Structure
 
@@ -94,10 +94,10 @@ Act 3 should still feel embodied. The visual and copy should communicate that se
 
 Act 4 is the handoff layer.
 
-The report should make two next steps obvious:
+The report should make the next step obvious:
 
 - `Rapid Fix Plan` = trace the proven gap to the landing pages and routes causing the most drag, and return the sequenced fixes that close it fastest
-- `Performance Intelligence` = join measured user, device, and network conditions to GA4, Google Ads, Search Console, and warehouse context to surface which campaigns, landing pages, and audience segments are most exposed
+- A second, generic engagement card invites the viewer to take the measured truth into a deeper diagnostic conversation with Stroma without naming or describing the downstream paid product
 
 The report does not give away those deeper layers for free. It proves the gap and hands off cleanly.
 
@@ -233,7 +233,7 @@ The free report is a proof artifact, not a consulting deliverable.
 The CTA language must preserve that:
 
 - Rapid Fix Plan pinpoints the landing pages and routes carrying the most drag and returns a sequenced fix order
-- Performance Intelligence joins measured user, device, and network conditions to GA4, Google Ads, Search Console, and warehouse context to surface exposed campaigns, landing pages, and audience segments
+- The second engagement card invites the viewer into a wider Stroma conversation about turning measured user-experience evidence into commercial decisions, without naming or describing the downstream paid product
 
 Benchmark or comparative extras, if present later, should remain tertiary.
 

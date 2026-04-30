@@ -20,6 +20,7 @@
     "noUnusedParameters": true,
     "paths": {
       "@stroma-labs/signal-contracts": ["packages/signal-contracts/src/index.ts"],
+      "@stroma-labs/signal-pi": ["internal/packages/signal-pi/src/index.ts"],
       "@stroma-labs/signal": ["packages/signal/src/index.ts"],
       "@stroma-labs/signal/ga4": ["packages/signal/src/ga4/index.ts"],
       "@stroma-labs/signal/report": ["packages/signal/src/report/index.ts"],
