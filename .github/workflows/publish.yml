@@ -43,5 +43,9 @@ jobs:
             echo "tag=latest" >> "$GITHUB_OUTPUT"
           fi
       - run: pnpm --filter @stroma-labs/signal publish --provenance --access public --no-git-checks --tag ${{ steps.npm_tag.outputs.tag }}
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        # No NODE_AUTH_TOKEN here. npm Trusted Publishing uses the
+        # GitHub OIDC token (enabled by `permissions: id-token: write`
+        # at the job level) to authenticate this workflow run against
+        # the trusted-publisher policy configured for @stroma-labs/signal
+        # at npmjs.com → settings → packages → trusted publishers.
+        # No long-lived NPM_TOKEN secret needs to exist.
