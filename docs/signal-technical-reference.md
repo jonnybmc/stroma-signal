@@ -352,6 +352,29 @@ Tree-shaking ensures unused modules are excluded from production builds. A minim
 
 ---
 
+## SDK Configuration
+
+`init(config)` accepts the following options. Required: `sinks`. Everything else is optional and defaults to production-safe behavior.
+
+| Option | Type | Default | Purpose |
+|---|---|---|---|
+| `sinks` | `SignalSink[]` | (required) | Where finalized events are dispatched. |
+| `sampleRate` | `number` (0–1) | `1` (always sample) | Probabilistic gate; `0` disables capture, `1` always captures. |
+| `networkTierThresholds` | `SignalNetworkTierThresholds` | `DEFAULT_NETWORK_THRESHOLDS` | Override the TCP-handshake band boundaries (urban / moderate / constrained_moderate). |
+| `deviceTierOverride` | `(cores, memory, screenWidth) => SignalDeviceTier` | composite scoring | Bypass the default classifier with a host-supplied function. |
+| `generateTarget` | `(element) => string \| null` | tag-name fallback | Custom safe-label generator for LCP / interaction targets. |
+| `firstPartyOriginsAllowlist` | `readonly string[]` | (none) | Extra origins to treat as first-party (CDN aliasing). |
+| `debug` | `boolean` | `false` | Emits `[signal] finalize` entries through the configured logger. |
+| `packageVersion` | `string` | `'0.1.0'` | Stamped on `meta.pkg_version`. |
+| `clock` | `() => number` | `Date.now` | Wall-clock factory. Inject for deterministic event timestamps. |
+| `random` | `() => number` | `Math.random` | Random factory in `[0, 1)`. Inject for deterministic sample-rate gating. |
+| `eventIdFactory` | `() => string` | `createEventId` (UUID with random fallback) | Inject for stable event ids in tests. |
+| `logger` | `SignalRuntimeLogger` | `console` | Routes runtime warnings + debug info. Implement `{ warn, info }` to forward into your own observability without monkeypatching the global console. |
+
+`destroy()` releases the singleton (live or sealed) so a subsequent `init()` spins up a fresh runtime. Safe to call when no runtime exists.
+
+---
+
 ## Local Development Tools
 
 The repository includes development harnesses that are not part of the published npm package:

@@ -234,6 +234,7 @@ const PUBLIC_EXPORTS: Record<string, ReadonlySet<string>> = {
     'SignalWarehouseRowV1',
     'SignalInitConfig',
     'SignalRuntimeController',
+    'SignalRuntimeLogger',
     'BeaconSinkOptions',
     'CallbackSinkOptions'
   ]),

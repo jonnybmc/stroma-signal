@@ -36,6 +36,8 @@ This is intentional. Soft navigation support is not first-class in v0.1. The per
 
 Signal stores its runtime under a `Symbol.for('stroma.signal.runtime')` global singleton. If `init()` is called more than once — by React Strict Mode, hot module replacement, or multiple entry points — the second call returns the existing controller without creating a new runtime.
 
+`destroy()` releases the singleton from both live and sampled-out runtimes, so a subsequent `init()` spins up a fresh controller. Use this in tests / micro-frontend tear-down — never in normal production code.
+
 You do not need:
 - A `useRef` guard
 - A `hasInitialised` flag

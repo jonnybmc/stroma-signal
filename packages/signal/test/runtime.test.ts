@@ -1,7 +1,7 @@
 import type { SignalSink } from '@stroma-labs/signal-contracts';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { transitionSignalLifecycle } from '../src/core/state-machine.js';
-import { destroy, init } from '../src/index.js';
+import { destroy, init, type SignalRuntimeLogger } from '../src/index.js';
 
 type Listener = {
   callback: (event: Event | PageTransitionEvent) => void;
@@ -435,5 +435,165 @@ describe('signal runtime integration', () => {
     expect(controller.isSampledOut()).toBe(true);
     expect(controller.getEventId()).toBe('sampled_out');
     expect(controller.getState()).toBe('sealed');
+  });
+
+  it('sealed-controller destroy() releases the singleton so the next init() spins up a live runtime', () => {
+    setupGlobals();
+
+    const sealed = init({ sinks: [createSink()], sampleRate: 0, packageVersion: 'test' });
+    expect(sealed.isSampledOut()).toBe(true);
+    sealed.destroy();
+
+    const live = init({ sinks: [createSink()], packageVersion: 'test' });
+    expect(live.isSampledOut()).toBe(false);
+    expect(live.getState()).toBe('observing');
+  });
+});
+
+describe('SignalInitConfig effect injection', () => {
+  it('uses the injected clock for event.ts (deterministic timestamp)', () => {
+    setupGlobals();
+    const sink = createSink();
+    const fixedNow = 1_700_000_000_000;
+
+    const controller = init({
+      sinks: [sink],
+      packageVersion: 'test',
+      clock: () => fixedNow
+    });
+    controller.flushNow();
+
+    expect(sink.handle).toHaveBeenCalledTimes(1);
+    expect(sink.handle.mock.calls[0]?.[0].ts).toBe(fixedNow);
+  });
+
+  it('uses the injected eventIdFactory for the initial event id', () => {
+    setupGlobals();
+    const sink = createSink();
+
+    const controller = init({
+      sinks: [sink],
+      packageVersion: 'test',
+      eventIdFactory: () => 'evt_test_fixed'
+    });
+    controller.flushNow();
+
+    expect(sink.handle).toHaveBeenCalledTimes(1);
+    expect(sink.handle.mock.calls[0]?.[0].event_id).toBe('evt_test_fixed');
+  });
+
+  it('uses the injected random for sample-rate gating — high random forces sample-out', () => {
+    setupGlobals();
+    const sink = createSink();
+
+    const controller = init({
+      sinks: [sink],
+      sampleRate: 0.5,
+      packageVersion: 'test',
+      random: () => 0.9
+    });
+
+    expect(controller.isSampledOut()).toBe(true);
+    controller.flushNow();
+    expect(sink.handle).not.toHaveBeenCalled();
+  });
+
+  it('uses the injected random for sample-rate gating — low random forces sample-in', () => {
+    setupGlobals();
+    const sink = createSink();
+
+    const controller = init({
+      sinks: [sink],
+      sampleRate: 0.5,
+      packageVersion: 'test',
+      random: () => 0.1
+    });
+
+    expect(controller.isSampledOut()).toBe(false);
+    controller.flushNow();
+    expect(sink.handle).toHaveBeenCalledTimes(1);
+  });
+
+  it('routes sink failures through the injected logger.warn instead of console.warn', () => {
+    setupGlobals();
+    const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const warn = vi.fn();
+    const info = vi.fn();
+    const logger: SignalRuntimeLogger = { warn, info };
+
+    const failingSink: SignalSink = {
+      id: 'broken',
+      handle: vi.fn(() => {
+        throw new Error('boom');
+      })
+    };
+
+    const controller = init({ sinks: [failingSink], packageVersion: 'test', logger });
+    controller.flushNow();
+
+    expect(warn).toHaveBeenCalled();
+    expect(warn.mock.calls[0]?.[0]).toBe('[signal] sink failed');
+    expect(warn.mock.calls[0]?.[1]).toBe('broken');
+    expect(consoleWarn).not.toHaveBeenCalled();
+
+    consoleWarn.mockRestore();
+  });
+
+  it('routes debug-mode finalize info through the injected logger.info', () => {
+    setupGlobals();
+    const consoleInfo = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+    const warn = vi.fn();
+    const info = vi.fn();
+    const logger: SignalRuntimeLogger = { warn, info };
+
+    const controller = init({
+      sinks: [createSink()],
+      packageVersion: 'test',
+      debug: true,
+      logger
+    });
+    controller.flushNow();
+
+    expect(info).toHaveBeenCalled();
+    expect(info.mock.calls[0]?.[0]).toBe('[signal] finalize');
+    expect(consoleInfo).not.toHaveBeenCalled();
+
+    consoleInfo.mockRestore();
+  });
+
+  it('defaults to console.warn when no logger is supplied', () => {
+    setupGlobals();
+    const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    const failingSink: SignalSink = {
+      id: 'broken-default',
+      handle: vi.fn(() => {
+        throw new Error('boom');
+      })
+    };
+
+    const controller = init({ sinks: [failingSink], packageVersion: 'test' });
+    controller.flushNow();
+
+    expect(consoleWarn).toHaveBeenCalled();
+    consoleWarn.mockRestore();
+  });
+
+  it('combined injection — fully deterministic event under fixed clock + eventIdFactory', () => {
+    setupGlobals();
+    const fixedClock = (): number => 1_700_000_000_000;
+    const fixedId = (): string => 'evt_deterministic';
+
+    const sinkA = createSink();
+    init({ sinks: [sinkA], packageVersion: 'test', clock: fixedClock, eventIdFactory: fixedId }).flushNow();
+    destroy();
+
+    const sinkB = createSink();
+    init({ sinks: [sinkB], packageVersion: 'test', clock: fixedClock, eventIdFactory: fixedId }).flushNow();
+
+    const eventA = sinkA.handle.mock.calls[0]?.[0];
+    const eventB = sinkB.handle.mock.calls[0]?.[0];
+    expect(eventA?.ts).toBe(eventB?.ts);
+    expect(eventA?.event_id).toBe(eventB?.event_id);
   });
 });
