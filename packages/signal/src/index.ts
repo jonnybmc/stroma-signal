@@ -24,7 +24,7 @@ export {
   SIGNAL_PREVIEW_MINIMUM_SAMPLE,
   SIGNAL_REPORT_BASE_URL
 } from '@stroma-labs/signal-contracts';
-export type { SignalInitConfig, SignalRuntimeController } from './core/runtime.js';
+export type { SignalInitConfig, SignalRuntimeController, SignalRuntimeLogger } from './core/runtime.js';
 export { destroy, init } from './core/runtime.js';
 export type { BeaconSinkOptions } from './sinks/beacon.js';
 export { createBeaconSink } from './sinks/beacon.js';

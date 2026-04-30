@@ -24,6 +24,11 @@ const EMPTY_VITALS = {
   ttfb_ms: null
 } satisfies SignalEventV1['vitals'];
 
+export interface SignalRuntimeLogger {
+  warn(...args: unknown[]): void;
+  info(...args: unknown[]): void;
+}
+
 export interface SignalInitConfig {
   sinks: SignalSink[];
   sampleRate?: number;
@@ -35,6 +40,15 @@ export interface SignalInitConfig {
   firstPartyOriginsAllowlist?: readonly string[];
   debug?: boolean;
   packageVersion?: string;
+  // Effect injection points. All optional; defaults preserve current
+  // production behavior. Inject in tests / wrappers to make event
+  // timestamps, ids, and sampling deterministic, and to route runtime
+  // warnings into your own observability without monkeypatching the
+  // global console.
+  clock?: () => number;
+  random?: () => number;
+  eventIdFactory?: () => string;
+  logger?: SignalRuntimeLogger;
 }
 
 export interface SignalRuntimeController {
@@ -70,14 +84,14 @@ function readReferrer(): string | null {
   }
 }
 
-function emitToSinks(sinks: SignalSink[], event: SignalEventV1): void {
+function emitToSinks(sinks: SignalSink[], event: SignalEventV1, logger: SignalRuntimeLogger): void {
   for (const sink of sinks) {
     try {
       Promise.resolve(sink.handle(event)).catch((error) => {
-        console.warn('[signal] sink failed', sink.id, error);
+        logger.warn('[signal] sink failed', sink.id, error);
       });
     } catch (error) {
-      console.warn('[signal] sink failed', sink.id, error);
+      logger.warn('[signal] sink failed', sink.id, error);
     }
   }
 }
@@ -128,8 +142,11 @@ function createLoadScopedNetwork(
 }
 
 function createRuntime(config: SignalInitConfig): RuntimeInternals {
+  const clock = config.clock ?? Date.now;
+  const eventIdFactory = config.eventIdFactory ?? createEventId;
+  const logger: SignalRuntimeLogger = config.logger ?? console;
   let state: SignalLifecycleState = 'booting';
-  let eventId = createEventId();
+  let eventId = eventIdFactory();
   const startedPrerendered = Boolean(
     (globalThis.document as (Document & { prerendering?: boolean }) | undefined)?.prerendering
   );
@@ -148,7 +165,7 @@ function createRuntime(config: SignalInitConfig): RuntimeInternals {
     if (!config.debug) return;
     const debugSnapshot = vitalObserver?.debugSnapshot();
 
-    console.info('[signal] finalize', {
+    logger.info('[signal] finalize', {
       reason,
       navigation_type: navigationType,
       raw_fcp_entry: debugSnapshot?.rawFcpEntry ?? null,
@@ -169,7 +186,7 @@ function createRuntime(config: SignalInitConfig): RuntimeInternals {
     const event: SignalEventV1 = {
       v: SIGNAL_EVENT_VERSION,
       event_id: eventId,
-      ts: Date.now(),
+      ts: clock(),
       host: globalThis.location?.host ?? 'unknown.local',
       url: readPageUrl(),
       ref: readReferrer(),
@@ -193,10 +210,10 @@ function createRuntime(config: SignalInitConfig): RuntimeInternals {
     vitalObserver?.disconnect();
     vitalObserver = null;
     try {
-      emitToSinks(config.sinks, event);
+      emitToSinks(config.sinks, event, logger);
       state = transitionSignalLifecycle(state, 'flush_success');
     } catch (error) {
-      console.warn('[signal] emitToSinks failed unexpectedly', error);
+      logger.warn('[signal] emitToSinks failed unexpectedly', error);
       state = transitionSignalLifecycle(state, 'flush_error');
     }
   };
@@ -210,7 +227,7 @@ function createRuntime(config: SignalInitConfig): RuntimeInternals {
   const onPageShow = (event: PageTransitionEvent): void => {
     if (!event.persisted || state !== 'flushed') return;
     state = transitionSignalLifecycle(state, 'bfcache_restore');
-    eventId = createEventId();
+    eventId = eventIdFactory();
     navigationType = 'restore';
     startVitalObserver();
   };
@@ -275,11 +292,11 @@ function createRuntime(config: SignalInitConfig): RuntimeInternals {
   };
 }
 
-function shouldSample(sampleRate: number | undefined): boolean {
+function shouldSample(sampleRate: number | undefined, random: () => number): boolean {
   if (sampleRate == null) return true;
   if (sampleRate <= 0) return false;
   if (sampleRate >= 1) return true;
-  return Math.random() < sampleRate;
+  return random() < sampleRate;
 }
 
 /**
@@ -297,9 +314,17 @@ export function init(config: SignalInitConfig): SignalRuntimeController {
   const existing = (globalThis as Record<PropertyKey, unknown>)[RUNTIME_KEY] as RuntimeInternals | undefined;
   if (existing) return existing.controller;
 
-  if (!shouldSample(config.sampleRate)) {
+  const random = config.random ?? Math.random;
+  if (!shouldSample(config.sampleRate, random)) {
     const controller: SignalRuntimeController = {
-      destroy() {},
+      destroy() {
+        // Mirror the live-controller cleanup: drop the singleton so a
+        // subsequent init() can spin up a fresh runtime. Without this,
+        // the sealed controller leaks across init/destroy cycles and
+        // poisons every later init() call into returning the sealed
+        // shape.
+        delete (globalThis as Record<PropertyKey, unknown>)[RUNTIME_KEY];
+      },
       flushNow() {},
       getState() {
         return 'sealed';
