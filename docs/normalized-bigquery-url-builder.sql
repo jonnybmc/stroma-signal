@@ -411,9 +411,9 @@ SELECT CONCAT(
   '&nsd=', CAST(save_data_share AS STRING),
   IF(dq IS NULL, '', CONCAT('&nsl=', CAST(ROUND(dq[OFFSET(1)], 1) AS STRING), ',', CAST(ROUND(dq[OFFSET(2)], 1) AS STRING), ',', CAST(ROUND(dq[OFFSET(3)], 1) AS STRING))),
   IF(rq IS NULL, '', CONCAT('&nsr=', CAST(rq[OFFSET(1)] AS STRING), ',', CAST(rq[OFFSET(2)] AS STRING), ',', CAST(rq[OFFSET(3)] AS STRING))),
-  -- iteration-6: environment
+  -- environment block
   '&eb=', CAST(br_chrome AS STRING), ',', CAST(br_safari AS STRING), ',', CAST(br_firefox AS STRING), ',', CAST(br_edge AS STRING), ',', CAST(br_other AS STRING),
-  -- PR-6: visibility bookkeeping (raw pre-filter count + background exclusions)
+  -- visibility bookkeeping (raw pre-filter count + background exclusions)
   '&rs=', CAST(raw_sample_size AS STRING),
   '&xb=', CAST(excluded_background_sessions AS STRING),
   -- freshness provenance

@@ -100,7 +100,7 @@ These signals are collected for cross-reference but do not feed tier classificat
 |---|---|---|
 | `meta.pkg_version` | `string` | Signal package version. |
 | `meta.browser` | `string` | Browser family. |
-| `meta.navigation_type` | `'navigate' \| 'reload' \| 'back-forward' \| 'prerender' \| 'restore'` | Normalized navigation semantics. Replaces the legacy `meta.nav_type` field (removed in 0.1.x). |
+| `meta.navigation_type` | `'navigate' \| 'reload' \| 'back-forward' \| 'prerender' \| 'restore'` | Normalized navigation lifecycle classification. |
 
 ---
 

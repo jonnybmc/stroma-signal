@@ -1,4 +1,4 @@
-/* Spike-lab shares the Stroma Signal design system with /r and /build so
+/* Spike-lab shares the Signal design system with /r and /build so
  * the QA harness, final report, and report builder read as one product.
  * Token subset mirrors report-tokens.css --sr-* contract; see that file
  * for the canonical documentation. Keep in sync when those tokens shift.

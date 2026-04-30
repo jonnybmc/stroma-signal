@@ -486,7 +486,7 @@ describe('observeVitals', () => {
     expect(observer.snapshot().lcp_breakdown).toBeNull();
   });
 
-  it('computes third-party pre-LCP script share with eTLD+1 first-party rule (§2.4)', () => {
+  it('computes third-party pre-LCP script share with eTLD+1 first-party rule', () => {
     const resources = [
       {
         name: 'https://example.co.za/bundle.js',

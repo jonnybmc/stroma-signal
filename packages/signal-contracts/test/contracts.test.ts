@@ -200,8 +200,8 @@ describe('signal contracts', () => {
     const flattened = flattenSignalEventForGa4(chromeColdNavFixture);
     const ga4SafeFieldCount = Object.keys(SIGNAL_GA4_FIELD_MAP_V1.fields).length;
 
-    // Hard-equality: post-PR-5 the field map settled at exactly 24 (25
-    // flatten keys including `event`), with one slot of headroom against
+    // Hard-equality: the field map is exactly 24 entries (25 flatten
+    // keys including `event`), with one slot of headroom against
     // GA4's 25-custom-parameter cap. Any 26th param added in future would
     // fail here at test time rather than at Google's ingestion boundary.
     expect(ga4SafeFieldCount).toBe(24);
@@ -1037,7 +1037,7 @@ describe('signal contracts', () => {
     expect(decoded.inp_story).toBeUndefined();
   });
 
-  it('classifies third-party weight tiers by pre-LCP script share (§2.4)', () => {
+  it('classifies third-party weight tiers by pre-LCP script share', () => {
     expect(classifyThirdPartyShareTier(null)).toBeNull();
     expect(classifyThirdPartyShareTier(-1)).toBeNull();
     expect(classifyThirdPartyShareTier(0)).toBe('none');
