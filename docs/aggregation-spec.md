@@ -12,22 +12,25 @@ For the canonical production artifact generated from the provided warehouse SQL,
 
 `SignalAggregateV1` must include:
 
-- network tier distribution
-- device tier distribution
-- sample size
-- period days
-- urban vs comparison-tier p75 values
-- network coverage
-- unclassified network share
-- connection reuse share
-- LCP coverage
+- `v` and `rv` (`v=1`, `rv=1`)
+- `mode` (`preview` or `production`)
+- `generated_at` and `domain`
+- `sample_size` and `classified_sample_size`
+- `period_days`
+- `network_distribution` and `device_distribution`
 - `comparison_tier`
-- `race_metric`
-- `race_fallback_reason`
-- additive `experience_funnel` stage summaries for Act 3
-- additive `device_hardware`, `network_signals`, and `environment` blocks (iteration 6)
-- additive `form_factor_distribution` (mobile / tablet / desktop shares) derived from `device_screen_w`
-- report version `rv=1`
+- `race_metric` and `race_fallback_reason`
+- `coverage` block (`network_coverage`, `unclassified_network_share`, `connection_reuse_share`, `lcp_coverage`, `selected_metric_urban_coverage`, `selected_metric_comparison_coverage`, `raw_sample_size`, `excluded_background_sessions`)
+- `vitals.urban` and `vitals.comparison` p75 summaries
+- `top_page_path`
+- `warnings` array
+
+Additive optional fields (omitted entirely when upstream data is insufficient):
+
+- `experience_funnel` — Act 3 stage summaries
+- `device_hardware`, `network_signals`, `environment` — actionable signal blocks
+- `form_factor_distribution` — mobile / tablet / desktop shares, derived from `device_screen_w`
+- `lcp_story`, `inp_story`, `third_party_story`, `loaf_story`, `context_story` — narrative blocks for the report's act surfaces
 
 ## Actionable Signal Blocks
 
@@ -139,18 +142,89 @@ Safari and Firefox sessions carry `vitals.loaf = null` and contribute no observa
 
 The Act 3 view-model gates LoAF narration on the INP funnel stage being active — LoAF is never claimed when the INP story itself could not be defended.
 
+## LCP Story
+
+Per-cohort dominant LCP subpart and culprit. Aggregation gates the `lcp_story` block on `SIGNAL_MIN_RACE_OBSERVATIONS = 25` events with a complete LCP subpart breakdown (`vitals.lcp_breakdown` populated and `vitals.ttfb_ms != null`). Below that the block is `undefined` and the report omits the line.
+
+The block carries:
+
+- `dominant_subpart` — argmax across `ttfb`, `resource_load_delay`, `resource_load_time`, `element_render_delay`. Null when the cohort sums to zero.
+- `dominant_subpart_share_pct` — the dominant subpart's share of the summed budget.
+- `dominant_culprit_kind` — argmax across the LCP culprit-classifier outputs (`hero_image`, `headline_text`, `banner_image`, `product_image`, `video_poster`, `unknown`). Null when no events carry a `culprit_kind`.
+- `subpart_distribution_pct` — the four-way percentage distribution.
+
+Safari / Firefox sessions never contribute to this story (no LCP). The Act 3 view-model gates LCP narration on the LCP funnel stage being active.
+
+## INP Story
+
+Per-cohort dominant INP phase. Aggregation gates the `inp_story` block on `SIGNAL_MIN_RACE_OBSERVATIONS = 25` events with a populated `inp_attribution.dominant_phase`. Below that the block is `undefined`.
+
+The block carries:
+
+- `dominant_phase` — argmax across `input_delay`, `processing`, `presentation`. Null when no events contribute.
+- `dominant_phase_share_pct` — the dominant phase's share.
+- `phase_distribution_pct` — the three-way percentage distribution.
+
+Per-event `dominant_phase` is computed at capture time using the `processing > input_delay > presentation` tiebreak (see [Signal Technical Reference](./signal-technical-reference.md#optional-attribution)).
+
+## Third-Party Story
+
+Per-cohort third-party pre-paint script weight. Aggregation gates the `third_party_story` block on `SIGNAL_MIN_RACE_OBSERVATIONS = 25` events with a non-null `vitals.third_party.pre_lcp_script_share_pct`. Below that the block is `undefined`.
+
+The block carries:
+
+- `median_share_pct` — median of per-event share percentages.
+- `dominant_tier` — most-frequent tier across the cohort. Null when the cohort is empty.
+- `dominant_tier_share_pct` — the dominant tier's share of contributing events.
+- `median_origin_count` — median of per-event distinct off-domain origin counts.
+
+Per-event share is binned into a `SignalThirdPartyTier` using these boundaries (mirrored at capture time and aggregation time so labels stay consistent):
+
+| Share range | Tier |
+|---|---|
+| `share === 0` | `none` |
+| `0 < share <= 15` | `light` |
+| `15 < share <= 40` | `moderate` |
+| `share > 40` | `heavy` |
+
+Negative or non-numeric shares are dropped.
+
+## Context Story
+
+Act 1 audience-reality block. Reuses the same per-session signals that feed `network_signals`, but in editorial shape. Emitted whenever the post-filter sample is non-empty (`undefined` only when the aggregate carried zero contributing rows). The view-model layer applies per-field narrate-or-omit thresholds:
+
+- `save_data_share_pct` — narrated only when `>= SIGNAL_SAVE_DATA_NARRATE_THRESHOLD_PCT = 1`.
+- `cellular_share_pct` — narrated only when `>= SIGNAL_CELLULAR_NARRATE_THRESHOLD_PCT = 10` (Chromium-only `connection_type`; Safari / Firefox systematically null).
+- `median_rtt_ms` — surfaced when present.
+- `effective_type_dominant` — most-frequent `effective_type` bucket from `4g`, `3g`, `2g`, `slow-2g`, `unknown`. Null when no events contribute.
+
+## Top Page Path
+
+`top_page_path` is the most-observed `event.url` value across the post-filter cohort. Used by the Tier Report shell to ground audience-shape copy on the page path that drove the majority of traffic in the window. Null when no events contribute.
+
+## Warnings
+
+The `warnings` array surfaces aggregation-time caveats. The renderer should treat each as a tone-tempering instruction, not a fatal error. The full enumeration:
+
+| Warning | When it fires |
+|---|---|
+| `Sample size below the recommended preview threshold.` | `mode === 'preview'` AND `sample_size < SIGNAL_PREVIEW_MINIMUM_SAMPLE = 100`. |
+| `Act 2 cannot render a comparable race with the current data.` | `race_metric === 'none'`. |
+| `coverage_marginal` | LCP race chosen and the cohort lands within the `SIGNAL_COVERAGE_MARGINAL_THRESHOLD_PCT` / `_OBS` slack window. See [Marginal-Coverage Warning](#marginal-coverage-warning). |
+| `signal_report_url_exceeds_soft_limit:<bytes>` | Encoded report URL exceeds `SIGNAL_REPORT_URL_SOFT_LIMIT_BYTES`. See [Report URL Byte Budget](#report-url-byte-budget). |
+
 ## Comparison Tier
 
-The comparison tier is the highest-share non-urban classified tier. If no non-urban tier has observations, `comparison_tier = "none"`.
+The comparison tier is the highest-share non-urban classified tier. Ties are resolved by canonical insertion order (`moderate` > `constrained_moderate` > `constrained`). If no non-urban tier has observations, `comparison_tier = "none"`.
 
 ## Act 2 Metric Fallback
 
 The report renderer must not choose the race metric. The aggregate chooses it.
 
-1. Use `lcp` only if both urban and comparison cohorts have at least 25 observations and at least 50% LCP coverage.
-2. Else use `fcp` if both cohorts have at least 25 observations and non-zero FCP coverage.
-3. Else use `ttfb` if both cohorts have at least 25 observations and non-zero TTFB coverage.
-4. Else set `race_metric = "none"` and render an insufficient-data state.
+1. Use `lcp` only if both urban and comparison cohorts have at least 25 observations and at least 50% LCP coverage. `race_fallback_reason = null`.
+2. Else use `fcp` if both cohorts have at least 25 observations and non-zero FCP coverage. `race_fallback_reason = 'lcp_coverage_below_threshold'`.
+3. Else use `ttfb` if both cohorts have at least 25 observations and non-zero TTFB coverage. `race_fallback_reason = 'fcp_unavailable'`.
+4. Else set `race_metric = 'none'`. `race_fallback_reason = 'insufficient_comparable_data'`.
 
 All labels in Act 2 must explicitly name the selected metric.
 
@@ -166,13 +240,13 @@ The additive `experience_funnel` block carries:
 - per-stage thresholds
 - per-tier stage coverage and poor-share summaries
 
-Stage thresholds:
+Stage thresholds (constants live in `packages/signal-contracts/src/types.ts`):
 
-1. `fcp` poor threshold: `> 3000ms`
-2. `lcp` poor threshold: `> 4000ms`
-3. `inp` poor threshold: `> 500ms`
+1. `fcp` poor threshold: `SIGNAL_FUNNEL_FCP_POOR_THRESHOLD = 3000` (`> 3000ms`)
+2. `lcp` poor threshold: `SIGNAL_FUNNEL_LCP_POOR_THRESHOLD = 4000` (`> 4000ms`)
+3. `inp` poor threshold: `SIGNAL_FUNNEL_INP_POOR_THRESHOLD = 500` (`> 500ms`)
 
-Stage activation rules:
+Stage activation rules (`SIGNAL_MIN_RACE_OBSERVATIONS = 25`, `SIGNAL_MIN_LCP_COVERAGE = 50`):
 
 1. `fcp` is active whenever the aggregate has reportable classified sample.
 2. `lcp` is active only when there are at least 25 measured classified observations and at least 50% classified coverage.
