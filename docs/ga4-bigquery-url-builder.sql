@@ -327,8 +327,8 @@ funnel_rollup AS (
 -- warehouse recipe (normalized-bigquery-url-builder.sql) to produce reports
 -- with the Actionable Signals slide populated.
 --
--- PR-6 (visibility filter): context_visibility_hidden_at_load is also
--- warehouse-only — the GA4 recipe cannot pre-filter background-tab loads.
+-- Visibility filter: context_visibility_hidden_at_load is warehouse-only
+-- — the GA4 recipe cannot pre-filter background-tab loads.
 -- As a consequence, the rs (raw_sample_size) and xb (excluded_background_
 -- sessions) URL params are NOT emitted from this recipe. Decoders treat
 -- their absence as "unknown" and the report's credibility strip gracefully

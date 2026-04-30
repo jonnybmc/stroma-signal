@@ -15,7 +15,7 @@
 
   /* ---------------------------------------------------------------------
    * Canonical immersive tokens (sr-*). Single source of truth for the
-   * Stroma Signal design system across /r, /build, and spike-lab. All
+   * Signal design system across /r, /build, and spike-lab. All
    * surfaces must theme against these — no per-app colour palettes.
    * ------------------------------------------------------------------- */
 
@@ -103,9 +103,8 @@
   --sr-z-chrome: 40;
 
   /* ---------------------------------------------------------------------
-   * Iteration 4 additions: modular type scale, elevation system, icon
-   * sizing, and severity tone overlays. These replace ad-hoc values that
-   * were scattered through report-immersive.css and give every premium
+   * Modular type scale, elevation system, icon sizing, and severity tone
+   * overlays. Centralised here so every premium
    * atom (gauge, delta chip, funnel node, cohort cell) a single source
    * of truth for sizing, shadow depth, and status color.
    * ------------------------------------------------------------------- */
