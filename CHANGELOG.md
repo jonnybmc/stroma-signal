@@ -6,34 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 Pre-release identifiers (e.g. `-rc.N`) are published to the npm `next`
-dist-tag. The `latest` dist-tag is reserved for stable releases. To
-install a pre-release: `pnpm add @stroma-labs/signal@next` (or pin to
-the exact version, e.g. `@stroma-labs/signal@0.1.0-rc.1`).
+dist-tag. The `latest` dist-tag is reserved for stable releases.
+
+```
+pnpm add @stroma-labs/signal@next            # latest pre-release
+pnpm add @stroma-labs/signal@0.1.0-rc.2      # exact pin
+pnpm add @stroma-labs/signal                 # latest stable (when published)
+```
 
 ## [0.1.0-rc.2] - 2026-04-30
 
-Re-cut of the first release candidate after `0.1.0-rc.1`'s publish
-attempt was rejected by npm with `403 Forbidden — Two-factor
-authentication or granular access token with bypass 2fa enabled is
-required` (the original `NPM_TOKEN` did not bypass 2FA, so unattended
-CI publishing failed). No package code changed; the tarball is
-byte-identical to what `0.1.0-rc.1` would have produced.
-
-Also closes a hygiene leak: `.claude/settings.json` was being tracked
-in the public repo (revealed that Claude Code is used for development
-and named the active skill plugin). The full `.claude/` directory is
-now gitignored; only `.claude/worktrees/` was previously excluded.
-
-### Fixed
-
-- **Repo hygiene:** `.claude/settings.json` removed from tracking;
-  `.gitignore` now excludes the full `.claude/` directory so local
-  Claude Code config and state never enter the public repo.
-
-## [0.1.0-rc.1] - 2026-04-30
-
-First public release candidate. Published attempt failed at npm due
-to a token-bypass-2FA issue; superseded by `0.1.0-rc.2` (same code).
+First publishable release candidate. Package contents identical to
+`0.1.0-rc.1` (which did not reach the registry).
 
 ### Added
 

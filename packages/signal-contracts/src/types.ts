@@ -279,14 +279,14 @@ export interface SignalWarehouseRowV1 {
   third_party_origin_count?: number | null;
   loaf_dominant_cause?: SignalLoafCause | null;
   context_visibility_hidden_at_load?: boolean | null;
-  // Identity layer columns (v6.2 PI planning). Optional so historical
-  // warehouse rows round-trip unchanged. SDK capture + ingest population
-  // is Phase 1 of PI work.
+  // Optional identity / attribution columns. Mirror the optional fields
+  // on `SignalEventV1`; populated by the host site or an SDK extension
+  // when warehouse-side joins to other analytics or ad-platform data
+  // are wanted. Optional so historical warehouse rows round-trip
+  // unchanged.
   ga_session_id?: string | null;
   user_pseudo_id?: string | null;
   gclid?: string | null;
-  // Attribution-independent conversion fingerprint (v6.3). See mirror
-  // comment on SignalEventV1. Enables Signal-as-attribution-fact-checker.
   conversion_fingerprint?: string | null;
 }
 

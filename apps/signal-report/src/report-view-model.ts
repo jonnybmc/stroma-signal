@@ -1315,7 +1315,7 @@ function buildOfferCards(): Array<{ title: string; body: string; href: string; c
     {
       title: 'Rapid Fix Plan',
       body: 'Optional: if you want hands-on help executing on the gap, the Rapid Fix Plan traces it to the landing pages and routes causing the most drag and returns a sequenced fix order.',
-      href: 'https://www.stroma.design/rapid-fix-plan',
+      href: 'https://www.stroma.design/book?service=rapid-fix',
       cta: 'Commission a plan'
     }
   ];
