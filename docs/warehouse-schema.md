@@ -12,7 +12,7 @@ Recommended flat warehouse row shape for non-GA4 collection:
 | `referrer` | STRING | Nullable |
 | `net_tier` | STRING | Nullable: `urban`, `moderate`, `constrained_moderate`, `constrained`; null for non-load-shaped `restore`/`prerender` rows |
 | `net_tcp_ms` | INT64 | Nullable and null for non-load-shaped `restore`/`prerender` rows |
-| `net_tcp_source` | STRING | Includes unavailable reasons |
+| `net_tcp_source` | STRING | One of: `nav_timing_tcp_isolated`, `nav_timing_full`, `unavailable_reused`, `unavailable_sw`, `unavailable_tls_coalesced`, `unavailable_missing_timing` |
 | `device_tier` | STRING | `low`, `mid`, `high` |
 | `device_cores` | INT64 | Browser logical cores |
 | `device_memory_gb` | FLOAT64 | Nullable |
