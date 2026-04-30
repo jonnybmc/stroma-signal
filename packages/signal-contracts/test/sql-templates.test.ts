@@ -322,12 +322,16 @@ describe('bigquery sql templates', () => {
     }
   });
 
-  it('uses deterministic tie-breaking in comparison tier selection', () => {
+  it('uses deterministic tie-breaking in comparison tier selection that matches aggregation.ts', () => {
     for (const fileName of ['ga4-bigquery-url-builder.sql', 'normalized-bigquery-url-builder.sql']) {
       const sql = readSqlTemplate(fileName);
 
-      // Secondary sort on tier name ensures deterministic results on count ties
-      expect(sql).toContain('ORDER BY tier_count DESC, tier ASC');
+      // Tie-break order: moderate (1) > constrained_moderate (2) > constrained (3),
+      // mirroring CLASSIFIED_TIERS insertion order in aggregation.ts.
+      expect(sql).toContain('ORDER BY tier_count DESC, tier_priority ASC');
+      expect(sql).toContain("'moderate' AS tier, 1 AS tier_priority");
+      expect(sql).toContain("'constrained_moderate' AS tier, 2 AS tier_priority");
+      expect(sql).toContain("'constrained' AS tier, 3 AS tier_priority");
     }
   });
 

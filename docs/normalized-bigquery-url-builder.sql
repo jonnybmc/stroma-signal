@@ -72,18 +72,21 @@ counts AS (
   FROM source_events
 ),
 comparison_tier AS (
+  -- Tie-break order: when two tiers have equal counts, prefer
+  -- moderate > constrained_moderate > constrained. Mirrors
+  -- aggregation.ts pickComparisonTier() (CLASSIFIED_TIERS insertion order).
   SELECT
     IF(
       MAX(tier_count) = 0,
       'none',
-      ARRAY_AGG(tier ORDER BY tier_count DESC, tier ASC LIMIT 1)[OFFSET(0)]
+      ARRAY_AGG(tier ORDER BY tier_count DESC, tier_priority ASC LIMIT 1)[OFFSET(0)]
     ) AS comparison_tier
   FROM (
-    SELECT 'moderate' AS tier, COUNTIF(net_tier = 'moderate') AS tier_count FROM source_events
+    SELECT 'moderate' AS tier, 1 AS tier_priority, COUNTIF(net_tier = 'moderate') AS tier_count FROM source_events
     UNION ALL
-    SELECT 'constrained_moderate' AS tier, COUNTIF(net_tier = 'constrained_moderate') AS tier_count FROM source_events
+    SELECT 'constrained_moderate' AS tier, 2 AS tier_priority, COUNTIF(net_tier = 'constrained_moderate') AS tier_count FROM source_events
     UNION ALL
-    SELECT 'constrained' AS tier, COUNTIF(net_tier = 'constrained') AS tier_count FROM source_events
+    SELECT 'constrained' AS tier, 3 AS tier_priority, COUNTIF(net_tier = 'constrained') AS tier_count FROM source_events
   )
 ),
 race_inputs AS (
@@ -297,19 +300,22 @@ funnel_rollup AS (
   FROM source_events, funnel_activation
 ),
 device_hardware AS (
+  -- Bucket boundaries mirror aggregation.ts coresBucket() / memoryBucket().
+  -- Each bucket is "<= ceiling", with the lower bound exclusive of the
+  -- previous bucket's ceiling so values land in exactly one bucket.
   SELECT
     COUNT(*) AS total,
-    IFNULL(ROUND(100 * SAFE_DIVIDE(COUNTIF(device_cores = 1), COUNT(*))), 0) AS cores_1,
-    IFNULL(ROUND(100 * SAFE_DIVIDE(COUNTIF(device_cores = 2), COUNT(*))), 0) AS cores_2,
-    IFNULL(ROUND(100 * SAFE_DIVIDE(COUNTIF(device_cores = 4), COUNT(*))), 0) AS cores_4,
-    IFNULL(ROUND(100 * SAFE_DIVIDE(COUNTIF(device_cores = 6), COUNT(*))), 0) AS cores_6,
-    IFNULL(ROUND(100 * SAFE_DIVIDE(COUNTIF(device_cores = 8), COUNT(*))), 0) AS cores_8,
-    IFNULL(ROUND(100 * SAFE_DIVIDE(COUNTIF(device_cores >= 12), COUNT(*))), 0) AS cores_12plus,
-    IFNULL(ROUND(100 * SAFE_DIVIDE(COUNTIF(device_memory_gb = 0.5), COUNT(*))), 0) AS mem_05,
-    IFNULL(ROUND(100 * SAFE_DIVIDE(COUNTIF(device_memory_gb = 1), COUNT(*))), 0) AS mem_1,
-    IFNULL(ROUND(100 * SAFE_DIVIDE(COUNTIF(device_memory_gb = 2), COUNT(*))), 0) AS mem_2,
-    IFNULL(ROUND(100 * SAFE_DIVIDE(COUNTIF(device_memory_gb = 4), COUNT(*))), 0) AS mem_4,
-    IFNULL(ROUND(100 * SAFE_DIVIDE(COUNTIF(device_memory_gb >= 8), COUNT(*))), 0) AS mem_8plus,
+    IFNULL(ROUND(100 * SAFE_DIVIDE(COUNTIF(device_cores <= 1), COUNT(*))), 0) AS cores_1,
+    IFNULL(ROUND(100 * SAFE_DIVIDE(COUNTIF(device_cores > 1 AND device_cores <= 2), COUNT(*))), 0) AS cores_2,
+    IFNULL(ROUND(100 * SAFE_DIVIDE(COUNTIF(device_cores > 2 AND device_cores <= 4), COUNT(*))), 0) AS cores_4,
+    IFNULL(ROUND(100 * SAFE_DIVIDE(COUNTIF(device_cores > 4 AND device_cores <= 6), COUNT(*))), 0) AS cores_6,
+    IFNULL(ROUND(100 * SAFE_DIVIDE(COUNTIF(device_cores > 6 AND device_cores <= 8), COUNT(*))), 0) AS cores_8,
+    IFNULL(ROUND(100 * SAFE_DIVIDE(COUNTIF(device_cores > 8), COUNT(*))), 0) AS cores_12plus,
+    IFNULL(ROUND(100 * SAFE_DIVIDE(COUNTIF(device_memory_gb IS NOT NULL AND device_memory_gb <= 0.5), COUNT(*))), 0) AS mem_05,
+    IFNULL(ROUND(100 * SAFE_DIVIDE(COUNTIF(device_memory_gb > 0.5 AND device_memory_gb <= 1), COUNT(*))), 0) AS mem_1,
+    IFNULL(ROUND(100 * SAFE_DIVIDE(COUNTIF(device_memory_gb > 1 AND device_memory_gb <= 2), COUNT(*))), 0) AS mem_2,
+    IFNULL(ROUND(100 * SAFE_DIVIDE(COUNTIF(device_memory_gb > 2 AND device_memory_gb <= 4), COUNT(*))), 0) AS mem_4,
+    IFNULL(ROUND(100 * SAFE_DIVIDE(COUNTIF(device_memory_gb > 4), COUNT(*))), 0) AS mem_8plus,
     IFNULL(ROUND(100 * SAFE_DIVIDE(COUNTIF(device_memory_gb IS NULL), COUNT(*))), 0) AS mem_unknown,
     IFNULL(ROUND(100 * SAFE_DIVIDE(COUNTIF(device_memory_gb IS NOT NULL), COUNT(*))), 0) AS memory_coverage
   FROM source_events

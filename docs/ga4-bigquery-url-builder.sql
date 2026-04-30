@@ -92,18 +92,21 @@ counts AS (
   FROM source_events
 ),
 comparison_tier AS (
+  -- Tie-break order: when two tiers have equal counts, prefer
+  -- moderate > constrained_moderate > constrained. Mirrors
+  -- aggregation.ts pickComparisonTier() (CLASSIFIED_TIERS insertion order).
   SELECT
     IF(
       MAX(tier_count) = 0,
       'none',
-      ARRAY_AGG(tier ORDER BY tier_count DESC, tier ASC LIMIT 1)[OFFSET(0)]
+      ARRAY_AGG(tier ORDER BY tier_count DESC, tier_priority ASC LIMIT 1)[OFFSET(0)]
     ) AS comparison_tier
   FROM (
-    SELECT 'moderate' AS tier, COUNTIF(net_tier = 'moderate') AS tier_count FROM source_events
+    SELECT 'moderate' AS tier, 1 AS tier_priority, COUNTIF(net_tier = 'moderate') AS tier_count FROM source_events
     UNION ALL
-    SELECT 'constrained_moderate' AS tier, COUNTIF(net_tier = 'constrained_moderate') AS tier_count FROM source_events
+    SELECT 'constrained_moderate' AS tier, 2 AS tier_priority, COUNTIF(net_tier = 'constrained_moderate') AS tier_count FROM source_events
     UNION ALL
-    SELECT 'constrained' AS tier, COUNTIF(net_tier = 'constrained') AS tier_count FROM source_events
+    SELECT 'constrained' AS tier, 3 AS tier_priority, COUNTIF(net_tier = 'constrained') AS tier_count FROM source_events
   )
 ),
 race_inputs AS (
