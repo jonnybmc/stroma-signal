@@ -1,6 +1,6 @@
 # Marketer Quickstart: GTM To Shareable Signal URL
 
-<img src="./images/signal-stroma-logo.png" alt="Signal by Stroma logo" width="320" />
+<img src="./images/signal-stroma-logo.png" alt="Signal" width="320" />
 
 This is the fastest launch path for a GTM/GA4-led team.
 

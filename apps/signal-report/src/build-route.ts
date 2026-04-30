@@ -74,7 +74,7 @@ function parseReportUrlInput(value: string): {
 app.className = 'app-shell';
 app.innerHTML = `
   <section class="builder-card">
-    <p class="eyebrow">Signal by Stroma</p>
+    <p class="eyebrow">Signal</p>
     <h1 class="headline">Zero-code report builder</h1>
     <p class="lede">
       Use this launch companion to either turn a warehouse aggregate into a shareable report URL or validate a generated report URL before sharing it.

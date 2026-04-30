@@ -1,4 +1,4 @@
--- Signal by Stroma
+-- Signal
 -- Normalized warehouse validation query
 -- Use this first to prove Signal rows are landing before running the normalized URL-builder query.
 -- The URL-builder query excludes navigation_type = restore/prerender by default.

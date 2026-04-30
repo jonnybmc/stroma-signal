@@ -1,4 +1,4 @@
--- Signal by Stroma
+-- Signal
 -- BigQuery URL builder for a flat SignalWarehouseRowV1 table
 -- Default report math excludes non-load-shaped restore/prerender rows.
 -- Background-tab loads (context_visibility_hidden_at_load = TRUE) are

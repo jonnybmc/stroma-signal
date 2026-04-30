@@ -1,4 +1,4 @@
--- Signal by Stroma
+-- Signal
 -- GA4 BigQuery validation query
 -- Use this first to prove perf_tier_report rows are landing before running the URL-builder query.
 -- The URL-builder query excludes navigation_type = restore/prerender by default.

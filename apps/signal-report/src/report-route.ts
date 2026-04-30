@@ -14,7 +14,7 @@ function renderInvalidReportState(message: string): void {
   app.className = 'app-shell';
   app.innerHTML = `
     <section class="builder-card">
-      <p class="eyebrow">Signal by Stroma</p>
+      <p class="eyebrow">Signal</p>
       <h1 class="headline">Invalid report URL</h1>
       <p class="lede">
         This report link could not be decoded safely. Use the builder to generate or validate a report URL.

@@ -1,6 +1,6 @@
 # Choose Your Signal Setup
 
-<img src="./images/signal-stroma-logo.png" alt="Signal by Stroma logo" width="320" />
+<img src="./images/signal-stroma-logo.png" alt="Signal" width="320" />
 
 `@stroma-labs/signal` is configured in application code. The browser package does not expose a runtime GUI, CLI flag, GTM container ID, or GA4 measurement ID.
 
