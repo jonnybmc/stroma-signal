@@ -178,7 +178,7 @@ Signal normalizes the browser's navigation context into five semantic types:
 
 The GA4 dataLayer sink pushes a flattened `perf_tier_report` event with a compact subset of the full schema. This path is designed for GTM forwarding, GA4 DebugView, and BigQuery export. The subset stays within GA4's standard event parameter limits.
 
-The GA4 compact subset includes 24 fields: `event_id`, `host`, `url`, `net_tier`, `net_tcp_ms`, `net_tcp_source`, `device_tier`, `device_screen_w`, `lcp_ms`, `fcp_ms`, `ttfb_ms`, `browser`, `navigation_type`, `lcp_load_state`, `lcp_element_type`, `inp_load_state`, `interaction_type`, `input_delay_ms`, `processing_duration_ms`, `presentation_delay_ms`, `lcp_culprit_kind`, `lcp_dominant_subpart`, `inp_dominant_phase`, `third_party_weight_tier` — plus the `event` name itself for 25 total, exactly at GA4's custom-parameter ceiling. The legacy `nav_type` parameter has been removed in 0.1.x; use `navigation_type` (identical semantics, wider coverage).
+The GA4 compact subset includes 24 fields: `event_id`, `host`, `url`, `net_tier`, `net_tcp_ms`, `net_tcp_source`, `device_tier`, `device_screen_w`, `lcp_ms`, `fcp_ms`, `ttfb_ms`, `browser`, `navigation_type`, `lcp_load_state`, `lcp_element_type`, `inp_load_state`, `interaction_type`, `input_delay_ms`, `processing_duration_ms`, `presentation_delay_ms`, `lcp_culprit_kind`, `lcp_dominant_subpart`, `inp_dominant_phase`, `third_party_weight_tier` — plus the `event` name itself for 25 total, exactly at GA4's custom-parameter ceiling.
 
 `device_screen_w` unlocks the aggregate-time form-factor split (mobile / tablet / desktop) that the hosted report surfaces in the persistent footer. Breakpoints and rationale in [aggregation-spec.md](./aggregation-spec.md).
 

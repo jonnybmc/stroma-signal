@@ -19,7 +19,7 @@ Recommended behavior:
 4. Acknowledge quickly, then hand off persistence asynchronously where possible
 5. Write the flattened row to a warehouse table shaped like `SignalWarehouseRowV1`, deduping on `event_id`
 6. Aggregate warehouse data into `SignalAggregateV1`, excluding `navigation_type = restore` and `navigation_type = prerender` from default load-shaped report math
-7. Generate the final report URL via `SignalReportUrlV1`
+7. Generate the final report URL by calling `encodeSignalReportUrl(aggregate)` (returns a `SignalReportUrlResult`)
 
 Event payloads may now include additive diagnostic context:
 

@@ -29,7 +29,7 @@ Recommended flat warehouse row shape for non-GA4 collection:
 | `save_data` | BOOL | Nullable |
 | `connection_type` | STRING | Nullable |
 | `browser` | STRING | Lowercase family name |
-| `navigation_type` | STRING | Nullable normalized value: `navigate`, `reload`, `back-forward`, `prerender`, `restore`. Replaces the legacy `nav_type` column (removed in 0.1.x). |
+| `navigation_type` | STRING | Nullable normalized value: `navigate`, `reload`, `back-forward`, `prerender`, `restore`. |
 | `lcp_load_state` | STRING | Nullable: `loading`, `interactive`, `complete` |
 | `lcp_target` | STRING | Nullable safe label from `generateTarget()` or default tag name |
 | `lcp_element_type` | STRING | Nullable: `image` or `text` |
@@ -55,7 +55,6 @@ Do not rename the canonical metric fields if you want to keep the provided aggre
 
 Notes:
 
-- The legacy `nav_type` column has been removed in 0.1.x. Consumers that pinned to it should switch to `navigation_type` (identical semantics, wider coverage).
 - Default Signal URL-builder templates exclude `navigation_type = restore`, `navigation_type = prerender`, and `context_visibility_hidden_at_load = true` before computing coverage and percentiles. The excluded background-tab count is preserved separately via the `rs` (raw pre-filter sample size) and `xb` (excluded background sessions) report-URL params so the credibility strip can narrate the exclusion transparently. Invariant: `raw_sample_size === sample_size + excluded_background_sessions`.
 - Treat target/resource fields as diagnostic hints, not stable identifiers.
 - Keep raw event-table access limited to the smallest group that needs it; the table can contain operationally sensitive path/referrer/resource context even though Signal is not a user-identity system.
