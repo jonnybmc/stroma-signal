@@ -69,7 +69,7 @@ function isLoadShapedEvent(event: SignalEventV1): boolean {
   return event.meta.navigation_type !== 'restore' && event.meta.navigation_type !== 'prerender';
 }
 
-// Background-tab filter (§2.6). Events captured while the tab was hidden
+// Background-tab filter. Events captured while the tab was hidden
 // have throttled timers and deprioritized paint — folding them into
 // foreground percentiles skews every narrative number. We drop them
 // before any accumulator runs so `sample_size` / coverage / p75 all share
@@ -434,7 +434,7 @@ export function deriveSignalAggregateWarnings(
   return warnings;
 }
 
-// §5.1 marginal-coverage caveat. Fires when the LCP race cohort lands
+// marginal-coverage caveat. Fires when the LCP race cohort lands
 // within the slack thresholds of the ship gates — the numbers are
 // defensible, but barely, and the view model uses this warning to tone
 // language down ("the measurable sessions we have" vs "measured
@@ -821,7 +821,7 @@ export function aggregateSignalEvents(
   let connectionReuseCount = 0;
   let lcpCount = 0;
 
-  // Iteration 6 — actionable signal counters. Every field here answers a
+  // actionable signal counters. Every field here answers a
   // specific product-team decision (see SignalDeviceHardware / etc. docs).
   const coresCounters = { ...ZERO_CORES_HIST };
   const memoryCounters = { ...ZERO_MEMORY_HIST };
@@ -906,7 +906,7 @@ export function aggregateSignalEvents(
 
     deviceDistribution[event.device_tier] += 1;
 
-    // Iteration 6 — preserve every actionable signal the SDK already
+    // preserve every actionable signal the SDK already
     // captures so the report can render it as evidence. Coverage counters
     // stay first-class so the report can surface honest caveats where the
     // browser didn't expose the underlying API (Safari/Firefox).
@@ -976,7 +976,7 @@ export function aggregateSignalEvents(
     excluded_background_sessions: excludedBackgroundSessions
   };
 
-  // Aggregation-time invariant (§1.2). Dropped-event bookkeeping must
+  // Aggregation-time invariant. Dropped-event bookkeeping must
   // reconcile: every event either made it into the canonical denominator
   // or was counted as a background exclusion.
   if (coverage.raw_sample_size !== total + coverage.excluded_background_sessions) {
@@ -991,7 +991,7 @@ export function aggregateSignalEvents(
     race_metric: metricChoice.race_metric
   });
 
-  // §5.1 marginal-coverage caveat — only fires when an LCP race actually
+  // marginal-coverage caveat — only fires when an LCP race actually
   // lands (lcp race_metric) and the cohort is within the slack window.
   if (
     metricChoice.race_metric === 'lcp' &&

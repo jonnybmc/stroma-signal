@@ -561,8 +561,8 @@ function severityToneForWaitDelta(waitDeltaMs: number | null): SeverityTone {
 
 function renderLaneSampleLine(coverage: number | null, tierLabel: string): string {
   // Distinguish genuine 0% (measured the cohort, none had the metric) from
-  // absent (coverage field unset). The legacy `coverage ?? 0` coercion read
-  // "0% measured" for both, silently conflating absence with zero.
+  // absent (coverage field unset). Coercing `null` to 0 would render
+  // "0% measured" for both — same string, different truth.
   const measuredFragment = coverage != null ? `${coverage}% measured` : 'coverage unavailable';
   return `
     <span class="sr-lane-sample sr-mono sr-mono-sm">
@@ -873,7 +873,7 @@ function renderFunnelWaterfall(act3: ReportViewModel['act3']): string {
     const stage = byKey.get(key);
     if (stage) {
       // The INP node receives an inline phase-story caption when the
-      // aggregate carries a defensible INP story (see §3.3 / §4.1).
+      // aggregate carries a defensible INP story.
       // Other nodes pass `null` so the active-node renderer stays generic.
       const inpStoryForNode = stage.key === 'inp' ? act3.inp_story : null;
       const loafStoryForNode = stage.key === 'inp' ? act3.loaf_story : null;
@@ -901,7 +901,7 @@ function renderFunnelNodeActive(
   const tone = stageToneForShare(stage.weighted_poor_share);
   // Inline INP-phase caption under the threshold line. The caption stays
   // inside the existing node card so the funnel waterfall keeps its
-  // three-column rhythm — no new box, no new section (§3.3 of the plan).
+  // three-column rhythm — no new box, no new section.
   const inpCaption =
     inpStory && stage.key === 'inp'
       ? `<p class="sr-funnel-node-story" data-hedged="${inpStory.is_hedged ? 'true' : 'false'}">${escapeHtml(inpStory.narrative)}</p>`
@@ -1020,11 +1020,11 @@ function renderAct3(viewModel: ReportViewModel): string {
     `;
   }
 
-  // Distinguish genuine 0% (measured and found none crossed threshold) from
-  // absent (funnel exists but no defensible poor-share measurement). The
-  // legacy ?? 0 coercion silently rendered "0% of classified sessions
-  // crossed a poor-performance threshold" when the truth was "we couldn't
-  // measure this" — actively misleading.
+  // Distinguish genuine 0% (measured and found none crossed threshold)
+  // from absent (funnel exists but no defensible poor-share measurement).
+  // Coercing `null` to 0 here would render "0% of classified sessions
+  // crossed a poor-performance threshold" when the truth is "we couldn't
+  // measure this".
   const hasPoor = act3.poor_session_share != null;
   const hasCoverage = act3.measured_session_coverage != null;
   const poorShare = hasPoor ? (act3.poor_session_share as number) : 0;

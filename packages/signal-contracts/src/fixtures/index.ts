@@ -32,8 +32,7 @@ function pickFromMix<T extends string>(mix: Partial<Record<T, number>> | undefin
 
 // Third-party tier → representative mid-range share percentage. Aggregator
 // re-classifies from the event-level share so the numbers don't have to be
-// perfect — just plausibly inside each tier's band per §2.4 of the 0.1.x
-// enrichment plan.
+// perfect — just plausibly inside each tier's band.
 const THIRD_PARTY_TIER_SHARE_CENTER: Record<SignalThirdPartyTier, number> = {
   none: 0,
   light: 8,
@@ -325,7 +324,7 @@ interface SeriesOptions {
   startTs: number;
   path: string;
   browser?: 'chrome' | 'safari' | 'firefox';
-  // Iteration 6 — let each series override the hardware + connection signals
+  // let each series override the hardware + connection signals
   // so strong / affirming fixtures can show honestly varied histograms on the
   // Act 1 "Actionable signals" strip instead of every row reading 100% one.
   deviceTier?: 'high' | 'mid' | 'low';
@@ -621,7 +620,7 @@ export const affirmingAggregateFixture: SignalAggregateV1 = aggregateSignalEvent
       // dominant `none` (clean first-party surface), no background sessions
       // excluded, healthy LCP where `resource_load_time` leads over
       // `element_render_delay`, INP dominated by `presentation` (cheap
-      // frame commit), LoAF rare and painted. Verifies the §4 affirming /
+      // frame commit), LoAF rare and painted. Verifies the affirming /
       // silence branches emit clean copy rather than urgent diagnostics.
       enrichment: {
         lcpSubpartMix: {

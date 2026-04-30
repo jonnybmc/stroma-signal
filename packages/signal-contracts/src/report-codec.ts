@@ -382,8 +382,8 @@ function encodeAggregate(aggregate: SignalAggregateV1): URLSearchParams {
   if (aggregate.third_party_story) encodeThirdPartyStory(params, aggregate.third_party_story);
   if (aggregate.loaf_story) encodeLoafStory(params, aggregate.loaf_story);
   if (aggregate.context_story) encodeContextStory(params, aggregate.context_story);
-  // Denominator bookkeeping (§1.2). Emit only when present so legacy
-  // aggregates (pre-PR-6) round-trip unchanged.
+  // Denominator bookkeeping. Emit only when present so older aggregates
+  // (without raw / excluded counts) round-trip unchanged.
   if (aggregate.coverage.raw_sample_size != null) {
     params.set('rs', String(aggregate.coverage.raw_sample_size));
   }
@@ -410,7 +410,7 @@ export function encodeSignalReportUrl(
   const params = encodeAggregate(aggregate);
   const url = `${baseUrl}?${params.toString()}`;
 
-  // §5.4 URL-size budget. Hard breach throws — a silently-truncated URL
+  // URL-size budget. Hard breach throws — a silently-truncated URL
   // would fail at the proxy/browser layer with no useful error. Soft
   // breach stays emittable but surfaces a warning the caller can log.
   const urlByteLength = measureByteLength(url);

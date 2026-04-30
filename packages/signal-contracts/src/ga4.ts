@@ -35,7 +35,7 @@ const SIGNAL_GA4_SAFE_FIELDS_V1: SignalGa4FieldMapV1['fields'] = {
   third_party_weight_tier: 'third_party_weight_tier'
 };
 
-// Per-event third-party pre-LCP script weight tier (§2.4 of the enrichment
+// Per-event third-party pre-LCP script weight tier (of the enrichment
 // plan). Null when no LCP anchor is present (Safari/Firefox) or no scripts
 // loaded pre-paint. Keeps the GA4 row compact — full share % lives in the
 // warehouse column, the GA4 param carries the narratable bucket only.
