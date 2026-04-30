@@ -1,6 +1,6 @@
 {
   "name": "@stroma-labs/signal",
-  "version": "0.1.0-rc.1",
+  "version": "0.1.0-rc.2",
   "description": "Browser instrumentation package for measuring real-user network, device, and performance tiers.",
   "license": "MIT",
   "author": "Jonathan Booysen",

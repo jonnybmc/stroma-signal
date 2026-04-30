@@ -11,7 +11,8 @@ test-results
 .DS_Store
 .vscode/
 .idea/
-.claude/worktrees/
+# Local Claude Code config + state — never tracked in the public repo.
+.claude/
 *.log
 npm-debug.log*
 pnpm-debug.log*
