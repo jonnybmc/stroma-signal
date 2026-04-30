@@ -9,5 +9,6 @@ export * from './spec.js';
 export * from './summary.js';
 export * from './types.js';
 
-// Performance Intelligence (paid-product) types/codec/guards live in
-// the private @stroma-labs/signal-pi package. See packages/signal-pi/README.md.
+// `@stroma-labs/signal-pi` is a private companion workspace member that
+// lives outside the public source tree. Re-exporting from it here is
+// forbidden by `scripts/check-boundaries.mjs`.

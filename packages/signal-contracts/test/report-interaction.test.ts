@@ -11,12 +11,12 @@ import {
 function makeValidInteraction(): SignalReportInteractionV1 {
   return {
     v: SIGNAL_REPORT_INTERACTION_VERSION,
-    event_kind: 'pi_opened',
+    event_kind: 'report_opened',
     event_id: 'evt_abc123',
     ts: Date.UTC(2026, 3, 20, 12, 0, 0),
     st: 'a7k3m2p8',
-    route: 'pi',
-    piv: 1,
+    route: 'r',
+    rv: 1,
     ua_browser: 'chrome',
     ua_tier: 'desktop'
   };
@@ -24,119 +24,57 @@ function makeValidInteraction(): SignalReportInteractionV1 {
 
 describe('explainReportInteractionIssues', () => {
   describe('happy path', () => {
-    it('accepts a well-formed pi_opened event', () => {
+    it('accepts a well-formed report_opened event', () => {
       expect(explainReportInteractionIssues(makeValidInteraction())).toEqual([]);
       expect(isSignalReportInteractionV1(makeValidInteraction())).toBe(true);
     });
 
-    it('accepts a pi_closed event with dwell_ms', () => {
+    it('accepts a report_slide_advanced event with section_id', () => {
       const ev: SignalReportInteractionV1 = {
         ...makeValidInteraction(),
-        event_kind: 'pi_closed',
-        dwell_ms: 45_600
-      };
-      expect(explainReportInteractionIssues(ev)).toEqual([]);
-    });
-
-    it('accepts a pi_offer_clicked event with offer_index + offer_href', () => {
-      const ev: SignalReportInteractionV1 = {
-        ...makeValidInteraction(),
-        event_kind: 'pi_offer_clicked',
-        offer_index: 0,
-        offer_href: 'https://cal.com/stroma/pilot'
-      };
-      expect(explainReportInteractionIssues(ev)).toEqual([]);
-    });
-
-    it('accepts a pi_section_viewed event with section_id + dwell_ms', () => {
-      const ev: SignalReportInteractionV1 = {
-        ...makeValidInteraction(),
-        event_kind: 'pi_section_viewed',
-        section_id: 'drift-headline',
-        dwell_ms: 12_400
-      };
-      expect(explainReportInteractionIssues(ev)).toEqual([]);
-    });
-
-    it('accepts a report_opened event with rv', () => {
-      const ev: SignalReportInteractionV1 = {
-        v: SIGNAL_REPORT_INTERACTION_VERSION,
-        event_kind: 'report_opened',
-        event_id: 'evt_r1',
-        ts: Date.UTC(2026, 3, 20, 12, 0, 0),
-        st: 'token123',
-        route: 'r',
-        rv: 1
-      };
-      expect(explainReportInteractionIssues(ev)).toEqual([]);
-    });
-
-    it('accepts a report_slide_advanced event with rv + section_id', () => {
-      const ev: SignalReportInteractionV1 = {
-        v: SIGNAL_REPORT_INTERACTION_VERSION,
         event_kind: 'report_slide_advanced',
-        event_id: 'evt_r2',
-        ts: Date.UTC(2026, 3, 20, 12, 0, 0),
-        st: 'token123',
-        route: 'r',
-        rv: 1,
         section_id: 'act-3'
+      };
+      expect(explainReportInteractionIssues(ev)).toEqual([]);
+    });
+
+    it('accepts a report_slide_advanced event with section_id + dwell_ms', () => {
+      const ev: SignalReportInteractionV1 = {
+        ...makeValidInteraction(),
+        event_kind: 'report_slide_advanced',
+        section_id: 'act-2',
+        dwell_ms: 12_400
       };
       expect(explainReportInteractionIssues(ev)).toEqual([]);
     });
   });
 
-  describe('per-kind required fields (v6.1 tightening)', () => {
-    it('rejects pi_opened missing piv', () => {
-      const ev = { ...makeValidInteraction() } as Record<string, unknown>;
-      delete ev.piv;
-      const issues = explainReportInteractionIssues(ev);
-      expect(issues).toContain('Expected "piv" to be present for event_kind "pi_opened".');
-    });
-
-    it('rejects pi_closed missing dwell_ms', () => {
-      const ev = { ...makeValidInteraction(), event_kind: 'pi_closed' as const };
-      const issues = explainReportInteractionIssues(ev);
-      expect(issues).toContain('Expected "dwell_ms" to be present for event_kind "pi_closed".');
-    });
-
-    it('rejects pi_offer_clicked missing offer_index', () => {
-      const ev = {
-        ...makeValidInteraction(),
-        event_kind: 'pi_offer_clicked' as const,
-        offer_href: 'https://example.com'
-      };
-      const issues = explainReportInteractionIssues(ev);
-      expect(issues).toContain('Expected "offer_index" to be present for event_kind "pi_offer_clicked".');
-    });
-
-    it('rejects pi_offer_clicked missing offer_href', () => {
-      const ev = {
-        ...makeValidInteraction(),
-        event_kind: 'pi_offer_clicked' as const,
-        offer_index: 0
-      };
-      const issues = explainReportInteractionIssues(ev);
-      expect(issues).toContain('Expected "offer_href" to be present for event_kind "pi_offer_clicked".');
-    });
-
-    it('rejects pi_section_viewed missing section_id', () => {
-      const ev = { ...makeValidInteraction(), event_kind: 'pi_section_viewed' as const };
-      const issues = explainReportInteractionIssues(ev);
-      expect(issues).toContain('Expected "section_id" to be present for event_kind "pi_section_viewed".');
-    });
-
+  describe('per-kind required fields', () => {
     it('rejects report_opened missing rv', () => {
-      const ev = {
-        v: SIGNAL_REPORT_INTERACTION_VERSION,
-        event_kind: 'report_opened' as const,
-        event_id: 'evt_r1',
-        ts: Date.UTC(2026, 3, 20, 12, 0, 0),
-        st: 'token123',
-        route: 'r' as const
-      };
+      const ev = { ...makeValidInteraction() } as Record<string, unknown>;
+      delete ev.rv;
       const issues = explainReportInteractionIssues(ev);
       expect(issues).toContain('Expected "rv" to be present for event_kind "report_opened".');
+    });
+
+    it('rejects report_slide_advanced missing section_id', () => {
+      const ev = { ...makeValidInteraction(), event_kind: 'report_slide_advanced' as const };
+      const issues = explainReportInteractionIssues(ev);
+      expect(issues).toContain('Expected "section_id" to be present for event_kind "report_slide_advanced".');
+    });
+
+    it('rejects report_slide_advanced missing rv', () => {
+      const ev = {
+        v: SIGNAL_REPORT_INTERACTION_VERSION,
+        event_kind: 'report_slide_advanced' as const,
+        event_id: 'evt_r2',
+        ts: Date.UTC(2026, 3, 20, 12, 0, 0),
+        st: 'token123',
+        route: 'r' as const,
+        section_id: 'act-3'
+      };
+      const issues = explainReportInteractionIssues(ev);
+      expect(issues).toContain('Expected "rv" to be present for event_kind "report_slide_advanced".');
     });
   });
 
@@ -177,10 +115,10 @@ describe('explainReportInteractionIssues', () => {
       expect(issues.some((i) => i.includes('route'))).toBe(true);
     });
 
-    it('rejects piv !== 1 when route === "pi"', () => {
-      const ev = { ...makeValidInteraction(), piv: 99 };
+    it('rejects rv !== 1 when route === "r"', () => {
+      const ev = { ...makeValidInteraction(), rv: 99 };
       const issues = explainReportInteractionIssues(ev);
-      expect(issues.some((i) => i.includes('piv'))).toBe(true);
+      expect(issues.some((i) => i.includes('rv'))).toBe(true);
     });
 
     it('rejects unknown ua_tier', () => {
@@ -196,12 +134,6 @@ describe('explainReportInteractionIssues', () => {
       const ev = { ...makeValidInteraction(), dwell_ms: -5 };
       const issues = explainReportInteractionIssues(ev);
       expect(issues.some((i) => i.includes('dwell_ms'))).toBe(true);
-    });
-
-    it('rejects negative offer_index', () => {
-      const ev = { ...makeValidInteraction(), event_kind: 'pi_offer_clicked' as const, offer_index: -1 };
-      const issues = explainReportInteractionIssues(ev);
-      expect(issues.some((i) => i.includes('offer_index'))).toBe(true);
     });
   });
 

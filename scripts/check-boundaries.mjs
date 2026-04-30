@@ -57,10 +57,11 @@ if (packageJson.dependencies && Object.keys(packageJson.dependencies).length > 0
   throw new Error('packages/signal/package.json must not declare runtime dependencies.');
 }
 
-// Public/private boundary: free-tier surfaces must not import the paid PI
-// package. The paid product moves to a sibling private repo; this guard is
-// the defensive backstop so a stray import does not leak schema from the
-// public tree at build time.
+// Public/private boundary: public-tree surfaces must not import the
+// `@stroma-labs/signal-pi` package, which is a private workspace member
+// that lives outside the public source tree. This guard is the defensive
+// backstop so a stray import does not pull private code into a public
+// build artifact.
 const FREE_TIER_ROOTS = ['packages/signal/src', 'packages/signal-contracts/src', 'apps/signal-spike-lab/src'];
 const PI_IMPORT_PATTERNS = [
   /from\s+['"]@stroma-labs\/signal-pi(?:['"/])/,
@@ -77,7 +78,7 @@ for (const relRoot of FREE_TIER_ROOTS) {
       content,
       PI_IMPORT_PATTERNS,
       file,
-      'Free-tier surfaces must not import @stroma-labs/signal-pi (paid product lives in sibling private repo)'
+      'Public-tree surfaces must not import @stroma-labs/signal-pi (private companion package, lives outside the public source tree)'
     );
   }
 }
@@ -95,7 +96,7 @@ for (const rel of FREE_TIER_PACKAGE_JSONS) {
     const deps = pkg[block];
     if (deps && Object.hasOwn(deps, '@stroma-labs/signal-pi')) {
       throw new Error(
-        `${rel} must not declare ${block}["@stroma-labs/signal-pi"] (paid product lives in sibling private repo).`
+        `${rel} must not declare ${block}["@stroma-labs/signal-pi"] (private companion package, lives outside the public source tree).`
       );
     }
   }

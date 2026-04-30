@@ -1,27 +1,21 @@
-// Report-interaction telemetry contract. Separate from SignalEventV1
-// because (a) the /r and /pi report routes emit a different event
-// shape than the Signal beacon captures on client pages, (b) the
-// ingest endpoint for these is dedicated (/ingest/report-interaction)
-// per the architecture plan, and (c) bundling them into SignalEventV1
-// would force every Signal consumer to branch on event_kind they
-// don't care about.
+// Report-interaction telemetry contract for the hosted Tier Report.
+// Separate from `SignalEventV1` because (a) the report route emits a
+// different event shape than the Signal beacon captures on client
+// pages, (b) the ingest endpoint for these is dedicated
+// (`/ingest/report-interaction`), and (c) bundling them into
+// `SignalEventV1` would force every Signal consumer to branch on event
+// kinds they do not care about.
 //
-// The share token (`st`) is the per-URL identifier the builder
-// generates when a report is prepared for a specific prospect. The
-// warehouse join from this event back to the prospect is done
-// out-of-band (the user's own tracking sheet ↔ st pairs).
+// The share token (`st`) is the per-URL identifier the report builder
+// generates when a report is prepared for a specific recipient. The
+// warehouse join from this event back to the recipient is done
+// out-of-band (the operator's own tracking sheet ↔ `st` pairs).
 
 export const SIGNAL_REPORT_INTERACTION_VERSION = 1 as const;
 
-export type SignalReportInteractionKind =
-  | 'pi_opened'
-  | 'pi_closed'
-  | 'pi_section_viewed'
-  | 'pi_offer_clicked'
-  | 'report_opened'
-  | 'report_slide_advanced';
+export type SignalReportInteractionKind = 'report_opened' | 'report_slide_advanced';
 
-export type SignalReportInteractionRoute = 'pi' | 'r';
+export type SignalReportInteractionRoute = 'r';
 
 export type SignalReportInteractionUaTier = 'mobile' | 'tablet' | 'desktop';
 
@@ -37,37 +31,26 @@ export interface SignalReportInteractionV1 {
   // specific send, which defeats the validation-signal purpose.
   st: string;
   route: SignalReportInteractionRoute;
-  // Version param from the URL. `piv` when route === 'pi', `rv`
-  // when route === 'r'. Optional because some events may originate
-  // before the version is parsed; guards assert the right one based
-  // on route.
-  piv?: number;
+  // Version param from the URL (`rv`). Optional because some events
+  // may originate before the version is parsed; the per-kind required
+  // map below asserts it for kinds that need it.
   rv?: number;
-  // Populated when event_kind === 'pi_section_viewed' — identifies
-  // which section of the /pi artifact entered the viewport.
+  // Populated when event_kind === 'report_slide_advanced' — identifies
+  // which section of the report entered the viewport.
   section_id?: string;
-  // Populated when event_kind === 'pi_offer_clicked' —
-  // Act-4-style offer-card index + href for the click.
-  offer_index?: number;
-  offer_href?: string;
-  // Cumulative ms spent before this event fired on the prior
-  // section/slide. Optional because the first event in a session
-  // has no prior dwell to measure.
+  // Cumulative ms spent before this event fired on the prior section.
+  // Optional because the first event in a session has no prior dwell.
   dwell_ms?: number;
   ua_browser?: string;
   ua_tier?: SignalReportInteractionUaTier;
 }
 
 export const SIGNAL_REPORT_INTERACTION_VALID_KINDS: ReadonlySet<SignalReportInteractionKind> = new Set([
-  'pi_opened',
-  'pi_closed',
-  'pi_section_viewed',
-  'pi_offer_clicked',
   'report_opened',
   'report_slide_advanced'
 ]);
 
-export const SIGNAL_REPORT_INTERACTION_VALID_ROUTES: ReadonlySet<SignalReportInteractionRoute> = new Set(['pi', 'r']);
+export const SIGNAL_REPORT_INTERACTION_VALID_ROUTES: ReadonlySet<SignalReportInteractionRoute> = new Set(['r']);
 
 export const SIGNAL_REPORT_INTERACTION_VALID_UA_TIERS: ReadonlySet<SignalReportInteractionUaTier> = new Set([
   'mobile',
@@ -75,19 +58,14 @@ export const SIGNAL_REPORT_INTERACTION_VALID_UA_TIERS: ReadonlySet<SignalReportI
   'desktop'
 ]);
 
-// Per-kind required fields. The kill criterion (5 responses / first yes
-// / 90 days) is only meaningful if the validation telemetry is
-// structurally useful — this means every event kind carries the fields
-// a downstream materialised view needs to aggregate against.
+// Per-kind required fields. Every event kind declares which fields
+// beyond the base must be present so the downstream metrics view can
+// aggregate without defensive-null checks at query time.
 //
 // Base fields required on every event: v, event_kind, event_id, ts,
 // st, route. Everything below is event-kind-specific in addition to
 // the base.
 const KIND_REQUIRED_FIELDS: Record<SignalReportInteractionKind, readonly string[]> = {
-  pi_opened: ['piv'],
-  pi_closed: ['piv', 'dwell_ms'],
-  pi_offer_clicked: ['piv', 'offer_index', 'offer_href'],
-  pi_section_viewed: ['piv', 'section_id'],
   report_opened: ['rv'],
   report_slide_advanced: ['rv', 'section_id']
 };
@@ -125,13 +103,9 @@ export function explainReportInteractionIssues(value: unknown): string[] {
     typeof v.route !== 'string' ||
     !SIGNAL_REPORT_INTERACTION_VALID_ROUTES.has(v.route as SignalReportInteractionRoute)
   ) {
-    issues.push('Expected "route" to be "pi" or "r".');
+    issues.push('Expected "route" to be "r".');
   }
 
-  // Per-kind required fields (v6.1 tightening). Each event kind
-  // declares which fields beyond the base must be present, so the
-  // downstream metrics view can aggregate without defensive-null
-  // checks at query time.
   if (kindValid) {
     const kind = v.event_kind as SignalReportInteractionKind;
     const required = KIND_REQUIRED_FIELDS[kind];
@@ -143,12 +117,7 @@ export function explainReportInteractionIssues(value: unknown): string[] {
     }
   }
 
-  // Route-version consistency: when route === 'pi', piv must equal 1
-  // when set; when 'r', rv must equal 1 when set. Existence is
-  // enforced by KIND_REQUIRED_FIELDS above.
-  if (v.route === 'pi' && v.piv != null && v.piv !== 1) {
-    issues.push('Expected "piv" to be 1 when route === "pi".');
-  }
+  // Route/version consistency: rv must equal 1 when set.
   if (v.route === 'r' && v.rv != null && v.rv !== 1) {
     issues.push('Expected "rv" to be 1 when route === "r".');
   }
@@ -160,9 +129,6 @@ export function explainReportInteractionIssues(value: unknown): string[] {
   if (v.dwell_ms != null && (typeof v.dwell_ms !== 'number' || v.dwell_ms < 0)) {
     issues.push('Expected "dwell_ms" to be a non-negative number when present.');
   }
-  if (v.offer_index != null && (typeof v.offer_index !== 'number' || v.offer_index < 0)) {
-    issues.push('Expected "offer_index" to be a non-negative number when present.');
-  }
 
   return issues;
 }
@@ -171,7 +137,7 @@ export function isSignalReportInteractionV1(value: unknown): value is SignalRepo
   return explainReportInteractionIssues(value).length === 0;
 }
 
-// Default ingest endpoint. Separate from Signal's /collect. Clients
-// deploying PI override via env; the view-model carries the final
-// URL into the beacon fire call.
+// Default ingest endpoint. Separate from Signal's `/collect`. Clients
+// override via env or inline configuration tag if hosting their own
+// ingest template.
 export const SIGNAL_REPORT_INTERACTION_INGEST_PATH = '/ingest/report-interaction';

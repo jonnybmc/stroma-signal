@@ -18,11 +18,12 @@ The Tier Report is not a diagnostic, attribution, or commercial modelling artifa
 
 It proves the existence and shape of the experience gap. It does not explain root cause, quantify business exposure, or prescribe remediation.
 
-It is the measured proof layer that sits between:
+It is the measured proof layer that sits on top of:
 
 - the browser instrumentation package
 - the warehouse and URL-builder workflow
-- the broader Stroma engagement layer, where the proven gap is taken into commercial and remediation work
+
+The report is a complete, standalone artifact. Its job is to make the experience gap visible and credible enough that a team can act on it from the report alone — no follow-on engagement is required for the report to be useful.
 
 ## Narrative Structure
 
@@ -90,16 +91,13 @@ Thresholds:
 
 Act 3 should still feel embodied. The visual and copy should communicate that sessions become late, then visibly late, then interaction-ready too late. It must not collapse into a clinical threshold table.
 
-### Act 4: What Exists Beyond This?
+### Act 4: What This Evidence Enables
 
-Act 4 is the handoff layer.
+Act 4 is the closing act.
 
-The report should make the next step obvious:
+It restates what the report has already proven — who is affected, how far apart the experience is, where performance becomes poor — and lets the reader take that proof into their own sprint planning, roadmap conversation, or stakeholder review.
 
-- `Rapid Fix Plan` = trace the proven gap to the landing pages and routes causing the most drag, and return the sequenced fixes that close it fastest
-- A second, generic engagement card invites the viewer to take the measured truth into a deeper diagnostic conversation with Stroma without naming or describing the downstream paid product
-
-The report does not give away those deeper layers for free. It proves the gap and hands off cleanly.
+A single optional CTA points at `Rapid Fix Plan` for teams that want help executing on the gap. `Rapid Fix Plan` is a Stroma consultancy engagement that traces the proven gap to the landing pages and routes causing the most drag and returns a sequenced fix order. The CTA is opt-in; the report stands on its own without it.
 
 ## Truth Boundary
 
@@ -228,21 +226,16 @@ If an older `rv=1` URL predates the additive funnel block:
 
 ## CTA Boundary
 
-The free report is a proof artifact, not a consulting deliverable.
+The report is a proof artifact, not a consulting deliverable.
 
-The CTA language must preserve that:
-
-- Rapid Fix Plan pinpoints the landing pages and routes carrying the most drag and returns a sequenced fix order
-- The second engagement card invites the viewer into a wider Stroma conversation about turning measured user-experience evidence into commercial decisions, without naming or describing the downstream paid product
-
-Benchmark or comparative extras, if present later, should remain tertiary.
+The single Act 4 CTA — `Rapid Fix Plan` — pinpoints the landing pages and routes carrying the most drag and returns a sequenced fix order. It is a Stroma consultancy engagement, opt-in, and explicitly framed as optional: a team should be able to take the report alone into a sprint review and act on it.
 
 Act 4 must close the evidence journey cleanly:
 
 - who is affected
 - how far apart the experience is
 - where performance becomes poor
-- what deeper layer answers why and what to fix first
+- what the team can do with this evidence — and where to find help if they want it
 
 ## Drift Rules
 

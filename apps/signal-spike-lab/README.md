@@ -33,8 +33,9 @@ emitted events.
 ## Boundary rules
 
 - ✅ Depends on `@stroma-labs/signal` and `@stroma-labs/signal-contracts`.
-- ❌ MUST NOT depend on `@stroma-labs/signal-pi` (paid product surface;
-  enforced by `scripts/check-boundaries.mjs`).
+- ❌ MUST NOT depend on `@stroma-labs/signal-pi` (private companion
+  package, lives outside the public source tree; enforced by
+  `scripts/check-boundaries.mjs`).
 
 ## Not for production
 

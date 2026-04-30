@@ -19,10 +19,11 @@ Splitting the contract from the SDK gives:
 2. **Independent test coverage.** Guards, codecs, aggregation, exports, and
    SQL templates are each unit-tested without booting the SDK runtime or the
    report renderer.
-3. **A clean boundary against the paid product.** This package is forbidden
-   from importing `@stroma-labs/signal-pi` (enforced by
-   `scripts/check-boundaries.mjs`). Paid PI types live in their own package
-   that imports *from* this one, never the other way around.
+3. **A clean boundary against any private companion layer.** This package is
+   forbidden from importing `@stroma-labs/signal-pi`, a private workspace
+   member that lives outside the public source tree (enforced by
+   `scripts/check-boundaries.mjs`). The contract package may be imported
+   *from* other workspace members; it never imports back into them.
 
 ## What ships
 
@@ -43,9 +44,9 @@ Splitting the contract from the SDK gives:
 ## Boundary rules
 
 - ✅ May depend on standard library types only (no runtime npm deps).
-- ✅ May be imported by `@stroma-labs/signal`, `apps/signal-report`,
-  `apps/signal-spike-lab`, and `@stroma-labs/signal-pi`.
-- ❌ MUST NOT import from `@stroma-labs/signal-pi` (paid product layer).
+- ✅ May be imported by any workspace member.
+- ❌ MUST NOT import from `@stroma-labs/signal-pi` (private companion
+  package, lives outside the public source tree).
 - ❌ MUST NOT import from any `apps/*` (apps depend on packages, never the
   reverse).
 

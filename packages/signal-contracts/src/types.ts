@@ -211,23 +211,20 @@ export interface SignalEventV1 {
   vitals: SignalVitals;
   context: SignalContext;
   meta: SignalMeta;
-  // Identity layer — optional type-level declarations landed in v6.2 PI
-  // planning. SDK client-side population (reading _ga / _ga_<container>
-  // cookies + persisting gclid via localStorage) is Phase 1 of PI work.
-  // See internal/docs/pi-identity-layer.md (private submodule) for load-order / Consent Mode v2
-  // fragility and per-key acceptance criteria. Optional so legacy events
-  // and non-PI deploys round-trip unchanged.
+  // Optional identity / attribution fields. When populated by the host
+  // site or by an SDK extension, these enable warehouse-side joins
+  // between SignalEventV1 rows and other analytics or ad-platform data.
+  // All four are optional so events from sites that do not populate
+  // them round-trip through the contract unchanged.
+  //   ga_session_id          — GA4 session identifier (from `_ga_<id>`)
+  //   user_pseudo_id         — GA4 pseudonymous user identifier
+  //   gclid                  — Google Click ID, useful for ad joins
+  //   conversion_fingerprint — independent conversion event hash that
+  //                            does not depend on Meta Pixel, Google
+  //                            conversion tags, or ITP-gated cookies
   ga_session_id?: string | null;
   user_pseudo_id?: string | null;
   gclid?: string | null;
-  // Attribution-independent conversion fingerprint (v6.3 architectural
-  // graduation). When Signal's beacon fires on a thank-you or form-submit
-  // page, the SDK emits a stable fingerprint so the warehouse can count
-  // conversions independent of Meta Pixel, Google conversion tags, ITP-
-  // gated cookies, and consent-denied analytics. Signal becomes the
-  // attribution fact-checker: "GA4 reports N conversions, Pixel reports M,
-  // Signal observed P — here's the cohort each is missing."
-  // v1: type-level declaration only; SDK population is Phase 1.
   conversion_fingerprint?: string | null;
 }
 

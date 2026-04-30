@@ -24,10 +24,7 @@ describe('report view model', () => {
     expect(viewModel.act3.active_stage_keys).toEqual(['fcp', 'lcp', 'inp']);
     expect(viewModel.act3.stages.map((stage) => stage.key)).toEqual(['fcp', 'lcp', 'inp']);
     expect(viewModel.mood_tier).toBe('urgent');
-    expect(viewModel.offer_cards.map((card) => card.title)).toEqual([
-      'Rapid Fix Plan',
-      'Take this into a wider conversation'
-    ]);
+    expect(viewModel.offer_cards.map((card) => card.title)).toEqual(['Rapid Fix Plan']);
   });
 
   it('drops to a reduced measured funnel when INP coverage is too weak', () => {
