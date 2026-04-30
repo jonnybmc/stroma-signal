@@ -391,7 +391,7 @@ describe('docs alignment — sweep C (semantic alignment)', () => {
         const doc = readDoc(docName);
         const drift: string[] = [];
         for (const { label, pattern, canonical } of THRESHOLD_PATTERNS) {
-          for (const match of doc.matchAll(new RegExp(pattern.source, pattern.flags + 'g'))) {
+          for (const match of doc.matchAll(new RegExp(pattern.source, `${pattern.flags}g`))) {
             const value = Number(match[1]);
             if (value !== canonical) {
               drift.push(`${label}: doc says ${value}ms, canonical is ${canonical}ms`);
