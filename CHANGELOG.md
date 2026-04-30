@@ -10,12 +10,30 @@ dist-tag. The `latest` dist-tag is reserved for stable releases. To
 install a pre-release: `pnpm add @stroma-labs/signal@next` (or pin to
 the exact version, e.g. `@stroma-labs/signal@0.1.0-rc.1`).
 
+## [0.1.0-rc.2] - 2026-04-30
+
+Re-cut of the first release candidate after `0.1.0-rc.1`'s publish
+attempt was rejected by npm with `403 Forbidden — Two-factor
+authentication or granular access token with bypass 2fa enabled is
+required` (the original `NPM_TOKEN` did not bypass 2FA, so unattended
+CI publishing failed). No package code changed; the tarball is
+byte-identical to what `0.1.0-rc.1` would have produced.
+
+Also closes a hygiene leak: `.claude/settings.json` was being tracked
+in the public repo (revealed that Claude Code is used for development
+and named the active skill plugin). The full `.claude/` directory is
+now gitignored; only `.claude/worktrees/` was previously excluded.
+
+### Fixed
+
+- **Repo hygiene:** `.claude/settings.json` removed from tracking;
+  `.gitignore` now excludes the full `.claude/` directory so local
+  Claude Code config and state never enter the public repo.
+
 ## [0.1.0-rc.1] - 2026-04-30
 
-First public release candidate. Published for pilot testing — feature-
-complete for the v0.1 scope, expected to graduate to `0.1.0` once
-warehouse-derived report URLs are validated against fixture semantics
-end-to-end on a live deployment.
+First public release candidate. Published attempt failed at npm due
+to a token-bypass-2FA issue; superseded by `0.1.0-rc.2` (same code).
 
 ### Added
 
