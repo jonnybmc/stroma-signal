@@ -160,6 +160,8 @@ This measures the actual round-trip time between the user's device and the serve
 
 Default thresholds are calibrated against Opensignal network quality reports and CrUX BigQuery RTT distributions. They are configuration-overridable to match the network conditions of any market.
 
+The canonical numbers live in `packages/signal-contracts/src/types.ts` as `DEFAULT_NETWORK_THRESHOLDS` and are re-exported from `@stroma-labs/signal-contracts`. The SDK imports them; report renderers import the matching `formatNetworkBand(tier)` helper to derive the human-readable band copy. Customising the SDK boundaries via `init({ networkTierThresholds })` keeps the SDK and any downstream renderer that uses the same helper in lock-step.
+
 ### TCP Source Values
 
 The `net_tcp_source` field documents how the TCP measurement was derived and whether tier classification was possible.

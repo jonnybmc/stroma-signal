@@ -17,6 +17,9 @@ import type {
   SignalThirdPartyTier
 } from '@stroma-labs/signal-contracts';
 import {
+  DEFAULT_NETWORK_THRESHOLDS,
+  formatDeviceSignature,
+  formatNetworkBand,
   SIGNAL_CELLULAR_NARRATE_THRESHOLD_PCT,
   SIGNAL_FRESHNESS_UNKNOWN_WARNING,
   SIGNAL_FUNNEL_FCP_POOR_THRESHOLD,
@@ -435,17 +438,31 @@ const DEVICE_TIER_LABELS: Record<ReportDeviceTierKey, string> = {
 // packages/signal/src/core/classify-device.ts. Surfacing them in the Act 1
 // narrative lets a reader see what the tier actually MEANS in hardware terms
 // rather than reading atmospheric marketing copy.
-const DEVICE_SIGNATURE: Record<ReportDeviceTierKey, string> = {
-  high: '6+ CPU cores, 1280px+ screens, 4+ GB RAM where measurable',
-  mid: '4–6 CPU cores, 768–1280px screens, 2–4 GB RAM where measurable',
-  low: '≤2 CPU cores, <768px screens, ≤2 GB RAM where measurable'
-};
+// Narrative-tone descriptions of the canonical device signatures. The
+// tier boundaries themselves come from `formatDeviceSignature()` —
+// `signatureFor()` rewrites them into Act 1's editorial voice without
+// hand-curating new cutoff numbers.
+function signatureFor(key: ReportDeviceTierKey): string {
+  // Examples (with default boundaries):
+  //   high → "6+ cores · 4+ GB · 1280px+"
+  //   mid  → "4–6 cores · 2–4 GB · 768px+"
+  //   low  → "≤2 cores · ≤1 GB · <768px"
+  // Re-shape into prose by replacing the compact glyphs with editorial
+  // wording while keeping every number the helper produced.
+  return formatDeviceSignature(key)
+    .replace('cores', 'CPU cores')
+    .replace(' · ', ', ')
+    .replace(' · ', ', ')
+    .replace(/(\d+px\+)/, '$1 screens')
+    .replace(/<(\d+px)/, '<$1 screens')
+    .replace(/(\d+\+ GB|≤\d+ GB|\d+–\d+ GB)/, '$1 RAM where measurable');
+}
 
 function buildDeviceNarrative(key: ReportDeviceTierKey, share: number): string {
   if (share === 0) {
     return 'No sessions in this device class were observed in this sample.';
   }
-  const signature = DEVICE_SIGNATURE[key];
+  const signature = signatureFor(key);
   if (share >= 50) {
     return `The dominant hardware reality of your audience. Sessions on ${signature}.`;
   }
@@ -1577,7 +1594,7 @@ function buildPersonaContrast(aggregate: SignalAggregateV1): ReportPersonaContra
       share: urbanShare,
       tone: 'steady',
       network_tier: TIER_LABELS.urban,
-      network_criteria: '< 50 ms TCP',
+      network_criteria: formatNetworkBand('urban'),
       effective_type: bestEffective !== 'Unknown' ? bestEffective : null,
       downlink_label: bestDownlink,
       rtt_label: bestRtt,
@@ -1586,8 +1603,7 @@ function buildPersonaContrast(aggregate: SignalAggregateV1): ReportPersonaContra
       browser: bestBrowser ? bestBrowser.charAt(0).toUpperCase() + bestBrowser.slice(1) : null,
       save_data: false,
       is_empty: urbanShare === 0,
-      empty_message:
-        'No sessions in this window met the urban tier threshold (< 50 ms TCP). Every measured session lives outside the best-connected band.'
+      empty_message: `No sessions in this window met the urban tier threshold (${formatNetworkBand('urban')}). Every measured session lives outside the best-connected band.`
     },
     constrained: {
       label: constrainedShare > 0 ? 'Your most constrained' : 'No constrained cohort',
@@ -1599,7 +1615,10 @@ function buildPersonaContrast(aggregate: SignalAggregateV1): ReportPersonaContra
             ? TIER_LABELS.constrained
             : TIER_LABELS.constrained_moderate
           : TIER_LABELS.constrained,
-      network_criteria: nd.constrained >= nd.constrained_moderate ? '≥ 400 ms TCP' : '150–400 ms TCP',
+      network_criteria:
+        nd.constrained >= nd.constrained_moderate
+          ? formatNetworkBand('constrained')
+          : formatNetworkBand('constrained_moderate'),
       effective_type: constrainedEffective !== 'Unknown' ? constrainedEffective : null,
       downlink_label: constrainedDownlink,
       rtt_label: constrainedRtt,
@@ -1608,8 +1627,7 @@ function buildPersonaContrast(aggregate: SignalAggregateV1): ReportPersonaContra
       browser: bestBrowser ? bestBrowser.charAt(0).toUpperCase() + bestBrowser.slice(1) : null,
       save_data: (ns?.save_data_share ?? 0) > 0,
       is_empty: constrainedShare === 0,
-      empty_message:
-        'No sessions in this window fell into the constrained tiers (> 150 ms TCP). The full audience lives in better-connected bands.'
+      empty_message: `No sessions in this window fell into the constrained tiers (> ${DEFAULT_NETWORK_THRESHOLDS.moderate} ms TCP). The full audience lives in better-connected bands.`
     }
   };
 }

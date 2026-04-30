@@ -1,16 +1,13 @@
 import type { SignalNetTcpSource, SignalNetworkTier, SignalNetworkTierThresholds } from '@stroma-labs/signal-contracts';
+import { DEFAULT_NETWORK_THRESHOLDS } from '@stroma-labs/signal-contracts';
+
+export { DEFAULT_NETWORK_THRESHOLDS };
 
 export interface NetworkSnapshot {
   net_tier: SignalNetworkTier | null;
   net_tcp_ms: number | null;
   net_tcp_source: SignalNetTcpSource;
 }
-
-export const DEFAULT_NETWORK_THRESHOLDS: SignalNetworkTierThresholds = {
-  urban: 50,
-  moderate: 150,
-  constrained_moderate: 400
-};
 
 function classifyTier(tcpMs: number, thresholds: SignalNetworkTierThresholds): SignalNetworkTier {
   if (tcpMs < thresholds.urban) return 'urban';

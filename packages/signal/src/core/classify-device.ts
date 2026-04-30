@@ -1,4 +1,7 @@
-import type { SignalDeviceTier } from '@stroma-labs/signal-contracts';
+import type { SignalDeviceScoreBoundaries, SignalDeviceTier } from '@stroma-labs/signal-contracts';
+import { DEFAULT_DEVICE_SCORE_BOUNDARIES } from '@stroma-labs/signal-contracts';
+
+export { DEFAULT_DEVICE_SCORE_BOUNDARIES };
 
 export interface DeviceSnapshot {
   device_tier: SignalDeviceTier;
@@ -8,31 +11,36 @@ export interface DeviceSnapshot {
   device_screen_h: number;
 }
 
-function scoreCores(cores: number): number {
-  if (cores <= 2) return 0;
-  if (cores <= 4) return 1;
-  if (cores <= 6) return 2;
+function scoreCores(cores: number, boundaries: SignalDeviceScoreBoundaries['cores']): number {
+  if (cores <= boundaries.low) return 0;
+  if (cores <= boundaries.mid) return 1;
+  if (cores <= boundaries.high) return 2;
   return 3;
 }
 
-function scoreMemory(memory: number | null): number | null {
+function scoreMemory(memory: number | null, boundaries: SignalDeviceScoreBoundaries['memory_gb']): number | null {
   if (memory == null) return null;
-  if (memory <= 1) return 0;
-  if (memory <= 2) return 1;
-  if (memory <= 4) return 2;
+  if (memory <= boundaries.low) return 0;
+  if (memory <= boundaries.mid) return 1;
+  if (memory <= boundaries.high) return 2;
   return 3;
 }
 
-function scoreScreen(width: number): number {
-  if (width < 480) return 0;
-  if (width < 768) return 1;
-  if (width < 1280) return 2;
+function scoreScreen(width: number, boundaries: SignalDeviceScoreBoundaries['screen_w']): number {
+  if (width < boundaries.mobile) return 0;
+  if (width < boundaries.tablet) return 1;
+  if (width < boundaries.desktop) return 2;
   return 3;
 }
 
-export function defaultDeviceTier(cores: number, memory: number | null, screenWidth: number): SignalDeviceTier {
-  const scores = [scoreCores(cores), scoreScreen(screenWidth)];
-  const memoryScore = scoreMemory(memory);
+export function defaultDeviceTier(
+  cores: number,
+  memory: number | null,
+  screenWidth: number,
+  boundaries: SignalDeviceScoreBoundaries = DEFAULT_DEVICE_SCORE_BOUNDARIES
+): SignalDeviceTier {
+  const scores = [scoreCores(cores, boundaries.cores), scoreScreen(screenWidth, boundaries.screen_w)];
+  const memoryScore = scoreMemory(memory, boundaries.memory_gb);
   if (memoryScore != null) scores.push(memoryScore);
 
   const total = scores.reduce((sum, score) => sum + score, 0);
