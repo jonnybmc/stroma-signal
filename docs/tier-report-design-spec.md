@@ -245,8 +245,6 @@ The report product surface must stay aligned with:
 - the canonical package name `@stroma-labs/signal`
 - the additive `rv=1` report contract
 
-No old references to `@stroma/perf-tiers` or `tiers.stroma.design` should remain in live report docs.
-
 ## Validation Expectations
 
 Changes to the report surface should be validated together across:
