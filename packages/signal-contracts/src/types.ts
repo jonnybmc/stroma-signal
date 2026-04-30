@@ -105,6 +105,78 @@ export interface SignalNetworkTierThresholds {
   constrained_moderate: number;
 }
 
+// Canonical TCP-handshake (ms) thresholds used by the SDK network
+// classifier. Single source of truth — the SDK imports these to bin
+// per-event TCP times; report renderers import them via
+// `formatNetworkBand()` to derive the human-readable band copy. Keeping
+// the values here means a tuning lower than 50ms ripples to one place.
+export const DEFAULT_NETWORK_THRESHOLDS: SignalNetworkTierThresholds = {
+  urban: 50,
+  moderate: 150,
+  constrained_moderate: 400
+} as const;
+
+// Bucket boundaries the SDK device classifier uses to score per-event
+// CPU / memory / screen signals before composing the device tier. These
+// are NOT strict tier definitions — the tier is a sum-of-scores
+// composite — but they are the canonical numbers any descriptive copy
+// about "what tier X means" has to draw from.
+export interface SignalDeviceScoreBoundaries {
+  // Inclusive upper bounds for cores scoring (cores <= low → 0,
+  // <= mid → 1, <= high → 2, else 3).
+  cores: { low: number; mid: number; high: number };
+  // Inclusive upper bounds for memory_gb scoring (same staircase shape).
+  memory_gb: { low: number; mid: number; high: number };
+  // Exclusive upper bounds for screen_w scoring (< mobile → 0,
+  // < tablet → 1, < desktop → 2, else 3).
+  screen_w: { mobile: number; tablet: number; desktop: number };
+}
+
+export const DEFAULT_DEVICE_SCORE_BOUNDARIES: SignalDeviceScoreBoundaries = {
+  cores: { low: 2, mid: 4, high: 6 },
+  memory_gb: { low: 1, mid: 2, high: 4 },
+  screen_w: { mobile: 480, tablet: 768, desktop: 1280 }
+} as const;
+
+// Human-readable network band derived from the canonical thresholds.
+// One helper, one set of glyphs (en-dash, ≥), so report renderers stay
+// in lock-step with the classifier when the numbers move.
+export function formatNetworkBand(
+  tier: SignalNetworkTier,
+  thresholds: SignalNetworkTierThresholds = DEFAULT_NETWORK_THRESHOLDS
+): string {
+  switch (tier) {
+    case 'urban':
+      return `< ${thresholds.urban} ms TCP`;
+    case 'moderate':
+      return `${thresholds.urban}–${thresholds.moderate} ms TCP`;
+    case 'constrained_moderate':
+      return `${thresholds.moderate}–${thresholds.constrained_moderate} ms TCP`;
+    case 'constrained':
+      return `≥ ${thresholds.constrained_moderate} ms TCP`;
+  }
+}
+
+// Human-readable device signature derived from the canonical score
+// boundaries. The output is approximate (the SDK tier is a composite
+// of three scores, not a strict bucket), but the cutoff numbers come
+// from the same source the classifier uses, so any change to the score
+// boundaries propagates to report copy.
+export function formatDeviceSignature(
+  tier: SignalDeviceTier,
+  boundaries: SignalDeviceScoreBoundaries = DEFAULT_DEVICE_SCORE_BOUNDARIES
+): string {
+  const { cores, memory_gb, screen_w } = boundaries;
+  switch (tier) {
+    case 'high':
+      return `${cores.high}+ cores · ${memory_gb.high}+ GB · ${screen_w.desktop}px+`;
+    case 'mid':
+      return `${cores.mid}–${cores.high} cores · ${memory_gb.mid}–${memory_gb.high} GB · ${screen_w.tablet}px+`;
+    case 'low':
+      return `≤${cores.low} cores · ≤${memory_gb.low} GB · <${screen_w.tablet}px`;
+  }
+}
+
 export interface SignalLcpAttribution {
   load_state: SignalLoadState;
   target: string | null;

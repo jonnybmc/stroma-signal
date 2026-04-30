@@ -1,4 +1,5 @@
 import type { SignalDeviceTier, SignalNetworkTier, SignalRaceFallbackReason } from '@stroma-labs/signal-contracts';
+import { formatDeviceSignature, formatNetworkBand } from '@stroma-labs/signal-contracts';
 
 import { escapeHtml } from './render-utils';
 import { REPORT_BRAND } from './report-brand';
@@ -59,27 +60,28 @@ function stageIcon(stageKey: string): string {
   return icon ? renderIcon(icon, 'sr-icon sr-icon-sm') : '';
 }
 
-// Classification criteria derived from the SDK classification thresholds.
-// These explain what each tier MEANS in real measurable terms so the
-// landing tables tell the full story, not just the label + share.
-// Typed as exhaustive records — adding a new tier to the contract's
-// SignalNetworkTier / SignalDeviceTier enum will fail to compile here
-// until the criteria + meaning copy is added, preventing silent empty
-// fallback on future tier additions.
+// Classification criteria derived from the canonical thresholds in
+// signal-contracts. The four classified network bands and three device
+// signatures resolve through `formatNetworkBand()` /
+// `formatDeviceSignature()` so any change to the SDK's threshold
+// constants ripples here without a manual string edit. The `unknown`
+// tier has no measured boundary and stays as inline copy. Typed as
+// exhaustive records so adding a new tier to the contract enum fails
+// to compile here until the criteria entry is added.
 type TierKeyAll = SignalNetworkTier | 'unknown';
 
 const NETWORK_CRITERIA: Record<TierKeyAll, string> = {
-  urban: '< 50 ms TCP',
-  moderate: '50–150 ms TCP',
-  constrained_moderate: '150–400 ms TCP',
-  constrained: '≥ 400 ms TCP',
+  urban: formatNetworkBand('urban'),
+  moderate: formatNetworkBand('moderate'),
+  constrained_moderate: formatNetworkBand('constrained_moderate'),
+  constrained: formatNetworkBand('constrained'),
   unknown: 'Not classifiable'
 };
 
 const DEVICE_CRITERIA: Record<SignalDeviceTier, string> = {
-  high: '6+ cores · 4+ GB · 1280px+',
-  mid: '4–6 cores · 2–4 GB · 768px+',
-  low: '≤2 cores · ≤2 GB · <768px'
+  high: formatDeviceSignature('high'),
+  mid: formatDeviceSignature('mid'),
+  low: formatDeviceSignature('low')
 };
 
 // Plain-English interpretation copy for desktop hover tooltips. These are
