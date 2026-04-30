@@ -91,8 +91,7 @@ function expectCanonicalSevenCompleteDayWindow(sql: string): void {
 }
 
 interface GtmWorkspaceTemplate {
-  requiredDataLayerVariables: Array<{ dataLayerName: string }>;
-  recommendedDataLayerVariables: Array<{ dataLayerName: string }>;
+  dataLayerVariables: Array<{ dataLayerName: string; required: boolean }>;
   ga4EventTag: {
     parameters: Array<{ name: string; variable: string }>;
   };
@@ -372,17 +371,38 @@ describe('bigquery sql templates', () => {
 
   it('keeps the GTM workspace template aligned with the GA4-safe allowlist', () => {
     const template = readDocJson<GtmWorkspaceTemplate>('gtm-workspace-template.json');
-    const requiredVariableNames = template.requiredDataLayerVariables.map((variable) => variable.dataLayerName).sort();
-    const recommendedVariableNames = template.recommendedDataLayerVariables
-      .map((variable) => variable.dataLayerName)
-      .sort();
+    const variableNames = template.dataLayerVariables.map((variable) => variable.dataLayerName).sort();
     const eventParameterNames = template.ga4EventTag.parameters.map((parameter) => parameter.name).sort();
-    const templateFieldNames = new Set([...requiredVariableNames, ...recommendedVariableNames, ...eventParameterNames]);
+    const templateFieldNames = new Set([...variableNames, ...eventParameterNames]);
 
-    expect(requiredVariableNames).toEqual(ga4SafeFieldNames);
+    // Every GA4-safe field must appear as a DLV and a GA4 event param.
+    expect(variableNames).toEqual(ga4SafeFieldNames);
     expect(eventParameterNames).toEqual(ga4SafeFieldNames);
-    expect(recommendedVariableNames).toEqual([]);
 
+    // Required-vs-optional split must match what the URL builder needs.
+    // Required = the URL builder aggregates against this field; optional =
+    // diagnostic / filter-default-friendly.
+    const requiredFields = new Set(
+      template.dataLayerVariables.filter((variable) => variable.required).map((variable) => variable.dataLayerName)
+    );
+    const expectedRequired = new Set([
+      'event_id',
+      'host',
+      'url',
+      'net_tier',
+      'net_tcp_source',
+      'device_tier',
+      'device_screen_w',
+      'lcp_ms',
+      'fcp_ms',
+      'ttfb_ms',
+      'input_delay_ms',
+      'processing_duration_ms',
+      'presentation_delay_ms'
+    ]);
+    expect(requiredFields).toEqual(expectedRequired);
+
+    // Warehouse-only fields must not leak into the GTM template.
     for (const fieldName of removedWarehouseOnlyFields) {
       expect(templateFieldNames.has(fieldName)).toBe(false);
     }
