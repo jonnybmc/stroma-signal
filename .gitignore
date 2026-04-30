@@ -29,3 +29,7 @@ docs/safari-manual-checklist.md
 
 # Output of scripts/bootstrap-sql.mjs — contains consumer-specific project/host values
 bootstrapped-sql/
+
+# Private companion repo (cloned manually into internal/ for paid-product
+# work; intentionally not tracked here). See CONTRIBUTING.md for setup.
+internal/
