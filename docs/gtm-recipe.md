@@ -4,12 +4,12 @@ Use this when your site already has Google Tag Manager and you want Signal event
 
 Launch pack assets:
 
-- [marketer-quickstart.md](./marketer-quickstart.md)
-- [gtm-workspace-template.json](./gtm-workspace-template.json)
-- [ga4-bigquery-validation.sql](./ga4-bigquery-validation.sql)
-- [ga4-bigquery-url-builder.sql](./ga4-bigquery-url-builder.sql)
+- [marketer-quickstart.md](./marketer-quickstart.md) — end-to-end walkthrough
+- [gtm-workspace-template.json](./gtm-workspace-template.json) — machine-readable trigger / variable / tag blueprint
+- [ga4-bigquery-validation.sql](./ga4-bigquery-validation.sql) — confirm rows are landing in BigQuery
+- [ga4-bigquery-url-builder.sql](./ga4-bigquery-url-builder.sql) — produce the hosted `signal_report_url`
 
-## 1. Emit The Data Layer Event
+## 1. Emit the dataLayer event
 
 ```ts
 import { init } from '@stroma-labs/signal';
@@ -20,10 +20,9 @@ init({
 });
 ```
 
-Signal will push a custom event named `perf_tier_report` into `window.dataLayer`.
-That payload is intentionally a compact GA4-safe subset, not the full warehouse schema.
+Signal pushes a custom event named `perf_tier_report` into `window.dataLayer` with **24 user-defined parameters + the event name = exactly 25**, which sits at GA4's per-event parameter cap. The payload is a deliberately compact GA4-safe subset; the full warehouse schema is only available via the beacon / callback sinks.
 
-## 2. Create The GTM Trigger
+## 2. Create the GTM trigger
 
 Create a **Custom Event** trigger:
 
@@ -31,41 +30,49 @@ Create a **Custom Event** trigger:
 - Event name: `perf_tier_report`
 - This trigger fires on: `All Custom Events`
 
-## 3. Create The Required Data Layer Variables
+## 3. Create the dataLayer variables
 
-At minimum, create Data Layer Variables for:
+Map all 24 fields. They split into two groups by what the report SQL actually consumes.
 
-- `event_id`
-- `host`
-- `url`
-- `net_tier`
-- `net_tcp_ms`
-- `net_tcp_source`
-- `device_tier`
-- `device_screen_w` — required for the form-factor (mobile / tablet / desktop) report cell; without this DLV the report's form-factor strip will be absent.
-- `lcp_ms`
-- `fcp_ms`
-- `ttfb_ms`
-- `browser`
-- `navigation_type`
+### Required (the URL builder needs these to render the full report)
 
-Recommended additional variables:
+| DLV name                     | dataLayer key            | Used for                                                  |
+| ---------------------------- | ------------------------ | --------------------------------------------------------- |
+| `DLV - event_id`             | `event_id`               | Per-row de-duplication                                    |
+| `DLV - host`                 | `host`                   | Domain filter, header label                               |
+| `DLV - url`                  | `url`                    | Top page-path detection                                   |
+| `DLV - net_tier`             | `net_tier`               | Drives Acts 1, 2, 3 entirely                              |
+| `DLV - net_tcp_source`       | `net_tcp_source`         | Connection-reuse share in the credibility footer          |
+| `DLV - device_tier`          | `device_tier`            | Act 1 device distribution                                 |
+| `DLV - device_screen_w`      | `device_screen_w`        | Form-factor split (mobile / tablet / desktop)             |
+| `DLV - lcp_ms`               | `lcp_ms`                 | Act 2 race + Act 3 LCP funnel stage                       |
+| `DLV - fcp_ms`               | `fcp_ms`                 | Act 2 race + Act 3 FCP funnel stage                       |
+| `DLV - ttfb_ms`              | `ttfb_ms`                | Act 2 race fallback                                       |
+| `DLV - input_delay_ms`       | `input_delay_ms`         | Component of derived `inp_ms` (Act 3 INP stage)           |
+| `DLV - processing_duration_ms` | `processing_duration_ms` | Component of derived `inp_ms`                             |
+| `DLV - presentation_delay_ms` | `presentation_delay_ms` | Component of derived `inp_ms`                             |
 
-- `lcp_load_state`
-- `lcp_element_type`
-- `inp_load_state`
-- `interaction_type`
-- `input_delay_ms`
-- `processing_duration_ms`
-- `presentation_delay_ms`
-- `lcp_culprit_kind`
-- `lcp_dominant_subpart`
-- `inp_dominant_phase`
-- `third_party_weight_tier`
+> Without all three INP components, the URL builder cannot derive `inp_ms` and Act 3's INP funnel stage will be omitted (the report degrades cleanly to FCP + LCP).
 
-> **Deprecated in 0.1.x:** the legacy `nav_type` DLV has been removed. Use `navigation_type` (same semantics, wider coverage). If you are upgrading from 0.0.x, delete the `DLV - nav_type` variable and the corresponding GA4 parameter mapping.
+### Recommended (filter optimisation + diagnostic surfaces)
 
-## 4. Create The GA4 Event Tag
+| DLV name                          | dataLayer key                | What it adds                                                   |
+| --------------------------------- | ---------------------------- | -------------------------------------------------------------- |
+| `DLV - navigation_type`           | `navigation_type`            | Filters `restore` / `prerender` rows. Defaults to `navigate` if missing. |
+| `DLV - net_tcp_ms`                | `net_tcp_ms`                 | Raw handshake time. Useful for tier audits in the warehouse path. |
+| `DLV - browser`                   | `browser`                    | Environment block in the normalized warehouse path; useful in DebugView. |
+| `DLV - lcp_load_state`            | `lcp_load_state`             | DebugView attribution                                          |
+| `DLV - lcp_element_type`          | `lcp_element_type`           | DebugView attribution                                          |
+| `DLV - inp_load_state`            | `inp_load_state`             | DebugView attribution                                          |
+| `DLV - interaction_type`          | `interaction_type`           | DebugView attribution                                          |
+| `DLV - lcp_culprit_kind`          | `lcp_culprit_kind`           | Editorial classifier output                                    |
+| `DLV - lcp_dominant_subpart`      | `lcp_dominant_subpart`       | Per-event LCP breakdown summary                                |
+| `DLV - inp_dominant_phase`        | `inp_dominant_phase`         | Per-event INP phase summary                                    |
+| `DLV - third_party_weight_tier`   | `third_party_weight_tier`    | Pre-LCP third-party script weight tier                         |
+
+Fields that are deliberately **not** in the GA4 path (warehouse-only via beacon / callback): `lcp_target`, `lcp_resource_url`, `interaction_target`, `interaction_time_ms`, `device_cores`, `device_memory_gb`, `effective_type`, `downlink_mbps`, `rtt_ms`, `save_data`, `connection_type`. They preserve GA4 parameter headroom.
+
+## 4. Create the GA4 event tag
 
 Create a **GA4 Event** tag:
 
@@ -73,94 +80,82 @@ Create a **GA4 Event** tag:
 - Event name: `perf_tier_report`
 - Trigger: the custom event trigger above
 
-Map the GA4 event params from the matching Data Layer Variables. Example:
+Map every parameter from its matching DLV — same name on both sides, e.g.:
 
-- `event_id` -> `{{DLV - event_id}}`
-- `host` -> `{{DLV - host}}`
-- `url` -> `{{DLV - url}}`
-- `net_tier` -> `{{DLV - net_tier}}`
-- `net_tcp_ms` -> `{{DLV - net_tcp_ms}}`
-- `net_tcp_source` -> `{{DLV - net_tcp_source}}`
-- `device_tier` -> `{{DLV - device_tier}}`
-- `device_screen_w` -> `{{DLV - device_screen_w}}`
-- `lcp_ms` -> `{{DLV - lcp_ms}}`
-- `fcp_ms` -> `{{DLV - fcp_ms}}`
-- `ttfb_ms` -> `{{DLV - ttfb_ms}}`
-- `browser` -> `{{DLV - browser}}`
-- `navigation_type` -> `{{DLV - navigation_type}}`
-- `lcp_load_state` -> `{{DLV - lcp_load_state}}`
-- `lcp_element_type` -> `{{DLV - lcp_element_type}}`
-- `inp_load_state` -> `{{DLV - inp_load_state}}`
-- `interaction_type` -> `{{DLV - interaction_type}}`
-- `input_delay_ms` -> `{{DLV - input_delay_ms}}`
-- `processing_duration_ms` -> `{{DLV - processing_duration_ms}}`
-- `presentation_delay_ms` -> `{{DLV - presentation_delay_ms}}`
-- `lcp_culprit_kind` -> `{{DLV - lcp_culprit_kind}}`
-- `lcp_dominant_subpart` -> `{{DLV - lcp_dominant_subpart}}`
-- `inp_dominant_phase` -> `{{DLV - inp_dominant_phase}}`
-- `third_party_weight_tier` -> `{{DLV - third_party_weight_tier}}`
+```
+event_id              -> {{DLV - event_id}}
+host                  -> {{DLV - host}}
+url                   -> {{DLV - url}}
+net_tier              -> {{DLV - net_tier}}
+net_tcp_source        -> {{DLV - net_tcp_source}}
+device_tier           -> {{DLV - device_tier}}
+device_screen_w       -> {{DLV - device_screen_w}}
+lcp_ms                -> {{DLV - lcp_ms}}
+fcp_ms                -> {{DLV - fcp_ms}}
+ttfb_ms               -> {{DLV - ttfb_ms}}
+input_delay_ms        -> {{DLV - input_delay_ms}}
+processing_duration_ms -> {{DLV - processing_duration_ms}}
+presentation_delay_ms -> {{DLV - presentation_delay_ms}}
+navigation_type       -> {{DLV - navigation_type}}
+net_tcp_ms            -> {{DLV - net_tcp_ms}}
+browser               -> {{DLV - browser}}
+lcp_load_state        -> {{DLV - lcp_load_state}}
+lcp_element_type      -> {{DLV - lcp_element_type}}
+inp_load_state        -> {{DLV - inp_load_state}}
+interaction_type      -> {{DLV - interaction_type}}
+lcp_culprit_kind      -> {{DLV - lcp_culprit_kind}}
+lcp_dominant_subpart  -> {{DLV - lcp_dominant_subpart}}
+inp_dominant_phase    -> {{DLV - inp_dominant_phase}}
+third_party_weight_tier -> {{DLV - third_party_weight_tier}}
+```
 
-These diagnostic fields are intentionally compact enough for the GTM/GA4 path. Signal does not send `lcp_target`, `lcp_resource_url`, `interaction_target`, or `interaction_time_ms` through GA4 in v0.1.
+The full payload sits at exactly the 25-parameter cap (24 user-defined + the event name). Mapping all 24 keeps the warehouse export complete; the URL builder will pick what it needs.
 
-Important:
+## GA4 custom definitions (optional)
 
-- the compact GA4 path stays under the standard-property event parameter cap
-- not every param should become a GA4 custom definition
-- for deeper warehouse diagnostics, use the normalized warehouse path instead of trying to force the full schema through GA4
+GA4 lets you promote up to 50 custom dimensions and 50 custom metrics per property so they can be used in reports / explorations. Most teams don't need to promote every parameter — DebugView and BigQuery work without any custom definitions configured.
 
-Recommended GA4 custom definitions:
+If you do promote some, the useful split:
 
-- `net_tier`
-- `device_tier`
-- `browser`
-- `navigation_type`
-- `lcp_load_state`
-- `lcp_element_type`
-- `inp_load_state`
-- `interaction_type`
-- `lcp_ms`
-- `fcp_ms`
-- `ttfb_ms`
+**Custom dimensions** (string, used for grouping):
 
-Usually keep these for DebugView or BigQuery rather than GA4 custom definitions:
+- `net_tier`, `device_tier`, `browser`, `navigation_type`
+- `lcp_load_state`, `lcp_element_type`, `inp_load_state`, `interaction_type`
+- `lcp_culprit_kind`, `lcp_dominant_subpart`, `inp_dominant_phase`, `third_party_weight_tier`
 
-- `event_id`
-- `host`
-- `url`
-- `net_tcp_ms`
-- `net_tcp_source`
-- `input_delay_ms`
-- `processing_duration_ms`
-- `presentation_delay_ms`
+**Custom metrics** (numeric, used for sums / averages):
 
-## 5. Verify In GTM Preview And GA4 DebugView
+- `lcp_ms`, `fcp_ms`, `ttfb_ms`, `net_tcp_ms`
+- `input_delay_ms`, `processing_duration_ms`, `presentation_delay_ms`, `device_screen_w`
+
+Identifiers like `event_id`, `host`, `url` stay in DebugView and BigQuery; promoting them to custom definitions adds noise without analytical value.
+
+## 5. Verify in GTM Preview and GA4 DebugView
 
 In GTM Preview:
 
 1. Open your site in Preview mode.
-2. Trigger one Signal flush.
+2. Trigger one Signal flush (navigate, then close the tab).
 3. Confirm a `perf_tier_report` event appears in the left event timeline.
 4. Confirm the GA4 Event tag fires for that event.
-5. Inspect the Variables tab and confirm the expected Data Layer values are present.
+5. Inspect the **Variables** tab — every required DLV should resolve to a non-empty value.
 
 In GA4 DebugView:
 
-1. Open the linked GA4 property.
-2. Open DebugView.
-3. Confirm `perf_tier_report` appears.
-4. Open the event and confirm key params like `event_id`, `net_tier`, `device_tier`, `fcp_ms`, and `ttfb_ms`.
-5. If you mapped the diagnostic enrichments above, confirm params like `navigation_type`, `lcp_load_state`, `inp_load_state`, and `interaction_type` are present as well.
+1. Open the linked GA4 property → **DebugView**.
+2. Confirm `perf_tier_report` appears.
+3. Open the event and confirm key params: `event_id`, `net_tier`, `device_tier`, `lcp_ms`, `fcp_ms`, `ttfb_ms`, and the INP triple.
 
-## 6. After BigQuery Export Lands
+If anything fails here, see [launch-troubleshooting.md](./launch-troubleshooting.md).
 
-First run [ga4-bigquery-validation.sql](./ga4-bigquery-validation.sql) to confirm the rows are landing.
-That validation query shows raw exported rows, including `navigation_type = restore` and `navigation_type = prerender` when they occur.
+## 6. After BigQuery export lands
 
-Then use [ga4-bigquery-url-builder.sql](./ga4-bigquery-url-builder.sql) to generate the final hosted report URL. Save or schedule it using [bigquery-saved-query-setup.md](./bigquery-saved-query-setup.md) so the team can rerun the flow without editing SQL.
-The URL-builder query excludes those non-load-shaped lifecycle rows by default.
+1. Run [ga4-bigquery-validation.sql](./ga4-bigquery-validation.sql) to confirm rows are landing. The validation query shows raw exported rows including `navigation_type = restore` and `prerender`.
+2. Run [ga4-bigquery-url-builder.sql](./ga4-bigquery-url-builder.sql) to generate the hosted `signal_report_url`. The URL builder de-duplicates by `event_id` and excludes `restore` / `prerender` rows so percentiles stay tied to normal load performance.
+3. Save or schedule the URL-builder query using [bigquery-saved-query-setup.md](./bigquery-saved-query-setup.md) so the team can refresh the URL without editing SQL.
 
-## Rules To Keep Stable
+## Rules to keep stable
 
 - Keep the event name frozen as `perf_tier_report`.
-- Do not add direct `gtag` loading inside the public package.
-- Treat GTM as the forwarding layer and BigQuery as the production-truth aggregation layer.
+- Do not add direct `gtag` loading inside the public package — GTM is the forwarding layer.
+- Treat BigQuery as the production-truth aggregation layer; GA4 is the transport.
