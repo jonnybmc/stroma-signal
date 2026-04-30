@@ -13,18 +13,19 @@ import type {
   SignalVitalsThirdParty
 } from '@stroma-labs/signal-contracts';
 
-// Culprit-kind regex patterns — compiled once at module load (§9a.3).
+// Culprit-kind regex patterns — compiled once at module load.
 const LCP_HERO_URL_PATTERN = /(hero|banner|splash|cover)/i;
 const LCP_PRODUCT_URL_PATTERN = /(product|sku|gallery|pdp)/i;
 const LCP_VIDEO_URL_PATTERN = /(poster|video|thumb(?:nail)?)/i;
 const LCP_BANNER_TARGET_PATTERN = /banner/i;
 
-// INP interactionRecords Map cap (§2.3). Unbounded map on long-lived SPA
-// sessions was a memory regression risk for customer apps; capping at 100
-// with lowest-duration eviction preserves the p98 INP selection.
+// Cap on the in-memory `interactionRecords` map. Unbounded growth on
+// long-lived SPA sessions would leak memory into the host page; 100
+// entries with lowest-duration eviction is enough to preserve the p98
+// INP selection while keeping the working set bounded.
 const INP_INTERACTION_RECORDS_CAP = 100;
 
-// Inline public-suffix list for eTLD+1 extraction (§2.4). Keeps the
+// Inline public-suffix list for eTLD+1 extraction. Keeps the
 // zero-dependency posture — unmatched hosts fall back to "last two labels",
 // an acceptable approximation for the buyer cohort.
 const MULTI_PART_PUBLIC_SUFFIXES = new Set<string>([
@@ -62,7 +63,7 @@ const MULTI_PART_PUBLIC_SUFFIXES = new Set<string>([
 
 export interface ObserveVitalsOptions {
   generateTarget?: (element: Element | null) => string | null;
-  // §2.4 — opt-in first-party aliasing for exotic infrastructure.
+  // — opt-in first-party aliasing for exotic infrastructure.
   // Entries are treated as first-party after strict-host + eTLD+1 checks.
   firstPartyOriginsAllowlist?: readonly string[];
 }
@@ -270,7 +271,7 @@ function deriveInpDominantPhase(
   return 'presentation';
 }
 
-// §2.5 — LoAF dominant-cause: argmax across the four substages. Any
+// LoAF dominant-cause: argmax across the four substages. Any
 // substage with missing inputs is excluded from the argmax; if every
 // candidate is null, dominant_cause returns null rather than guessing.
 // Null-safe against the partial entries early Chrome 123 betas produced.
@@ -356,7 +357,7 @@ function getRegistrableDomain(host: string): string {
   return lastTwo;
 }
 
-// §2.4 first-party policy: strict host → eTLD+1 → optional allowlist.
+// first-party policy: strict host → eTLD+1 → optional allowlist.
 function isFirstPartyHost(host: string, currentHost: string, allowlist: readonly string[]): boolean {
   if (!host || !currentHost) return false;
   const normalized = host.toLowerCase();
@@ -415,7 +416,7 @@ function deriveThirdPartyShare(
   };
 }
 
-// All-or-nothing per §2.1. Any missing input → whole breakdown is null.
+// All-or-nothing per Any missing input → whole breakdown is null.
 function deriveLcpBreakdown(
   rawStartTime: number | undefined,
   rawLoadTime: number | undefined,
@@ -500,7 +501,7 @@ export function observeVitals(options: ObserveVitalsOptions = {}): VitalObserver
   let rawFcpEntry: RawPaintDebugEntry | null = null;
   let rawLcpEntry: RawLcpDebugEntry | null = null;
   // LoAF worst-duration running max. Only the highest-duration frame is
-  // retained (bounded memory per §9a.7); the rest are discarded as they
+  // retained; the rest are discarded as they
   // arrive. Safe on long-lived SPA sessions with many janky frames.
   let worstLoaf: LongAnimationFrameEntry | null = null;
 

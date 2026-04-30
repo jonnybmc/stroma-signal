@@ -27,7 +27,7 @@ import {
 
 // Dominance share threshold below which the LCP / INP story narratives
 // fall back to hedged copy instead of claiming a single dominant cause.
-// Kept as a named constant per plan §10.7 so future buyer-research feedback
+// Kept as a named constant so future buyer-research feedback
 // can tune the aggressiveness of single-cause claims in one place.
 export const SIGNAL_STORY_HEDGED_THRESHOLD_PCT = 35;
 
@@ -79,15 +79,14 @@ export interface ReportLcpSubpartRow {
   is_dominant: boolean;
 }
 
-// Act 2 LCP story — data for the "Where the gap lives" anatomy band that
-// replaces the legacy LCP P75 comparison rail. `narrative` carries only
-// the mechanism sentence (subpart clause); `culprit_clause` is separated
-// so the band can render it as a distinct, muted trailing line rather
-// than as an appended second sentence. `is_hedged` is true when no single
-// subpart carries enough share for a confident claim — when hedged, the
-// narrative becomes the honest "spread across multiple phases" line and
-// the band omits both the accent-coloured dominant segment and the
-// culprit clause.
+// Act 2 LCP story — data for the "Where the gap lives" anatomy band.
+// `narrative` carries only the mechanism sentence (subpart clause);
+// `culprit_clause` is separated so the band can render it as a distinct,
+// muted trailing line rather than as an appended second sentence.
+// `is_hedged` is true when no single subpart carries enough share for a
+// confident claim — when hedged, the narrative becomes the honest
+// "spread across multiple phases" line and the band omits both the
+// accent-coloured dominant segment and the culprit clause.
 export interface ReportLcpStoryViewModel {
   narrative: string;
   culprit_clause: string | null;
@@ -208,13 +207,13 @@ export interface ReportCredibilityStripViewModel {
   connection_reuse_share: number;
   metric_coverage: number;
   metric_coverage_label: string;
-  // Count of background-tab loads dropped before accumulation (§1.2).
+  // Count of background-tab loads dropped before accumulation.
   // Null when the aggregate pre-dates the visibility filter or no
   // sessions were excluded — the markup hides the segment in both cases
   // so silence stays the correct signal.
   excluded_background_sessions: number | null;
   // True when the LCP race cohort lands within the slack threshold of
-  // the ship gates (§5.1). The credibility strip appends a tone-tempered
+  // the ship gates. The credibility strip appends a tone-tempered
   // note, and view-model copy swaps to lighter phrasing for Act 3.
   coverage_marginal: boolean;
 }
@@ -510,7 +509,7 @@ const LCP_SUBPART_PLAIN_DESCRIPTORS: Record<SignalLcpSubpart, string> = {
   element_render_delay: 'painting the hero'
 };
 
-// Narrative copy per dominant subpart. Matches §3.4 of the enrichment
+// Narrative copy per dominant subpart. of the enrichment
 // plan — honest, temporal, measured, no prescription. Each sentence names
 // what is happening, not what to fix.
 const LCP_SUBPART_NARRATIVES: Record<SignalLcpSubpart, string> = {
@@ -949,7 +948,7 @@ function buildAct3ViewModel(aggregate: SignalAggregateV1, moodHint: ReportMoodTi
   // when the funnel has an active INP stage — otherwise we would be
   // claiming a phase diagnosis for a stage the funnel itself could not
   // defend. Legacy / reduced / coverage-thin funnels cleanly omit the
-  // inline line (§4.1 of the enrichment plan).
+  // inline line.
   const inpStage = funnel?.active_stages.includes('inp') ? aggregate.inp_story : undefined;
   const inpStory = buildInpStoryViewModel(inpStage);
   // LoAF story sits alongside the INP phase line when both are present.

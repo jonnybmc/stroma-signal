@@ -62,9 +62,9 @@ export type SignalInteractionType = 'pointer' | 'keyboard';
 export type SignalLcpElementType = 'image' | 'text';
 export type SignalExperienceStage = 'fcp' | 'lcp' | 'inp';
 
-// Free-tier 0.1.x enrichment — additive, non-breaking. Each union below
-// corresponds to a story that surfaces in the hosted report; capture lands
-// per-PR in the 0.1.x sequence, aggregation/report consumption follows.
+// Enrichment unions. Each one corresponds to a story the hosted report
+// can narrate when the SDK has captured enough signal. All are additive
+// and non-breaking — events without these fields decode cleanly.
 
 // LCP subpart that dominates paint delay. `ttfb` maps to the existing
 // `vitals.ttfb_ms` field — no duplicate storage.
@@ -110,8 +110,8 @@ export interface SignalLcpAttribution {
   target: string | null;
   element_type: SignalLcpElementType | null;
   resource_url: string | null;
-  // Classifier output — populated at emission time in PR-2 capture. Null
-  // when classification falls through or element_type is null.
+  // Classifier output. Null when classification falls through or
+  // `element_type` is null.
   culprit_kind?: SignalLcpCulpritKind | null;
 }
 
@@ -163,13 +163,13 @@ export interface SignalVitals {
   ttfb_ms: number | null;
   lcp_attribution?: SignalLcpAttribution;
   inp_attribution?: SignalInpAttribution;
-  // LCP subpart math (§2.1). Chromium-only; null on Safari/Firefox or
+  // LCP subpart math. Chromium-only; null on Safari/Firefox or
   // when the all-or-nothing rule strips a partial breakdown.
   lcp_breakdown?: SignalLcpBreakdown | null;
-  // Third-party pre-paint script share (§2.4). Requires an LCP anchor —
+  // Third-party pre-paint script share. Requires an LCP anchor —
   // null on browsers without LCP or when no scripts were loaded pre-LCP.
   third_party?: SignalVitalsThirdParty | null;
-  // LoAF worst-frame attribution (§2.5). Chromium 123+; null otherwise.
+  // LoAF worst-frame attribution. Chromium 123+; null otherwise.
   loaf?: SignalVitalsLoaf | null;
 }
 
@@ -179,11 +179,10 @@ export interface SignalContext {
   rtt_ms: number | null;
   save_data: boolean | null;
   connection_type: string | null;
-  // True when document.visibilityState === 'hidden' at event creation
-  // (backgrounded tab, prerendered navigation). Populated from PR-6
-  // onwards; aggregation uses it as a pre-accumulator filter. Optional
-  // during PR-1 scaffolding so existing fixtures stay valid — becomes
-  // effectively always-present once capture lands.
+  // True when `document.visibilityState === 'hidden'` at event creation
+  // (backgrounded tab, prerendered navigation). Aggregation uses it as a
+  // pre-accumulator filter so background loads don't poison percentiles.
+  // Optional on the type so older fixtures and historical events round-trip.
   visibility_hidden_at_load?: boolean;
 }
 
@@ -266,10 +265,9 @@ export interface SignalWarehouseRowV1 {
   input_delay_ms: number | null;
   processing_duration_ms: number | null;
   presentation_delay_ms: number | null;
-  // Free-tier 0.1.x enrichment columns — appended positionally (§1.4).
-  // Each column is optional during PR-1 scaffolding; PR-3/PR-5/PR-6/PR-7
-  // wire ga4.ts → toSignalWarehouseRow to emit them. Optional on the type
-  // so historical warehouse exports pre-enrichment round-trip cleanly.
+  // Enrichment columns — optional on the type so historical warehouse
+  // exports without these fields round-trip cleanly. Populated by
+  // `toSignalWarehouseRow()` in `ga4.ts`.
   lcp_breakdown_resource_load_delay_ms?: number | null;
   lcp_breakdown_resource_load_time_ms?: number | null;
   lcp_breakdown_element_render_delay_ms?: number | null;
@@ -311,11 +309,11 @@ export interface SignalCoverage {
   lcp_coverage: number;
   selected_metric_urban_coverage: number | null;
   selected_metric_comparison_coverage: number | null;
-  // Pre-filter observation count (before the visibility filter drops
-  // background-tab loads). Post-filter count remains the top-level
-  // `sample_size`. Aggregation-time invariant once PR-6 lands:
+  // Pre-filter observation count, before the visibility filter drops
+  // background-tab loads. Post-filter count is the top-level `sample_size`.
+  // Aggregation-time invariant:
   //   raw_sample_size === sample_size + excluded_background_sessions
-  // Optional during PR-1 scaffolding so legacy aggregates decode cleanly.
+  // Optional on the type so older aggregates without these fields decode.
   raw_sample_size?: number;
   excluded_background_sessions?: number;
 }
@@ -355,7 +353,7 @@ export interface SignalExperienceFunnel {
 }
 
 /* ---------------------------------------------------------------------
- * Iteration 6: actionable compute reality.
+ * actionable compute reality.
  *
  * Every new block here carries data the SDK already captures per session
  * but the aggregator used to throw away. Each field has to pass the
@@ -451,12 +449,12 @@ export interface SignalEnvironment {
 }
 
 /* ---------------------------------------------------------------------
- * Free-tier 0.1.x narrative stories.
+ * Aggregate narrative stories.
  *
- * Each aggregate story answers a single question the hosted report narrates
- * inline. `dominant_subpart_share_pct < 35%` (plan §4.1) triggers the
- * hedged copy branch — surfaced via the `share_pct` field so the view model
- * can decide. Undefined story = block omitted entirely.
+ * Each story answers a single question the hosted report narrates inline.
+ * `dominant_subpart_share_pct < 35%` triggers the hedged copy branch —
+ * surfaced via the `share_pct` field so the view model can decide.
+ * Undefined story = block omitted entirely.
  * ------------------------------------------------------------------- */
 
 // Act 2 — "why does LCP fail?" Surfaced as an inline line under the
@@ -541,9 +539,9 @@ export interface SignalAggregateV1 {
   // the mobile-friendliness axis paid-media buyers ask for first. Emitted
   // by both GA4 and normalized SQL paths.
   form_factor_distribution?: SignalFormFactorDistribution;
-  // Free-tier 0.1.x narrative stories. Each block is omitted entirely
-  // when upstream data is insufficient (Safari-only cohort, below-
-  // threshold coverage, etc.) — undefined always means "don't render".
+  // Narrative story blocks. Each is omitted entirely when upstream data
+  // is insufficient (Safari-only cohort, below-threshold coverage, etc.)
+  // — undefined always means "don't render".
   lcp_story?: SignalLcpStory;
   inp_story?: SignalInpStory;
   third_party_story?: SignalThirdPartyStory;
