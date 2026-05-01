@@ -65,6 +65,25 @@ pnpm typecheck            # Full workspace type check
 5. Husky pre-commit runs `lint-staged` plus `pnpm test:unit`, so expect the full unit suite locally before each commit
 6. Merge CI currently runs the Chromium-only `pnpm test:e2e:smoke` lane for functional regressions only; use `pnpm test:e2e` when you want the full browser matrix locally
 7. Visual baselines are intentionally local-only and platform-specific; keep both Darwin and Linux Chromium snapshots checked in when refreshing `pnpm test:e2e:visual:update`
+8. **CHANGELOG entry inline** — see "Documentation discipline" below. PRs that change public surface or consumer-visible behavior must add an `[Unreleased]` entry in the same commit.
+
+## Documentation discipline
+
+Every PR sweeps the docs that describe what it touched. Drift between code and the docs that explain it is treated as a bug.
+
+**Architecture / spec docs.** Six doc-alignment lock-in tests (`packages/signal-contracts/test/*-alignment.test.ts`, `packages/signal/test/spa-ssr-caveats-alignment.test.ts`, `apps/signal-report/src/tier-report-design-spec-alignment.test.ts`) actively block code-vs-doc drift on every PR. If your change adds a field, a constant, an enum value, or a behavioral claim that any of these tests asserts on, update the doc in the same commit — the test will fail otherwise.
+
+**CHANGELOG.** Maintain a single rolling `[Unreleased]` section at the top of `CHANGELOG.md`. Add an entry inline when your PR changes any of:
+
+- exports from `packages/*/src/index.ts`
+- types or constants in `packages/signal-contracts/src/types.ts`
+- behavior of any `docs/*.sql` template (URL-builder or validation)
+- consumer-observable behavior of `init()`, `destroy()`, or any sink factory
+- a bug fix that changes runtime behavior visible to a consumer
+
+Internal refactors with byte-identical observable behavior, doc-alignment lock-in additions, comment cleanups, and CI/release-workflow tweaks do **not** warrant a CHANGELOG entry. The discipline question is *"would a consumer notice this if they upgraded?"* — if no, leave the changelog alone.
+
+Entries are terse and public-facing: name what shipped, not why it broke previously. No PR numbers, no commit hashes, no past-bug narratives. When `-rc.N` is cut, the only release work is renaming `[Unreleased]` to `[0.1.0-rc.N] - <date>` and starting a fresh empty `[Unreleased]` above it.
 
 ## Public Launch Docs
 

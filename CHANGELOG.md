@@ -10,9 +10,28 @@ dist-tag. The `latest` dist-tag is reserved for stable releases.
 
 ```
 pnpm add @stroma-labs/signal@next            # latest pre-release
-pnpm add @stroma-labs/signal@0.1.0-rc.2      # exact pin
+pnpm add @stroma-labs/signal@0.1.0-rc.2      # exact rc.2 pin
 pnpm add @stroma-labs/signal                 # latest stable (when published)
 ```
+
+Bump the exact pin example whenever a new `-rc.N` is cut so onboarders default to the freshest pinned snapshot.
+
+## [Unreleased]
+
+### Added
+
+- `SignalRuntimeLogger` interface and four optional `SignalInitConfig` dependency-injection points (`clock`, `random`, `eventIdFactory`, `logger`). Defaults preserve current behavior; supply your own to make event timestamps, ids, and sample-rate gating deterministic, or to forward runtime warnings + debug info into your observability stack without monkeypatching `console`.
+- `DEFAULT_NETWORK_THRESHOLDS` and `DEFAULT_DEVICE_SCORE_BOUNDARIES` exported from `@stroma-labs/signal-contracts` as the canonical numbers behind the network and device classifiers. Previously SDK-internal; promoting them to the contract package means the SDK and downstream renderers / docs derive the same boundaries from one source.
+- `SignalDeviceScoreBoundaries` interface companion to the new `DEFAULT_DEVICE_SCORE_BOUNDARIES` constant.
+- `formatNetworkBand(tier)` and `formatDeviceSignature(tier)` helpers for deriving the human-readable boundary copy (e.g. `< 50 ms TCP`, `6+ cores · 4+ GB · 1280px+`) from the canonical thresholds. Both accept an optional override block for custom calibration.
+
+### Changed
+
+- BigQuery URL-builder SQL recipes (GTM and normalized warehouse paths) re-aligned with the canonical aggregator's bucketing, tie-break, and rollup logic. Existing decoded URLs keep behaving identically; future generations match authored-side numbers byte-for-byte.
+
+### Fixed
+
+- `destroy()` on the sealed (sampled-out) runtime controller now releases the global singleton, so a subsequent `init()` spins up a fresh runtime. Previously a no-op that left the sampled-out shape pinned in `globalThis` for the page lifetime.
 
 ## [0.1.0-rc.2] - 2026-04-30
 
