@@ -95,7 +95,7 @@ function buildLcpBounceRow(race: ReportRaceViewModel): ReportAct4ImpactRow | nul
       'CPC'
     ),
     tone: toneFromWaitDeltaMs(race.wait_delta_ms),
-    glossary_key: 'qs'
+    glossary_key: 'cpc'
   };
 }
 

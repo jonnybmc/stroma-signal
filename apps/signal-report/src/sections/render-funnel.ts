@@ -87,8 +87,13 @@ export function renderFunnelSection(vm: ReportViewModel): string {
         </div>
 
         ${
-          act3.mode === 'legacy'
-            ? `<div class="figure"><p class="section-lede">${escapeHtml(act3.legacy_message ?? '')}</p></div>`
+          act3.mode === 'legacy' || act3.stages.length === 0
+            ? renderReveal(
+                `<div class="figure">
+                  <div class="figure-eyebrow">Funnel unavailable</div>
+                  <p class="section-lede">${escapeHtml(act3.legacy_message ?? act3.threshold_basis)}</p>
+                </div>`
+              )
             : `
               <div class="block">
                 ${renderReveal(

@@ -147,25 +147,57 @@ function renderFormFactor(vm: ReportViewModel): string {
       ${renderReveal(`<div class="section-eyebrow">Form factor</div>`)}
       <div class="grid-3">
         ${segments
-          .map((s, i) =>
-            renderReveal(
-              `<div class="figure">
+          .map((s, i) => {
+            const pct = Math.round(s.normalized * 100);
+            const isEmpty = s.normalized === 0;
+            return renderReveal(
+              `<div class="figure" data-empty="${isEmpty ? 'true' : 'false'}"${
+                isEmpty ? ' style="opacity:0.55;border-style:dashed;background:transparent;box-shadow:none;"' : ''
+              }>
                 <div class="figure-eyebrow">${escapeHtml(s.label)}</div>
-                <div class="figure-stat" style="color:var(--ink);">${renderHeroValue(
-                  `${Math.round(s.normalized * 100)}%`,
-                  {
-                    countTo: true,
-                    delayMs: i * 80,
-                    durationMs: 900
-                  }
-                )}</div>
-                <div class="figure-cap">of measured sessions</div>
+                <div class="figure-stat" style="color:var(${isEmpty ? '--ink-faint' : '--ink'});">${
+                  isEmpty
+                    ? '<span class="hero-value-num">0</span><span class="hero-value-unit">%</span>'
+                    : renderHeroValue(`${pct}%`, { countTo: true, delayMs: i * 80, durationMs: 900 })
+                }</div>
+                <div class="figure-cap">${isEmpty ? 'no sessions in this form factor' : 'of measured sessions'}</div>
               </div>`,
               { as: 'card', delay: i * 80 }
-            )
-          )
+            );
+          })
           .join('')}
       </div>
+    </div>
+  `;
+}
+
+function renderContextStrip(vm: ReportViewModel): string {
+  if (!vm.act1_context_strip || vm.act1_context_strip.rows.length === 0) return '';
+  const rows = vm.act1_context_strip.rows
+    .map(
+      (r) => `
+        <div
+          class="context-row"
+          style="display:grid;grid-template-columns:minmax(120px,160px) 1fr;gap:var(--stack-md);padding:var(--stack-sm) 0;border-bottom:1px solid var(--line);"
+        >
+          <span class="eyebrow" title="${escapeHtml(r.tooltip)}">${escapeHtml(r.label)}</span>
+          <span style="font-size:14px;color:var(--ink-soft);line-height:1.5;text-wrap:pretty;">${escapeHtml(
+            r.narrative
+          )}</span>
+        </div>
+      `
+    )
+    .join('');
+
+  return `
+    <div class="block">
+      ${renderReveal(
+        `<div class="block-header">
+          <div class="section-eyebrow">Context that shapes the experience</div>
+          <p class="section-lede">Measured environment signals that explain why the cohorts above feel different — Save Data uptake, link latency, cellular dependency, and the connection class your audience self-reports.</p>
+        </div>`
+      )}
+      ${renderReveal(`<div class="figure" style="padding:var(--stack-md) var(--stack-md) calc(var(--stack-md) - 1px);">${rows}</div>`)}
     </div>
   `;
 }
@@ -212,6 +244,8 @@ export function renderAudienceSection(vm: ReportViewModel): string {
             ${renderReveal(renderPersonaCard(vm.persona_contrast.constrained, 'var(--accent)'), { as: 'card', delay: 180 })}
           </div>
         </div>
+
+        ${renderContextStrip(vm)}
 
         ${renderFormFactor(vm)}
       </div>
