@@ -12,7 +12,7 @@ import { classifyDevice } from './classify-device.js';
 import { classifyNetwork, DEFAULT_NETWORK_THRESHOLDS, getNavigationEntry } from './classify-network.js';
 import { readSignalContext } from './context.js';
 import { createEventId } from './create-event-id.js';
-import { observeVitals } from './observe-vitals.js';
+import { deriveNavigationTiming, observeVitals } from './observe-vitals.js';
 import { type SignalLifecycleState, transitionSignalLifecycle } from './state-machine.js';
 
 const RUNTIME_KEY = Symbol.for('stroma.signal.runtime');
@@ -117,6 +117,13 @@ function createLoadScopedVitals(
 ): SignalEventV1['vitals'] {
   if (isLoadShapedNavigationType(navigationType)) return vitals;
 
+  // Restore / prerender: load-shaped vitals (paint, interaction, third
+  // party) are nulled because the timing reflects cache or
+  // pre-activation state, not the user-visible load. The
+  // `navigation_timing` block is intentionally PRESERVED so backend
+  // visibility survives — the activation_adjusted_ttfb_ms field
+  // carries the user-visible interpretation, and the raw subparts
+  // remain available for debugging.
   return {
     ...vitals,
     lcp_ms: null,
@@ -182,7 +189,12 @@ function createRuntime(config: SignalInitConfig): RuntimeInternals {
     const thresholds = config.networkTierThresholds ?? DEFAULT_NETWORK_THRESHOLDS;
     const network = createLoadScopedNetwork(classifyNetwork(navigation, thresholds), navigationType);
     const device = classifyDevice(config.deviceTierOverride);
-    const vitals = createLoadScopedVitals(vitalObserver?.snapshot() ?? { ...EMPTY_VITALS }, navigationType);
+    const baseVitals = vitalObserver?.snapshot() ?? { ...EMPTY_VITALS };
+    // navigation_timing is preserved across the load-scoped null pass
+    // (see createLoadScopedVitals comment) so backend timing visibility
+    // survives prerender and bfcache restore.
+    const navigation_timing = deriveNavigationTiming(navigation);
+    const vitals = createLoadScopedVitals({ ...baseVitals, navigation_timing }, navigationType);
     const event: SignalEventV1 = {
       v: SIGNAL_EVENT_VERSION,
       event_id: eventId,

@@ -25,6 +25,12 @@ export {
   type LoafStoryAccumulator
 } from './loaf.js';
 export {
+  createNavigationTimingStoryAccumulator,
+  finalizeNavigationTimingStory,
+  ingestNavigationTimingStoryEvent,
+  type NavigationTimingStoryAccumulator
+} from './navigation-timing.js';
+export {
   classifyThirdPartyShareTier,
   createThirdPartyStoryAccumulator,
   finalizeThirdPartyStory,

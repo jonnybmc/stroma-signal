@@ -56,7 +56,8 @@ const AGGREGATE_FIELDS = [
   'inp_story',
   'third_party_story',
   'loaf_story',
-  'context_story'
+  'context_story',
+  'navigation_timing_story'
 ] as const;
 
 // Coverage subfields that the aggregator emits inside the `coverage` block.

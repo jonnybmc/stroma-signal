@@ -20,6 +20,9 @@ Bump the exact pin example whenever a new `-rc.N` is cut so onboarders default t
 
 ### Added
 
+- `vitals.navigation_timing` block on `SignalEventV1` — decomposes the full PerformanceNavigationTiming entry into named subparts (DNS / TCP / TLS / redirect / SW / request-to-first-byte / request-to-final-headers / response-download / interim-to-final-response), three named TTFB definitions (`nav_ttfb_ms`, `connection_ttfb_ms`, `activation_adjusted_ttfb_ms` clamped ≥ 0 for prerender), raw anchor timestamps for 103 Early Hints awareness (`first_interim_response_start_ms`, `final_response_headers_start_ms`), protocol + payload metadata (`next_hop_protocol`, `transfer_size`, `encoded_body_size`, `decoded_body_size`, `content_encoding`), and a `provenance` sub-block (`early_hints_present`, `activation_adjusted`, `timing_redacted_suspected`, `delivery_type`, `response_status`). Per-subpart `null` vs `0` discipline preserved (cached DNS, reused connection, no redirect = meaningful zeros). The block is preserved across prerender so backend timing visibility survives.
+- `SignalNavigationTimingStory` aggregate block — per-subpart quartile summary with observation counts (so quartile honesty survives reused-connection bias on DNS/TCP/TLS), strict-denominator dominant TTFB subpart (only events where every comparable subpart is non-null contribute), `next_hop_protocol_histogram`, and `provenance_roll_up` (each share with its own observed-denominator).
+- 24 new warehouse columns mirroring the breakdown — warehouse-only; the GA4 lane is unchanged at 24 fields.
 - `SignalRuntimeLogger` interface and four optional `SignalInitConfig` dependency-injection points (`clock`, `random`, `eventIdFactory`, `logger`). Defaults preserve current behavior; supply your own to make event timestamps, ids, and sample-rate gating deterministic, or to forward runtime warnings + debug info into your observability stack without monkeypatching `console`.
 - `DEFAULT_NETWORK_THRESHOLDS` and `DEFAULT_DEVICE_SCORE_BOUNDARIES` exported from `@stroma-labs/signal-contracts` as the canonical numbers behind the network and device classifiers. Previously SDK-internal; promoting them to the contract package means the SDK and downstream renderers / docs derive the same boundaries from one source.
 - `SignalDeviceScoreBoundaries` interface companion to the new `DEFAULT_DEVICE_SCORE_BOUNDARIES` constant.
@@ -27,11 +30,16 @@ Bump the exact pin example whenever a new `-rc.N` is cut so onboarders default t
 
 ### Changed
 
+- Documentation framing of `net_tier` softened to acknowledge it as "connection-setup tier when isolatable" rather than overclaiming as "network speed cohort." `net_tier` field name + behavior unchanged; consumers see no breaking change. The richer subpart picture lives in the new `vitals.navigation_timing` block.
 - BigQuery URL-builder SQL recipes (GTM and normalized warehouse paths) re-aligned with the canonical aggregator's bucketing, tie-break, and rollup logic. Existing decoded URLs keep behaving identically; future generations match authored-side numbers byte-for-byte.
 
 ### Fixed
 
 - `destroy()` on the sealed (sampled-out) runtime controller now releases the global singleton, so a subsequent `init()` spins up a fresh runtime. Previously a no-op that left the sampled-out shape pinned in `globalThis` for the page lifetime.
+
+### Note
+
+- `SignalNetTcpSource` union UNCHANGED. The new navigation-timing provenance flags live on `vitals.navigation_timing.provenance.*` because they are independent telemetry-quality flags, not TCP-classifier source values.
 
 ## [0.1.0-rc.2] - 2026-04-30
 

@@ -50,6 +50,30 @@ Recommended flat warehouse row shape for non-GA4 collection:
 | `third_party_origin_count` | INT64 | Nullable count of distinct off-domain script origins before LCP (hidden when below privacy mask of 3) |
 | `loaf_dominant_cause` | STRING | Nullable enum (Chromium 123+): `script`, `layout`, `style`, `paint`. Null when LoAF is unsupported, no frames fired, or substage inputs were absent. |
 | `context_visibility_hidden_at_load` | BOOL | `true` when `document.visibilityState === 'hidden'` at event creation. Default report aggregation pre-filters rows where this is `true` (background-tab loads) before computing sample size, percentiles, or shares. |
+| `navigation_timing_dns_ms` | INT64 | Nullable. DNS lookup duration (`domainLookupEnd − domainLookupStart`). Null on reused connections; `0` valid when DNS is cached. |
+| `navigation_timing_tcp_ms` | INT64 | Nullable. TCP handshake duration (`connectEnd − connectStart`). Null on reused / coalesced connections. |
+| `navigation_timing_tls_ms` | INT64 | Nullable. TLS handshake isolated from TCP (`connectEnd − secureConnectionStart`). Null on TLS-coalesced or non-HTTPS. |
+| `navigation_timing_redirect_ms` | INT64 | Nullable. Redirect duration (`redirectEnd − redirectStart`). `0` is meaningful (no redirect occurred). |
+| `navigation_timing_service_worker_ms` | INT64 | Nullable. Service-worker time (`fetchStart − workerStart`) when SW intercepted; null otherwise. |
+| `navigation_timing_request_to_first_byte_ms` | INT64 | Nullable. `responseStart − requestStart`. May be early-hints time per 2026 ResourceTiming semantics — see `request_to_final_headers_ms` for the clean anchor. |
+| `navigation_timing_request_to_final_headers_ms` | INT64 | Nullable. `finalResponseHeadersStart − requestStart`. Time to actual HTML response headers (post-103). Null when `finalResponseHeadersStart` not exposed. |
+| `navigation_timing_response_download_ms` | INT64 | Nullable. Response body transfer duration (`responseEnd − responseStart`). |
+| `navigation_timing_interim_to_final_response_ms` | INT64 | Nullable. `finalResponseHeadersStart − firstInterimResponseStart` when both exposed. Captures the gap between 103 Early Hints and final HTML. |
+| `navigation_timing_nav_ttfb_ms` | INT64 | Nullable. Raw nav TTFB (`responseStart − startTime`). Includes redirects + connect + request-response. |
+| `navigation_timing_connection_ttfb_ms` | INT64 | Nullable. `responseStart − domainLookupStart`. Excludes redirect; isolates connect-through-response. |
+| `navigation_timing_activation_adjusted_ttfb_ms` | INT64 | Nullable. User-visible TTFB on prerendered pages (`Math.max(0, responseStart − activationStart)`). Clamped to ≥ 0 because response can precede activation. |
+| `navigation_timing_first_interim_response_start_ms` | INT64 | Nullable. Raw `firstInterimResponseStart` anchor (ms relative to nav start). Null when no 1xx interim response or API not exposed. |
+| `navigation_timing_final_response_headers_start_ms` | INT64 | Nullable. Raw `finalResponseHeadersStart` anchor (ms relative to nav start). Null when API not exposed. |
+| `navigation_timing_next_hop_protocol` | STRING | Nullable. Protocol negotiated (e.g. `h2`, `h3`, `http/1.1`). |
+| `navigation_timing_transfer_size` | INT64 | Nullable. Total bytes transferred including headers. |
+| `navigation_timing_encoded_body_size` | INT64 | Nullable. Body size in bytes as transmitted (post-encoding). |
+| `navigation_timing_decoded_body_size` | INT64 | Nullable. Body size in bytes after decoding. 2026 ResourceTiming editor's draft; gated on browser availability. |
+| `navigation_timing_content_encoding` | STRING | Nullable. Content-Encoding header value (e.g. `gzip`, `br`). 2026 editor's draft; experimental. |
+| `navigation_timing_provenance_early_hints_present` | BOOL | Nullable. `true` when `firstInterimResponseStart > 0` (1xx interim response observed); `false` when `finalResponseHeadersStart > 0` and no interim; `null` when neither field exposed. |
+| `navigation_timing_provenance_activation_adjusted` | BOOL | Nullable. `true` when `activationStart > 0` (prerender → user-visible baseline used); `false` on regular navigation; `null` when `activationStart` API not exposed. |
+| `navigation_timing_provenance_timing_redacted_suspected` | BOOL | Nullable. `true` only when MULTIPLE timing fields are zero in a pattern consistent with TAO masking; `false` when comparable fields populated normally; `null` when underlying signals unavailable. |
+| `navigation_timing_provenance_delivery_type` | STRING | Nullable. ResourceTiming editor's draft (e.g. `cache`, `navigational-prefetch`). |
+| `navigation_timing_provenance_response_status` | INT64 | Nullable. HTTP status code if exposed by `responseStatus`. |
 
 Do not rename the canonical metric fields if you want to keep the provided aggregation and URL-builder templates usable as-is.
 

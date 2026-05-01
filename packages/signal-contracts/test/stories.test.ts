@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { SignalEventV1 } from '../src/index.js';
+import type { SignalEventV1, SignalVitalsNavigationTiming } from '../src/index.js';
 import { chromeColdNavFixture, classifyThirdPartyShareTier, SIGNAL_MIN_RACE_OBSERVATIONS } from '../src/index.js';
 // Story accumulators are deliberately internal — not part of the public
 // barrel. Reach in directly so the unit-test surface matches the
@@ -8,15 +8,18 @@ import {
   createInpStoryAccumulator,
   createLcpStoryAccumulator,
   createLoafStoryAccumulator,
+  createNavigationTimingStoryAccumulator,
   createThirdPartyStoryAccumulator,
   finalizeContextStory,
   finalizeInpStory,
   finalizeLcpStory,
   finalizeLoafStory,
+  finalizeNavigationTimingStory,
   finalizeThirdPartyStory,
   ingestInpStoryEvent,
   ingestLcpStoryEvent,
   ingestLoafStoryEvent,
+  ingestNavigationTimingStoryEvent,
   ingestThirdPartyStoryEvent
 } from '../src/stories/index.js';
 
@@ -270,5 +273,181 @@ describe('stories/context finalizer', () => {
     });
     expect(story).toBeDefined();
     expect(story?.effective_type_dominant).toBeNull();
+  });
+});
+
+describe('stories/navigation-timing accumulator', () => {
+  // Builder for a fully-populated nav_timing block. Caller can pass
+  // overrides to null specific subparts and exercise the per-subpart
+  // observation-count + strict-denominator rules.
+  function buildNavTiming(overrides: Partial<SignalVitalsNavigationTiming> = {}): SignalVitalsNavigationTiming {
+    return {
+      dns_ms: 20,
+      tcp_ms: 50,
+      tls_ms: 30,
+      redirect_ms: 0,
+      service_worker_ms: null,
+      request_to_first_byte_ms: 100,
+      request_to_final_headers_ms: 110,
+      response_download_ms: 80,
+      interim_to_final_response_ms: 10,
+      nav_ttfb_ms: 200,
+      connection_ttfb_ms: 180,
+      activation_adjusted_ttfb_ms: null,
+      first_interim_response_start_ms: 100,
+      final_response_headers_start_ms: 110,
+      next_hop_protocol: 'h2',
+      transfer_size: 5000,
+      encoded_body_size: 4500,
+      decoded_body_size: 18000,
+      content_encoding: 'gzip',
+      provenance: {
+        early_hints_present: true,
+        activation_adjusted: false,
+        timing_redacted_suspected: false,
+        delivery_type: null,
+        response_status: 200
+      },
+      ...overrides
+    };
+  }
+
+  function buildNavEvent(navigation_timing: SignalVitalsNavigationTiming | null): SignalEventV1 {
+    return {
+      ...chromeColdNavFixture,
+      vitals: { ...chromeColdNavFixture.vitals, navigation_timing }
+    };
+  }
+
+  it('returns undefined below SIGNAL_MIN_RACE_OBSERVATIONS', () => {
+    const acc = createNavigationTimingStoryAccumulator();
+    for (let i = 0; i < SIGNAL_MIN_RACE_OBSERVATIONS - 1; i += 1) {
+      ingestNavigationTimingStoryEvent(acc, buildNavEvent(buildNavTiming()));
+    }
+    expect(finalizeNavigationTimingStory(acc)).toBeUndefined();
+  });
+
+  it('per-subpart observation count reflects independent absence', () => {
+    const acc = createNavigationTimingStoryAccumulator();
+    // 50 events: DNS null in 30 of them (reused-connection pattern);
+    // request_to_first_byte populated in all 50.
+    for (let i = 0; i < 50; i += 1) {
+      const block = buildNavTiming({
+        dns_ms: i < 20 ? 25 : null
+      });
+      ingestNavigationTimingStoryEvent(acc, buildNavEvent(block));
+    }
+    const story = finalizeNavigationTimingStory(acc);
+    expect(story).toBeDefined();
+    expect(story?.subparts.dns_ms.observations).toBe(20);
+    expect(story?.subparts.request_to_first_byte_ms.observations).toBe(50);
+    expect(story?.subparts.dns_ms.p75).toBeGreaterThan(0);
+  });
+
+  it('strict-denominator dominance: only events with all comparable subparts contribute', () => {
+    const acc = createNavigationTimingStoryAccumulator();
+    // 50 events. 30 have only response_download_ms populated (no dns,
+    // no tcp, no tls, no redirect, no request). 20 have ALL six
+    // dominance fields populated. The dominance verdict must reflect
+    // only the 20-event strict cohort, not the 50-event union.
+    for (let i = 0; i < 50; i += 1) {
+      const block =
+        i < 20
+          ? buildNavTiming({
+              dns_ms: 10,
+              tcp_ms: 10,
+              tls_ms: 10,
+              redirect_ms: 0,
+              request_to_first_byte_ms: 50,
+              response_download_ms: 200 // dominant in this strict cohort
+            })
+          : buildNavTiming({
+              dns_ms: null,
+              tcp_ms: null,
+              tls_ms: null,
+              redirect_ms: null,
+              request_to_first_byte_ms: null,
+              response_download_ms: 5
+            });
+      ingestNavigationTimingStoryEvent(acc, buildNavEvent(block));
+    }
+    const story = finalizeNavigationTimingStory(acc);
+    expect(story).toBeDefined();
+    expect(story?.dominant_ttfb_subpart_strict_observations).toBe(20);
+    expect(story?.dominant_ttfb_subpart).toBe('response');
+  });
+
+  it('protocol histogram counts each bucket', () => {
+    const acc = createNavigationTimingStoryAccumulator();
+    const protocols = ['h2', 'h2', 'h2', 'h3', 'h3', 'http/1.1', 'spdy/3', 'h2'];
+    for (let i = 0; i < SIGNAL_MIN_RACE_OBSERVATIONS; i += 1) {
+      const proto = protocols[i % protocols.length] ?? 'h2';
+      ingestNavigationTimingStoryEvent(acc, buildNavEvent(buildNavTiming({ next_hop_protocol: proto })));
+    }
+    const story = finalizeNavigationTimingStory(acc);
+    expect(story).toBeDefined();
+    const hist = story?.next_hop_protocol_histogram;
+    expect(hist).toBeDefined();
+    if (hist) {
+      // Sum across buckets should equal the observation count.
+      const total = hist.h2 + hist.h3 + hist['http/1.1'] + hist.other;
+      expect(total).toBe(SIGNAL_MIN_RACE_OBSERVATIONS);
+      expect(hist.h2).toBeGreaterThan(0);
+      expect(hist.h3).toBeGreaterThan(0);
+      expect(hist['http/1.1']).toBeGreaterThan(0);
+      expect(hist.other).toBeGreaterThan(0); // 'spdy/3' falls into 'other'
+    }
+  });
+
+  it('provenance roll-up: each share has its own observed-denominator', () => {
+    const acc = createNavigationTimingStoryAccumulator();
+    // 30 events. All have early_hints_present recorded (10 true / 20 false).
+    // 20 have activation_adjusted=true, 10 have it=null (signal absent).
+    // Result: early_hints_share_pct = 33 (10/30); activation share = 100 (20/20).
+    for (let i = 0; i < 30; i += 1) {
+      const block = buildNavTiming({
+        provenance: {
+          early_hints_present: i < 10,
+          activation_adjusted: i < 20 ? true : null,
+          timing_redacted_suspected: false,
+          delivery_type: null,
+          response_status: 200
+        }
+      });
+      ingestNavigationTimingStoryEvent(acc, buildNavEvent(block));
+    }
+    const story = finalizeNavigationTimingStory(acc);
+    expect(story).toBeDefined();
+    expect(story?.provenance_roll_up.early_hints_share_pct).toBe(33);
+    expect(story?.provenance_roll_up.activation_adjusted_share_pct).toBe(100);
+    expect(story?.provenance_roll_up.timing_redacted_suspected_share_pct).toBe(0);
+  });
+
+  it('skips events without a navigation_timing block', () => {
+    const acc = createNavigationTimingStoryAccumulator();
+    ingestNavigationTimingStoryEvent(acc, buildNavEvent(null));
+    expect(acc.observationsWithBlock).toBe(0);
+  });
+
+  it('dominant_ttfb_subpart returns null when all buckets summed to 0', () => {
+    const acc = createNavigationTimingStoryAccumulator();
+    for (let i = 0; i < SIGNAL_MIN_RACE_OBSERVATIONS; i += 1) {
+      ingestNavigationTimingStoryEvent(
+        acc,
+        buildNavEvent(
+          buildNavTiming({
+            dns_ms: 0,
+            tcp_ms: 0,
+            tls_ms: 0,
+            redirect_ms: 0,
+            request_to_first_byte_ms: 0,
+            response_download_ms: 0
+          })
+        )
+      );
+    }
+    const story = finalizeNavigationTimingStory(acc);
+    expect(story?.dominant_ttfb_subpart).toBeNull();
+    expect(story?.dominant_ttfb_subpart_strict_observations).toBe(SIGNAL_MIN_RACE_OBSERVATIONS);
   });
 });

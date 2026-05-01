@@ -73,9 +73,10 @@ You can run several sinks at once — e.g., dataLayer for GA4 plus a beacon to y
 
 One event per page load with:
 
-- **Network tier** — `urban`, `moderate`, `constrained_moderate`, `constrained` from the actual TCP handshake (not the coarse browser label)
+- **Network tier** — `urban`, `moderate`, `constrained_moderate`, `constrained` from the TCP-handshake span exposed by Navigation Timing (a useful diagnostic slice — not a complete network-speed cohort; see [Navigation Timing breakdown](./docs/signal-technical-reference.md#navigation-timing-breakdown) for the richer picture)
 - **Device tier** — `low`, `mid`, `high` from real hardware signals
 - **Web Vitals** — LCP, INP, CLS, FCP, TTFB with attribution (which element was slow, which interaction phase dominated, which third-party scripts loaded before paint)
+- **Navigation Timing breakdown** — DNS / TCP / TLS / request / response / redirect / SW subparts, three named TTFB definitions (raw, connection, activation-adjusted-and-clamped), `next_hop_protocol`, transfer + body sizes, plus an Early-Hints-aware provenance sub-block. Warehouse-only.
 - **Long Animation Frame** story on Chromium 123+
 - **Background-tab filter** so percentiles aren't poisoned by hidden-tab loads
 

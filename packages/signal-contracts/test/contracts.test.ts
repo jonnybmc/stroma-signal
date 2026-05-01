@@ -1445,4 +1445,116 @@ describe('signal contracts', () => {
 
     expect(() => decodeSignalReportUrl(tampered)).toThrow(/Invalid encoded enum value for "cet"/);
   });
+
+  describe('navigation_timing_story codec round-trip', () => {
+    function buildNavStoryAggregate() {
+      return {
+        ...strongLcpCoverageAggregateFixture,
+        navigation_timing_story: {
+          subparts: {
+            dns_ms: { observations: 80, p25: 5, p50: 10, p75: 25 },
+            tcp_ms: { observations: 60, p25: 20, p50: 35, p75: 55 },
+            tls_ms: { observations: 60, p25: 15, p50: 25, p75: 40 },
+            redirect_ms: { observations: 100, p25: 0, p50: 0, p75: 0 },
+            service_worker_ms: { observations: 5, p25: null, p50: null, p75: null },
+            request_to_first_byte_ms: { observations: 100, p25: 50, p50: 80, p75: 120 },
+            request_to_final_headers_ms: { observations: 95, p25: 60, p50: 90, p75: 140 },
+            response_download_ms: { observations: 100, p25: 30, p50: 60, p75: 110 },
+            nav_ttfb_ms: { observations: 100, p25: 100, p50: 180, p75: 280 },
+            connection_ttfb_ms: { observations: 100, p25: 95, p50: 175, p75: 260 },
+            activation_adjusted_ttfb_ms: { observations: 4, p25: null, p50: null, p75: null }
+          },
+          dominant_ttfb_subpart: 'request' as const,
+          dominant_ttfb_subpart_strict_observations: 50,
+          next_hop_protocol_histogram: { h2: 60, h3: 30, 'http/1.1': 8, other: 2 },
+          provenance_roll_up: {
+            early_hints_share_pct: 13,
+            activation_adjusted_share_pct: 4,
+            timing_redacted_suspected_share_pct: 0
+          }
+        }
+      };
+    }
+
+    it('round-trips p75 + observations + dominant + protocol + provenance byte-identical', () => {
+      const aggregate = buildNavStoryAggregate();
+      const encoded = encodeSignalReportUrl(aggregate);
+      const decoded = decodeSignalReportUrl(encoded.url);
+
+      const story = decoded.navigation_timing_story;
+      expect(story).toBeDefined();
+      // p75 preserved exactly per subpart
+      expect(story?.subparts.dns_ms.p75).toBe(25);
+      expect(story?.subparts.request_to_first_byte_ms.p75).toBe(120);
+      // observation counts preserved
+      expect(story?.subparts.dns_ms.observations).toBe(80);
+      expect(story?.subparts.service_worker_ms.observations).toBe(5);
+      // dominant + strict observations preserved
+      expect(story?.dominant_ttfb_subpart).toBe('request');
+      expect(story?.dominant_ttfb_subpart_strict_observations).toBe(50);
+      // protocol histogram preserved
+      expect(story?.next_hop_protocol_histogram).toEqual({ h2: 60, h3: 30, 'http/1.1': 8, other: 2 });
+      // provenance shares preserved
+      expect(story?.provenance_roll_up.early_hints_share_pct).toBe(13);
+    });
+
+    it('p25 + p50 are intentionally null after URL round-trip (compact-subset contract)', () => {
+      const aggregate = buildNavStoryAggregate();
+      const encoded = encodeSignalReportUrl(aggregate);
+      const decoded = decodeSignalReportUrl(encoded.url);
+
+      // The URL transports p75 + observations only — p25 + p50 are
+      // dropped intentionally to stay under the byte budget. After
+      // decode they MUST be null (full fidelity is preserved by the
+      // aggregate JSON path, not the URL).
+      const story = decoded.navigation_timing_story;
+      expect(story?.subparts.dns_ms.p25).toBeNull();
+      expect(story?.subparts.dns_ms.p50).toBeNull();
+      expect(story?.subparts.request_to_first_byte_ms.p25).toBeNull();
+      expect(story?.subparts.request_to_first_byte_ms.p50).toBeNull();
+    });
+
+    it('null p75 in the original encodes as -1 sentinel, decodes back to null', () => {
+      const aggregate = buildNavStoryAggregate();
+      const encoded = encodeSignalReportUrl(aggregate);
+      const decoded = decodeSignalReportUrl(encoded.url);
+
+      // service_worker_ms had observations=5 but p75=null in the
+      // original (below quartile floor). The codec encodes -1 as a
+      // null sentinel; the decoder turns it back into null.
+      const story = decoded.navigation_timing_story;
+      expect(story?.subparts.service_worker_ms.p75).toBeNull();
+      expect(story?.subparts.service_worker_ms.observations).toBe(5);
+    });
+
+    it('omits the block entirely when navigation_timing_story is undefined on the aggregate', () => {
+      const encoded = encodeSignalReportUrl(strongLcpCoverageAggregateFixture);
+      const decoded = decodeSignalReportUrl(encoded.url);
+      expect(decoded.navigation_timing_story).toBeUndefined();
+      expect(encoded.url).not.toContain('nts75=');
+      expect(encoded.url).not.toContain('ntso=');
+    });
+
+    it('rejects malformed dominant_ttfb_subpart enum value on decode', () => {
+      const aggregate = buildNavStoryAggregate();
+      const encoded = encodeSignalReportUrl(aggregate);
+      const tampered = encoded.url.replace('ntd=request', 'ntd=bogus');
+      expect(() => decodeSignalReportUrl(tampered)).toThrow(/Invalid encoded enum value for "ntd"/);
+    });
+
+    it('throws when nts75 is present but ntso is missing (paired-keys discipline)', () => {
+      const aggregate = buildNavStoryAggregate();
+      const encoded = encodeSignalReportUrl(aggregate);
+      const url = new URL(encoded.url);
+      url.searchParams.delete('ntso');
+      expect(() => decodeSignalReportUrl(url.toString())).toThrow(/nts75 and ntso must be present together/);
+    });
+
+    it('full-story URL stays under the SOFT byte limit (2048)', () => {
+      const aggregate = buildNavStoryAggregate();
+      const encoded = encodeSignalReportUrl(aggregate);
+      const byteLength = new TextEncoder().encode(encoded.url).length;
+      expect(byteLength).toBeLessThan(2048);
+    });
+  });
 });

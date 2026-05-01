@@ -17,6 +17,8 @@ import type {
   SignalLcpSubpart,
   SignalLoafCause,
   SignalLoafStory,
+  SignalNavigationTimingDominantSubpart,
+  SignalNavigationTimingStory,
   SignalNetworkSignals,
   SignalQuartiles,
   SignalRaceFallbackReason,
@@ -296,6 +298,64 @@ function encodeContextStory(params: URLSearchParams, story: SignalContextStory):
   if (story.effective_type_dominant) params.set('cet', story.effective_type_dominant);
 }
 
+// Fixed order for the per-subpart tuples carried in URL params nts75
+// + ntso. Keep in sync with NAV_TIMING_SUBPART_KEYS in the decoder.
+// Slot count: 11 (matches SignalNavigationTimingStory.subparts shape).
+const NAV_TIMING_SUBPART_KEYS = [
+  'dns_ms',
+  'tcp_ms',
+  'tls_ms',
+  'redirect_ms',
+  'service_worker_ms',
+  'request_to_first_byte_ms',
+  'request_to_final_headers_ms',
+  'response_download_ms',
+  'nav_ttfb_ms',
+  'connection_ttfb_ms',
+  'activation_adjusted_ttfb_ms'
+] as const satisfies readonly (keyof SignalNavigationTimingStory['subparts'])[];
+
+const NAV_TIMING_DOMINANT_SUBPARTS = new Set<SignalNavigationTimingDominantSubpart>([
+  'dns',
+  'tcp',
+  'tls',
+  'redirect',
+  'request',
+  'response'
+]);
+
+function encodeNavigationTimingStory(params: URLSearchParams, story: SignalNavigationTimingStory): void {
+  // URL is a compact subset: p75-only per subpart + observation count
+  // per subpart (so coverage transparency survives the URL hop) +
+  // dominant subpart enum + dominant strict observation count +
+  // protocol histogram + provenance roll-up. Full p25/p50 stay in
+  // the in-memory aggregate; the URL trades them for byte-budget
+  // headroom.
+  params.set('nts75', joinInts(NAV_TIMING_SUBPART_KEYS.map((key) => story.subparts[key].p75 ?? -1)));
+  params.set('ntso', joinInts(NAV_TIMING_SUBPART_KEYS.map((key) => story.subparts[key].observations)));
+  if (story.dominant_ttfb_subpart) {
+    params.set('ntd', story.dominant_ttfb_subpart);
+    params.set('ntdo', String(story.dominant_ttfb_subpart_strict_observations));
+  }
+  params.set(
+    'ntp',
+    joinInts([
+      story.next_hop_protocol_histogram.h2,
+      story.next_hop_protocol_histogram.h3,
+      story.next_hop_protocol_histogram['http/1.1'],
+      story.next_hop_protocol_histogram.other
+    ])
+  );
+  params.set(
+    'ntpr',
+    joinInts([
+      story.provenance_roll_up.early_hints_share_pct,
+      story.provenance_roll_up.activation_adjusted_share_pct,
+      story.provenance_roll_up.timing_redacted_suspected_share_pct
+    ])
+  );
+}
+
 function encodeEnvironment(params: URLSearchParams, env: SignalEnvironment): void {
   params.set(
     'eb',
@@ -456,6 +516,7 @@ function encodeAggregate(aggregate: SignalAggregateV1): URLSearchParams {
   if (aggregate.third_party_story) encodeThirdPartyStory(params, aggregate.third_party_story);
   if (aggregate.loaf_story) encodeLoafStory(params, aggregate.loaf_story);
   if (aggregate.context_story) encodeContextStory(params, aggregate.context_story);
+  if (aggregate.navigation_timing_story) encodeNavigationTimingStory(params, aggregate.navigation_timing_story);
 
   if (aggregate.top_page_path) params.set('v', aggregate.top_page_path);
 
@@ -807,6 +868,70 @@ function readOptionalFormFactor(params: URLSearchParams): SignalFormFactorDistri
   return { mobile, tablet, desktop };
 }
 
+function readOptionalNavigationTimingStory(params: URLSearchParams): SignalNavigationTimingStory | undefined {
+  const p75Raw = params.get('nts75');
+  const obsRaw = params.get('ntso');
+  if (p75Raw == null && obsRaw == null) return undefined;
+  if (p75Raw == null || obsRaw == null) {
+    throw new Error('Invalid navigation_timing_story URL — nts75 and ntso must be present together');
+  }
+  const p75s = parseInts(p75Raw, NAV_TIMING_SUBPART_KEYS.length);
+  const observations = parseInts(obsRaw, NAV_TIMING_SUBPART_KEYS.length);
+
+  // Per the URL/contract pact: p25 + p50 are intentionally null after
+  // a URL round-trip (the URL transports only p75 + observations).
+  // Aggregate JSON paths preserve full quartiles.
+  const subparts = NAV_TIMING_SUBPART_KEYS.reduce(
+    (acc, key, idx) => {
+      const p75Slot = p75s[idx];
+      const obsSlot = observations[idx];
+      acc[key] = {
+        observations: obsSlot ?? 0,
+        p25: null,
+        p50: null,
+        p75: p75Slot != null && p75Slot >= 0 ? p75Slot : null
+      };
+      return acc;
+    },
+    {} as SignalNavigationTimingStory['subparts']
+  );
+
+  const dominantRaw = params.get('ntd');
+  let dominant: SignalNavigationTimingDominantSubpart | null = null;
+  if (dominantRaw != null) {
+    if (!NAV_TIMING_DOMINANT_SUBPARTS.has(dominantRaw as SignalNavigationTimingDominantSubpart)) {
+      throw new Error(`Invalid encoded enum value for "ntd": ${dominantRaw}`);
+    }
+    dominant = dominantRaw as SignalNavigationTimingDominantSubpart;
+  }
+  const dominantStrictObs = params.get('ntdo') != null ? readNumberParam(params, 'ntdo') : 0;
+
+  const protoRaw = params.get('ntp');
+  const [h2, h3, h11, other] =
+    protoRaw != null ? (parseInts(protoRaw, 4) as [number, number, number, number]) : [0, 0, 0, 0];
+
+  const provRaw = params.get('ntpr');
+  const [earlyHints, activationAdjusted, redactedSuspected] =
+    provRaw != null ? (parseInts(provRaw, 3) as [number, number, number]) : [0, 0, 0];
+
+  return {
+    subparts,
+    dominant_ttfb_subpart: dominant,
+    dominant_ttfb_subpart_strict_observations: dominantStrictObs,
+    next_hop_protocol_histogram: {
+      h2,
+      h3,
+      'http/1.1': h11,
+      other
+    },
+    provenance_roll_up: {
+      early_hints_share_pct: earlyHints,
+      activation_adjusted_share_pct: activationAdjusted,
+      timing_redacted_suspected_share_pct: redactedSuspected
+    }
+  };
+}
+
 export function decodeSignalReportUrl(value: string | URL): SignalAggregateV1 {
   const url = typeof value === 'string' ? new URL(value) : value;
   const params = url.searchParams;
@@ -875,6 +1000,7 @@ export function decodeSignalReportUrl(value: string | URL): SignalAggregateV1 {
     third_party_story: readOptionalThirdPartyStory(params),
     loaf_story: readOptionalLoafStory(params),
     context_story: readOptionalContextStory(params),
+    navigation_timing_story: readOptionalNavigationTimingStory(params),
     top_page_path: params.get('v'),
     warnings
   };
