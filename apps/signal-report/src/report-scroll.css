@@ -474,6 +474,156 @@ body { overflow-y: auto; overflow-x: hidden; }
   }
 }
 
+/* — race phone (CSS-only mockup) — */
+.race-phone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+.race-phone-label {
+  align-self: flex-start;
+  font-family: var(--font-mono);
+  font-size: var(--t-eyebrow);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  font-weight: 500;
+}
+.race-phone[data-tone="cyan"] .race-phone-label,
+.race-phone[data-tone="cyan"] .race-phone-time { color: var(--cyan); }
+.race-phone[data-tone="accent"] .race-phone-label,
+.race-phone[data-tone="accent"] .race-phone-time { color: var(--accent); }
+
+.race-phone-frame {
+  position: relative;
+  width: clamp(140px, 16vw, 200px);
+  aspect-ratio: 9 / 19;
+  border-radius: 26px;
+  background: linear-gradient(180deg, #f3eee5, #e8e1d4);
+  border: 1px solid var(--line-strong);
+  box-shadow:
+    0 0 0 1px var(--line),
+    0 24px 48px rgba(60, 40, 20, 0.08);
+  overflow: hidden;
+  transition: box-shadow 600ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+[data-theme="dark"] .race-phone-frame {
+  background: linear-gradient(180deg, #14171f, #0c0e13);
+}
+
+.race-phone-notch {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 40px;
+  height: 5px;
+  border-radius: 999px;
+  background: #000;
+  opacity: 0.35;
+}
+
+.race-phone-fill {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    var(--race-color, var(--accent)),
+    color-mix(in oklab, var(--race-color, var(--accent)) 70%, transparent) 60%,
+    transparent 100%
+  );
+  opacity: 0.85;
+  clip-path: inset(0 0 100% 0);
+  will-change: clip-path;
+  transition: clip-path var(--race-duration, 2000ms) linear;
+}
+[data-reveal][data-in="true"] .race-phone-fill,
+.race-phone[data-race-go="true"] .race-phone-fill {
+  clip-path: inset(0 0 0 0);
+}
+.race-phone[data-tone="cyan"] { --race-color: var(--cyan); }
+.race-phone[data-tone="accent"] { --race-color: var(--accent); }
+
+.race-phone-wireframe {
+  position: absolute;
+  top: 22px;
+  left: 14px;
+  right: 14px;
+  bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  opacity: 0.22;
+}
+.race-phone-wf-hero { height: 40%; border-radius: 8px; background: var(--ink); }
+.race-phone-wf-line {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--ink);
+}
+.race-phone-wf-line-medium { width: 70%; }
+.race-phone-wf-line-long { width: 85%; }
+.race-phone-wf-button {
+  margin-top: auto;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--ink);
+}
+
+.race-phone-time {
+  font-family: var(--font-display);
+  font-variation-settings: 'opsz' 144, 'SOFT' 30, 'WONK' 0;
+  font-size: clamp(24px, 1.6vw + 14px, 32px);
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.025em;
+  color: var(--ink-mute);
+  opacity: 0;
+  transition: color 400ms, opacity 400ms;
+  transition-delay: var(--race-duration, 2000ms);
+}
+[data-reveal][data-in="true"] .race-phone-time,
+.race-phone[data-race-go="true"] .race-phone-time { opacity: 1; }
+
+.race-phone-frame::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow: 0 0 60px transparent;
+  transition: box-shadow 600ms ease-out;
+  transition-delay: var(--race-duration, 2000ms);
+}
+[data-reveal][data-in="true"] .race-phone[data-tone="cyan"] .race-phone-frame::after,
+.race-phone[data-tone="cyan"][data-race-go="true"] .race-phone-frame::after {
+  box-shadow: 0 0 60px color-mix(in oklab, var(--cyan) 30%, transparent);
+}
+[data-reveal][data-in="true"] .race-phone[data-tone="accent"] .race-phone-frame::after,
+.race-phone[data-tone="accent"][data-race-go="true"] .race-phone-frame::after {
+  box-shadow: 0 0 60px color-mix(in oklab, var(--accent) 30%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .race-phone-fill,
+  .race-phone-time,
+  .race-phone-frame::after { transition: none; }
+  [data-reveal] .race-phone-fill { clip-path: inset(0 0 0 0); }
+  [data-reveal] .race-phone-time { opacity: 1; }
+}
+
+/* — race center wait counter — */
+.race-center-counter {
+  font-family: var(--font-display);
+  font-variation-settings: 'opsz' 144, 'SOFT' 30, 'WONK' 0;
+  font-size: clamp(48px, 5vw + 16px, 88px);
+  color: var(--accent);
+  line-height: 1;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.025em;
+}
+
 /* — cohort cards (Audience) — */
 .cohort-pair {
   display: grid;

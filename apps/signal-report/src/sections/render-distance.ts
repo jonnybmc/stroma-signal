@@ -6,49 +6,51 @@ import { renderHeroValue, renderReveal, renderTerm } from '../render-helpers.js'
 import { escapeHtml } from '../render-utils.js';
 import type { ReportLcpSubpartRow, ReportRaceViewModel, ReportViewModel } from '../report-view-model.js';
 
-function renderRaceLane(
-  side: 'left' | 'right',
-  label: string,
-  finalSeconds: string,
-  durationMs: number,
-  colorVar: string,
-  subLabel: string
-): string {
+function renderRacePhone(tone: 'cyan' | 'accent', label: string, finalSeconds: string, durationMs: number): string {
   return `
-    <div class="block stack-sm" style="text-align:${side === 'left' ? 'left' : 'right'};">
-      <div class="eyebrow" style="text-align:${side === 'left' ? 'left' : 'right'};">${escapeHtml(label)}</div>
-      <div class="figure" style="position:relative;overflow:hidden;padding:0;border-radius:var(--r-3);background:var(--bg-2);min-height:200px;">
-        <div
-          data-race-lane
-          data-race-duration="${durationMs}"
-          style="position:absolute;left:0;top:0;bottom:0;width:0;background:${colorVar};opacity:0.18;transition:width ${durationMs}ms linear;"
-        ></div>
-        <div style="position:relative;padding:clamp(20px,3vw,32px);height:100%;display:flex;flex-direction:column;justify-content:space-between;">
-          <div class="mono" style="font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-mute);">${escapeHtml(
-            subLabel
-          )}</div>
-          <div class="figure-stat" style="color:${colorVar};margin-top:auto;">${renderHeroValue(finalSeconds)}</div>
+    <div class="race-phone" data-tone="${tone}" style="--race-duration:${durationMs}ms;">
+      <div class="race-phone-label">${escapeHtml(label)}</div>
+      <div class="race-phone-frame">
+        <div class="race-phone-notch"></div>
+        <div class="race-phone-fill"></div>
+        <div class="race-phone-wireframe">
+          <div class="race-phone-wf-hero"></div>
+          <div class="race-phone-wf-line"></div>
+          <div class="race-phone-wf-line race-phone-wf-line-medium"></div>
+          <div class="race-phone-wf-line race-phone-wf-line-long"></div>
+          <div class="race-phone-wf-button"></div>
         </div>
       </div>
+      <div class="race-phone-time">${renderHeroValue(finalSeconds)}</div>
     </div>
   `;
 }
 
-function renderRaceCenter(deltaMs: number | null, deltaLabel: string): string {
+function renderRaceCenter(deltaMs: number | null, deltaLabel: string, urbanMs: number, comparisonMs: number): string {
   if (deltaMs == null) {
     return `
       <div class="race-center" style="text-align:center;">
         <div class="eyebrow">Wait delta</div>
-        <div class="figure-stat" style="color:var(--ink-mute);">n/a</div>
+        <div class="race-center-counter" style="color:var(--ink-mute);">n/a</div>
       </div>
     `;
   }
   const deltaSeconds = (deltaMs / 1000).toFixed(1);
+  // Counter starts AFTER urban completes and runs UNTIL comparison completes —
+  // the visible tween is the felt wait gap between the two phones.
+  const counterDelayMs = urbanMs + 100;
+  const counterDurationMs = Math.max(400, comparisonMs - urbanMs);
   return `
     <div class="race-center" style="text-align:center;display:flex;flex-direction:column;align-items:center;gap:var(--stack-xs);">
       <div class="eyebrow">Wait delta</div>
-      <div class="figure-stat">${renderHeroValue(`${deltaSeconds}s`, { countTo: true, delayMs: 600, durationMs: 1100 })}</div>
-      <div class="mono" style="font-size:11px;color:var(--ink-mute);">${escapeHtml(deltaLabel)}</div>
+      <div class="race-center-counter">${renderHeroValue(`${deltaSeconds}s`, {
+        countTo: true,
+        delayMs: counterDelayMs,
+        durationMs: counterDurationMs
+      })}</div>
+      <div class="mono" style="font-size:11px;color:var(--ink-mute);max-width:240px;text-wrap:pretty;line-height:1.5;">${escapeHtml(
+        deltaLabel
+      )}</div>
     </div>
   `;
 }
@@ -71,15 +73,18 @@ function renderRaceBlock(race: ReportRaceViewModel): string {
   return `
     <div class="figure" style="padding:clamp(24px,3vw,40px);">
       <div class="race-grid">
-        ${renderRaceLane('left', 'Urban', urbanSeconds, urbanMs, 'var(--cyan)', `${race.metric_label} · urban tier`)}
-        ${renderRaceCenter(race.wait_delta_ms, `${race.metric_label} · ${race.comparison_label} vs urban`)}
-        ${renderRaceLane(
-          'right',
-          escapeHtml(race.comparison_label),
+        ${renderRacePhone('cyan', `Urban · ${race.metric_label} p75`, urbanSeconds, urbanMs)}
+        ${renderRaceCenter(
+          race.wait_delta_ms,
+          `${escapeHtml(race.comparison_label)} users wait this much longer than urban, every visit.`,
+          urbanMs,
+          comparisonMs
+        )}
+        ${renderRacePhone(
+          'accent',
+          `${race.comparison_label} · ${race.metric_label} p75`,
           comparisonSeconds,
-          comparisonMs,
-          'var(--accent)',
-          `${race.metric_label} · ${race.comparison_label} tier`
+          comparisonMs
         )}
       </div>
     </div>
