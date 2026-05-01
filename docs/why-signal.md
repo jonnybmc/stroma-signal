@@ -22,7 +22,7 @@ Signal exists to make that gap measurable, honest, and actionable — the third 
 
 Signal is a browser instrumentation package that classifies real-user network and device conditions on every page load, tags Web Vitals to those classifications, and delivers the enriched data to your own analytics.
 
-The classification is not based on browser-estimated labels. It uses the actual TCP handshake time from the Navigation Timing API, a direct measurement of the round-trip between the user's device and your server. That measurement becomes a tier: urban, moderate, constrained moderate, or constrained. Device capability gets the same treatment: low, mid, or high, scored from real hardware signals.
+The classification is not based on browser-estimated labels. It uses the TCP-handshake span exposed by the Navigation Timing API — a connection-setup measurement, when the browser exposes it as an isolatable signal — and turns it into a tier: urban, moderate, constrained moderate, or constrained. It is a useful diagnostic slice, not a complete user-network cohort axis; the richer per-subpart picture (DNS, TLS, request, response, redirect, service worker; three named TTFB definitions) is captured separately as `vitals.navigation_timing` for warehouse analysis. Device capability gets the same treatment: low, mid, or high, scored from real hardware signals.
 
 Every page load produces one canonical event. Network tier, device tier, Core Web Vitals, LCP / INP attribution context, and on Chromium 123+, the Long Animation Frame story (worst-frame duration plus dominant cause: script, layout, style, or paint) when coverage is defensible. Enough diagnostic context to understand what the load actually felt like. One event. One beacon. Zero dependencies. No PII.
 
