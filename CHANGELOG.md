@@ -18,20 +18,41 @@ Bump the exact pin example whenever a new `-rc.N` is cut so onboarders default t
 
 ## [Unreleased]
 
+### Changed (RC3 — Tier Report `/r` visual + editorial refactor)
+
+- **Layout**: `/r` rewrites the four-act horizontal slide deck as a five-section vertical scroll narrative (`cover` · `audience` · `distance` · `funnel` · `business`). New top scroll-spy nav, smooth-scroll TOC anchors, and a bottom reading-progress hairline. Section IDs are semantic (no more `data-act="N"` chrome).
+- **Theme**: light default (warm cream paper aesthetic) with full dark parity via `[data-theme="dark"]`. Drops the prior data-driven mood/accent/density CSS variation system — one canonical accent (warm amber) carries every report; `mood_tier` stays on the view-model for editorial copy template selection only.
+- **Typography**: Signifier pairing — Fraunces (display, serif wedge) + Schibsted Grotesk (sans) + JetBrains Mono (mono). Loaded via Google Fonts CSS2 import.
+- **Editorial register**: tailored to the Paid-Media / PPC specialist and CMO. Glossary tooltips translate every Web-Vital into Paid-Media language with a "what this means for your KPIs" line keyed to CPC / Quality Score / ROAS / CAC / CPA. Body copy stays diagnostic; headlines never prescribe.
+- `tier-report-design-spec.md` rewritten end-to-end for the new structure + register; `tier-report-design-spec-alignment.test.ts` updated in lockstep (64 tests covering section IDs, mood enum, funnel stages, thresholds, CTA name, theme posture, typography, layout model).
+- BigQuery URL-builder SQL recipes (GTM and normalized warehouse paths) re-aligned with the canonical aggregator's bucketing, tie-break, and rollup logic. Existing decoded URLs keep behaving identically; future generations match authored-side numbers byte-for-byte.
+
 ### Added
 
+- `apps/signal-report/src/glossary.ts` — typed glossary (14 keys: lcp / fcp / inp / ttfb / p75 / cohort / qs / roas / cac / cpc / cpa / poor / classified / renderdelay) used by `renderTerm()` for KPI-translation tooltips.
+- `apps/signal-report/src/render-helpers.ts` — vanilla-TS Reveal / HeroValue / Term builders + boot helpers (`bootRevealObserver`, `bootCounterTweens`, `bootGlossaryPopovers`, `bootScrollSpy`, `bootReadingProgress`, `bootSmoothAnchors`).
+- `apps/signal-report/src/sections/render-{cover,audience,distance,funnel,business}.ts` + `render-shell.ts` — one file per section + the outer scroll-narrative shell.
+- `apps/signal-report/src/report-render-honesty.test.ts` — replaces the prior motion-payload guard. 399 generated tests across every fixture covering whole-doc forbidden tokens (revenue/monthly exposure/commercial diagnosis/asv/mts/zar + bid-down vocabulary) and headline+lede prescription verbs (recommend / you should / optimize / we suggest / the fix is / exclude / avoid).
+- `ReportPersonaProfile.save_data_share` (number) — surfaces the per-tier Data Saver share so the renderer can claim "X% of this cohort is on save-data" instead of a binary flag. Sourced from existing `network_summary.save_data_share`; no warehouse schema change.
+- `ReportAct4ImpactRow.glossary_key` (optional `'qs' | 'cpc' | 'cpa' | 'roas' | 'cohort'`) — anchors KPI-ledger rows to the right glossary tooltip term.
 - `SignalRuntimeLogger` interface and four optional `SignalInitConfig` dependency-injection points (`clock`, `random`, `eventIdFactory`, `logger`). Defaults preserve current behavior; supply your own to make event timestamps, ids, and sample-rate gating deterministic, or to forward runtime warnings + debug info into your observability stack without monkeypatching `console`.
 - `DEFAULT_NETWORK_THRESHOLDS` and `DEFAULT_DEVICE_SCORE_BOUNDARIES` exported from `@stroma-labs/signal-contracts` as the canonical numbers behind the network and device classifiers. Previously SDK-internal; promoting them to the contract package means the SDK and downstream renderers / docs derive the same boundaries from one source.
 - `SignalDeviceScoreBoundaries` interface companion to the new `DEFAULT_DEVICE_SCORE_BOUNDARIES` constant.
 - `formatNetworkBand(tier)` and `formatDeviceSignature(tier)` helpers for deriving the human-readable boundary copy (e.g. `< 50 ms TCP`, `6+ cores · 4+ GB · 1280px+`) from the canonical thresholds. Both accept an optional override block for custom calibration.
 
-### Changed
+### Removed
 
-- BigQuery URL-builder SQL recipes (GTM and normalized warehouse paths) re-aligned with the canonical aggregator's bucketing, tie-break, and rollup logic. Existing decoded URLs keep behaving identically; future generations match authored-side numbers byte-for-byte.
+- Canvas particle system (`apps/signal-report/src/report-motion.ts`, ~1400 lines) and its phase-orchestration scaffolding. Particles deferred indefinitely from RC3.
+- Legacy markup builder (`apps/signal-report/src/report-markup.ts`, ~1450 lines) and the immersive CSS layer (`report-immersive.css`, ~4300 lines). Replaced by per-section render functions + lean tokens-v2 / scroll CSS.
+- Mood-, accent-, and density-driven CSS variation system. The view-model still computes `mood_tier` to inform editorial copy template selection, but no longer drives visuals.
 
 ### Fixed
 
 - `destroy()` on the sealed (sampled-out) runtime controller now releases the global singleton, so a subsequent `init()` spins up a fresh runtime. Previously a no-op that left the sampled-out shape pinned in `globalThis` for the page lifetime.
+
+### Note
+
+- `SignalAggregateV1` contract unchanged. URL codec unchanged. Warehouse schema unchanged. The `/r` refactor is a presentation-layer change — every numeric value still traces to a canonical aggregate field.
 
 ## [0.1.0-rc.2] - 2026-04-30
 

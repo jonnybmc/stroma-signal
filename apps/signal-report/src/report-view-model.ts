@@ -275,6 +275,11 @@ export interface ReportPersonaProfile {
   memory_label: string;
   browser: string | null;
   save_data: boolean;
+  // Share of sessions in this persona's tier that browse with Data Saver
+  // enabled. Surfaced for the redesigned persona card so the renderer
+  // can claim "X% of this cohort is on save-data" instead of a binary
+  // flag. Sourced from `network_summary.save_data_share`.
+  save_data_share: number;
   // When true, the cohort this persona represents is absent from the
   // measured window (0% share). Renderer shows a stripped empty-state
   // card instead of fabricated detail rows. empty_message carries the
@@ -339,6 +344,10 @@ export interface ReportAct4ImpactRow {
   kpi_label: string;
   impact_sentence_html: string;
   tone: ReportAct4ImpactTone;
+  // Optional glossary anchor — paired with the redesigned `business_impact`
+  // ledger so the renderer can attach the right tooltip term to the row's
+  // KPI cameo. Pure presentation hint; safe to ignore in legacy renders.
+  glossary_key?: 'qs' | 'cpc' | 'cpa' | 'roas' | 'cohort';
 }
 
 const BOUNDARY_STATEMENT =
@@ -385,8 +394,9 @@ export function formatMetricDuration(value: number | null): string {
 
 // Splits a pre-formatted measurement (e.g. "4.2s", "2100ms", "45%", "3K")
 // into its numeric body and trailing unit characters. "n/a" / "—" / empty
-// return no unit. Powers the italic-serif unit-suffix treatment on hero
-// numbers in the report markup — see `.sr-unit` in report-immersive.css.
+// return no unit. Used by the legacy splitValueUnit helper kept for
+// downstream callers; the new render-helpers.renderHeroValue performs the
+// same split inline.
 const VALUE_UNIT_SPLITTER = /^(-?\d+(?:[.,]\d+)?)(ms|s|%|K|M|B)$/;
 export function splitValueUnit(text: string): { value: string; unit: string } {
   const match = VALUE_UNIT_SPLITTER.exec(text.trim());
@@ -1434,6 +1444,7 @@ function buildPersonaContrast(aggregate: SignalAggregateV1): ReportPersonaContra
       memory_label: bestMemory,
       browser: bestBrowser ? bestBrowser.charAt(0).toUpperCase() + bestBrowser.slice(1) : null,
       save_data: false,
+      save_data_share: 0,
       is_empty: urbanShare === 0,
       empty_message: `No sessions in this window met the urban tier threshold (${formatNetworkBand('urban')}). Every measured session lives outside the best-connected band.`
     },
@@ -1458,6 +1469,7 @@ function buildPersonaContrast(aggregate: SignalAggregateV1): ReportPersonaContra
       memory_label: constrainedMemory,
       browser: bestBrowser ? bestBrowser.charAt(0).toUpperCase() + bestBrowser.slice(1) : null,
       save_data: (ns?.save_data_share ?? 0) > 0,
+      save_data_share: ns?.save_data_share ?? 0,
       is_empty: constrainedShare === 0,
       empty_message: `No sessions in this window fell into the constrained tiers (> ${DEFAULT_NETWORK_THRESHOLDS.moderate} ms TCP). The full audience lives in better-connected bands.`
     }

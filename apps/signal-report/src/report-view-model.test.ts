@@ -13,7 +13,7 @@ import {
 } from '@stroma-labs/signal-contracts';
 import { describe, expect, it } from 'vitest';
 
-import { renderReportMarkup } from './report-markup';
+import { renderReportShell } from './render-shell';
 import { buildReportViewModel, REPORT_SCENE_BUDGETS, selectMotionMode } from './report-view-model';
 
 describe('report view model', () => {
@@ -459,35 +459,31 @@ describe('report view model', () => {
     }
   });
 
-  it('renders full markup from every fixture without NaN, undefined, or broken structure', () => {
+  it('renders the scroll-shell from every fixture without NaN, undefined, or broken structure', () => {
     for (const fixture of signalReportScenarioFixtures) {
       const viewModel = buildReportViewModel(fixture.aggregate);
-      const html = renderReportMarkup(viewModel, 'full');
+      const html = renderReportShell(viewModel);
 
-      // No bad string literals in rendered output
       expect(html).not.toContain('>NaN<');
       expect(html).not.toContain('>undefined<');
       expect(html).not.toContain('>null<');
 
-      // All 4 acts present
-      expect(html).toContain('data-act="1"');
-      expect(html).toContain('data-act="2"');
-      expect(html).toContain('data-act="3"');
-      expect(html).toContain('data-act="4"');
+      // All 5 sections present (semantic ids, RC3 redesign).
+      expect(html).toContain('id="cover"');
+      expect(html).toContain('id="audience"');
+      expect(html).toContain('id="distance"');
+      expect(html).toContain('id="funnel"');
+      expect(html).toContain('id="business"');
 
-      // Landing section present
-      expect(html).toContain('data-role="landing"');
-
-      // Credibility strip rendered (single provenance surface for the landing)
-      expect(html).toContain('sr-credibility-strip');
+      // Honesty surfaces survive the redesign — sample size + classified
+      // share land in the cover lede; footer carries the meta strip.
+      expect(html).toContain('sessions measured');
       expect(html).toContain('classified');
-      expect(html).toContain('conn reuse');
+      expect(html).toContain('class="scroll-footer"');
 
-      // Footer present
-      expect(html).toContain('data-role="persistent-footer"');
-
-      // Mood attribute set
-      expect(html).toMatch(/data-mood="(urgent|sober|affirming)"/);
+      // Mood is data-driven (drives editorial template selection) but no
+      // longer paints CSS variation. View-model exposes the canonical value.
+      expect(['urgent', 'sober', 'affirming']).toContain(viewModel.mood_tier);
     }
   });
 
@@ -665,33 +661,22 @@ describe('report view model', () => {
         inp_story: confidentInpStoryAggregate.inp_story
       };
       const viewModel = buildReportViewModel(aggregate);
-      const html = renderReportMarkup(viewModel, 'full');
 
-      expect(html).toContain('sr-lcp-anatomy');
-      expect(html).toContain('Element render delay dominates');
-      expect(html).toContain('Usually a hero image.');
-      expect(html).toContain('data-dominant-subpart="element_render_delay"');
-      expect(html).toContain('data-subpart="element_render_delay"');
-      expect(html).toContain('data-hedged="false"');
-
-      expect(html).toContain('sr-funnel-node-story');
-      expect(html).toContain('handler work after the click');
+      expect(viewModel.race.lcp_story?.dominant_subpart).toBe('element_render_delay');
+      expect(viewModel.race.lcp_story?.is_hedged).toBe(false);
+      expect(viewModel.race.lcp_story?.narrative).toContain('Element render delay dominates');
+      expect(viewModel.race.lcp_story?.culprit_clause).toBe('Usually a hero image.');
+      expect(viewModel.act3.inp_story?.narrative).toContain('handler work after the click');
     });
 
-    it('omits the Act 2 LCP story block entirely when race.lcp_story is null', () => {
+    it('exposes a null race.lcp_story when the aggregate carries no LCP story', () => {
       const viewModel = buildReportViewModel(strongLcpCoverageAggregateFixture);
-      const html = renderReportMarkup(viewModel, 'full');
-
       expect(viewModel.race.lcp_story).toBeNull();
-      expect(html).not.toContain('sr-lcp-anatomy');
     });
 
-    it('omits the Act 3 INP caption when act3.inp_story is null', () => {
+    it('exposes a null act3.inp_story when the aggregate carries no INP story', () => {
       const viewModel = buildReportViewModel(strongLcpCoverageAggregateFixture);
-      const html = renderReportMarkup(viewModel, 'full');
-
       expect(viewModel.act3.inp_story).toBeNull();
-      expect(html).not.toContain('sr-funnel-node-story');
     });
 
     it('builds a heavy third-party pre-race headline with median share in the copy', () => {
@@ -766,7 +751,7 @@ describe('report view model', () => {
       expect(viewModel.race.third_party_story).toBeNull();
     });
 
-    it('renders the third-party pre-race headline before the race grid with tier data-attr', () => {
+    it('builds a third-party story carrying the canonical tier + share + origin count', () => {
       const aggregate = {
         ...strongLcpCoverageAggregateFixture,
         third_party_story: {
@@ -777,30 +762,20 @@ describe('report view model', () => {
         }
       };
       const viewModel = buildReportViewModel(aggregate);
-      const html = renderReportMarkup(viewModel, 'full');
+      const story = viewModel.race.third_party_story;
 
-      expect(html).toContain('sr-third-party-headline');
-      expect(html).toContain('data-third-party-tier="heavy"');
-      expect(html).toContain('38%');
-      expect(html).toContain('8 off-domain origins');
-
-      // Pre-race positioning: headline must appear before the sr-race grid in source order.
-      const headlineIndex = html.indexOf('sr-third-party-headline');
-      const raceIndex = html.indexOf('class="sr-race"');
-      expect(headlineIndex).toBeGreaterThan(-1);
-      expect(raceIndex).toBeGreaterThan(-1);
-      expect(headlineIndex).toBeLessThan(raceIndex);
+      expect(story?.dominant_tier).toBe('heavy');
+      expect(story?.median_share_pct).toBe(38);
+      expect(story?.median_origin_count).toBe(8);
+      expect(story?.narrative).toContain('38%');
     });
 
-    it('omits the third-party headline entirely when race.third_party_story is null', () => {
+    it('exposes a null race.third_party_story when the aggregate carries no story', () => {
       const viewModel = buildReportViewModel(strongLcpCoverageAggregateFixture);
-      const html = renderReportMarkup(viewModel, 'full');
-
       expect(viewModel.race.third_party_story).toBeNull();
-      expect(html).not.toContain('sr-third-party-headline');
     });
 
-    it('hides the origin count from the headline when median_origin_count is null (privacy mask)', () => {
+    it('keeps median_origin_count nullable so the renderer can hide it (privacy mask)', () => {
       const aggregate = {
         ...strongLcpCoverageAggregateFixture,
         third_party_story: {
@@ -811,10 +786,10 @@ describe('report view model', () => {
         }
       };
       const viewModel = buildReportViewModel(aggregate);
-      const html = renderReportMarkup(viewModel, 'full');
+      const story = viewModel.race.third_party_story;
 
-      expect(html).toContain('sr-third-party-headline');
-      expect(html).not.toContain('off-domain origins');
+      expect(story?.median_origin_count).toBeNull();
+      expect(story?.narrative).toContain('24%');
     });
   });
 
@@ -881,7 +856,7 @@ describe('report view model', () => {
       expect(viewModel.act1_context_strip).toBeNull();
     });
 
-    it('renders the strip markup with tooltips when at least one row is present', () => {
+    it('exposes a context strip with tooltips when at least one row survives the gates', () => {
       const aggregate = {
         ...strongLcpCoverageAggregateFixture,
         context_story: {
@@ -892,16 +867,17 @@ describe('report view model', () => {
         }
       };
       const viewModel = buildReportViewModel(aggregate);
-      const html = renderReportMarkup(viewModel, 'full');
+      const strip = viewModel.act1_context_strip;
 
-      expect(html).toContain('sr-act1-ctx');
-      expect(html).toContain('data-key="save_data"');
-      expect(html).toContain('data-key="median_rtt"');
-      expect(html).not.toContain('data-key="cellular"');
-      expect(html).toMatch(/data-tooltip="[^"]+Save-Data/);
+      expect(strip).not.toBeNull();
+      const keys = strip?.rows.map((r) => r.key) ?? [];
+      expect(keys).toContain('save_data');
+      expect(keys).toContain('median_rtt');
+      expect(keys).not.toContain('cellular');
+      expect(strip?.rows.find((r) => r.key === 'save_data')?.tooltip).toMatch(/Save-Data/);
     });
 
-    it('omits the strip markup entirely when no rows survive', () => {
+    it('returns null context strip when no rows survive', () => {
       const aggregate = {
         ...strongLcpCoverageAggregateFixture,
         context_story: {
@@ -912,9 +888,7 @@ describe('report view model', () => {
         }
       };
       const viewModel = buildReportViewModel(aggregate);
-      const html = renderReportMarkup(viewModel, 'full');
-
-      expect(html).not.toContain('sr-act1-ctx');
+      expect(viewModel.act1_context_strip).toBeNull();
     });
   });
 
@@ -955,14 +929,13 @@ describe('report view model', () => {
       expect(viewModel.credibility_strip.excluded_background_sessions ?? 0).toBeGreaterThan(0);
     });
 
-    it('renders every new narrative block in the full report markup', () => {
+    it('exposes every new narrative block on the view-model for the full-depth fixture', () => {
       const viewModel = buildReportViewModel(fullDepthAggregateFixture);
-      const html = renderReportMarkup(viewModel, 'full');
 
-      expect(html).toContain('sr-lcp-anatomy');
-      expect(html).toContain('sr-third-party-headline');
-      expect(html).toContain('sr-funnel-node-loaf');
-      expect(html).toContain('sr-act1-ctx');
+      expect(viewModel.race.lcp_story).not.toBeNull();
+      expect(viewModel.race.third_party_story).not.toBeNull();
+      expect(viewModel.act3.loaf_story).not.toBeNull();
+      expect(viewModel.act1_context_strip).not.toBeNull();
     });
   });
 
@@ -992,13 +965,14 @@ describe('report view model', () => {
       expect(viewModel.act3.loaf_story).toBeNull();
     });
 
-    it('renders markup without the Chromium-only narrative hooks', () => {
+    it('renders the scroll shell without crashing when Chromium-only stories are absent', () => {
       const viewModel = buildReportViewModel(safariHeavyAggregateFixture);
-      const html = renderReportMarkup(viewModel, 'full');
+      const html = renderReportShell(viewModel);
 
-      expect(html).not.toContain('sr-lcp-anatomy');
-      expect(html).not.toContain('sr-third-party-headline');
-      expect(html).not.toContain('sr-funnel-node-loaf');
+      expect(html).toContain('id="cover"');
+      expect(html).toContain('id="distance"');
+      expect(html).not.toContain('>NaN<');
+      expect(html).not.toContain('>undefined<');
     });
   });
 });

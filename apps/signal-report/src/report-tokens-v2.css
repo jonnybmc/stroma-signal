@@ -1,0 +1,264 @@
+/* Stroma Signal Tier Report — design tokens (RC3 redesign, Signifier preset).
+   Light default; dark parity via [data-theme="dark"]. One canonical look —
+   no mood/accent/density CSS variation. Editorial copy carries tone. */
+
+:root {
+  /* — base canvas (light) — */
+  --bg-0: #f1ede4;            /* page floor (warm ivory) */
+  --bg-1: #fdfaf3;            /* card surface (cream) */
+  --bg-2: #f7f2e8;            /* recessed panel */
+  --bg-3: #ede7d8;            /* deepest recess */
+  --line: rgba(20, 17, 13, 0.08);
+  --line-strong: rgba(20, 17, 13, 0.16);
+
+  /* — text — */
+  --ink: #14110d;             /* primary */
+  --ink-soft: #2a2820;        /* secondary */
+  --ink-mute: #6a6558;        /* tertiary / metadata */
+  --ink-faint: #b3ad9e;       /* hairline / disabled */
+
+  /* — accent (single canonical: warm amber, Signifier-tuned) — */
+  --accent: #b8541b;          /* burnt sienna for cream */
+  --accent-soft: rgba(184, 84, 27, 0.10);
+  --accent-strong: #8e3f12;
+  --cyan: #1f7e93;            /* duotone counterpoint */
+  --cyan-soft: rgba(31, 126, 147, 0.10);
+  --green: #2f7a4f;
+  --red: #b8362c;
+
+  /* — tier colors (semantic; product-owned, fixed) — */
+  --tier-urban: #1f7e93;
+  --tier-moderate: #6a6da8;
+  --tier-cmoderate: #b8541b;
+  --tier-constrained: #b8362c;
+  --tier-unknown: #8a857a;
+
+  /* — typography (Signifier pairing) — */
+  --font-sans: 'Schibsted Grotesk', system-ui, -apple-system, sans-serif;
+  --font-display: 'Fraunces', 'Iowan Old Style', Georgia, serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+
+  /* fluid type ramp */
+  --t-eyebrow: clamp(10px, 0.7vw + 6px, 11px);
+  --t-meta:    clamp(11px, 0.7vw + 7px, 12px);
+  --t-body:    clamp(13px, 0.6vw + 11px, 14px);
+  --t-lead:    clamp(15px, 0.8vw + 12px, 17px);
+  --t-h3:      clamp(18px, 1.0vw + 14px, 22px);
+  --t-h2:      clamp(28px, 2.4vw + 16px, 44px);
+  --t-h1:      clamp(34px, 3.5vw + 18px, 58px);
+  --t-stat-l:  clamp(56px, 7vw + 16px, 132px);
+  --t-stat-m:  clamp(36px, 4vw + 14px, 72px);
+  --t-stat-s:  clamp(22px, 2vw + 12px, 32px);
+
+  /* spacing */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 20px;
+  --s-6: 24px;
+  --s-8: 32px;
+  --s-10: 40px;
+  --s-12: 48px;
+  --s-16: 64px;
+
+  /* radii */
+  --r-1: 6px;
+  --r-2: 10px;
+  --r-3: 14px;
+  --r-4: 20px;
+
+  /* shadows (paper-aware; gentle) */
+  --sh-1: 0 1px 2px rgba(20, 17, 13, 0.04), 0 1px 1px rgba(20, 17, 13, 0.03);
+  --sh-2: 0 4px 12px rgba(20, 17, 13, 0.05), 0 2px 4px rgba(20, 17, 13, 0.03);
+  --sh-accent: 0 4px 16px rgba(184, 84, 27, 0.18);
+
+  /* gutters */
+  --gutter: clamp(20px, 4vw, 56px);
+}
+
+/* — dark parity — */
+[data-theme="dark"] {
+  --bg-0: #08090c;
+  --bg-1: #0c0e13;
+  --bg-2: #14171f;
+  --bg-3: #1b1f2a;
+  --line: rgba(255, 255, 255, 0.06);
+  --line-strong: rgba(255, 255, 255, 0.12);
+
+  --ink: #f5f7fa;
+  --ink-soft: #c8ccd6;
+  --ink-mute: #7b8090;
+  --ink-faint: #4a4f5d;
+
+  --accent: #ffb86b;
+  --accent-soft: rgba(255, 184, 107, 0.10);
+  --accent-strong: #ffcd9a;
+  --cyan: #7cd4ff;
+  --cyan-soft: rgba(124, 212, 255, 0.10);
+  --green: #6be19a;
+  --red: #ff5a4a;
+
+  --tier-urban: #7cd4ff;
+  --tier-moderate: #c0bfff;
+  --tier-cmoderate: #ffb86b;
+  --tier-constrained: #ff5a4a;
+  --tier-unknown: #7b8090;
+
+  --sh-1: 0 1px 2px rgba(0, 0, 0, 0.30);
+  --sh-2: 0 4px 14px rgba(0, 0, 0, 0.35), 0 2px 6px rgba(0, 0, 0, 0.20);
+  --sh-accent: 0 4px 20px rgba(255, 184, 107, 0.22);
+}
+
+/* — base — */
+* { box-sizing: border-box; }
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg-0);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-feature-settings: 'ss01', 'cv11';
+  letter-spacing: -0.011em;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-feature-settings: 'tnum', 'zero';
+  letter-spacing: 0;
+}
+
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: var(--t-eyebrow);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+  font-weight: 500;
+}
+
+.display {
+  font-family: var(--font-display);
+  font-variation-settings: 'opsz' 144, 'SOFT' 30, 'WONK' 0;
+  font-weight: 400;
+  letter-spacing: -0.025em;
+  line-height: 1.0;
+}
+
+/* — utility — */
+.duotone-text {
+  background: linear-gradient(90deg, var(--accent) 0%, var(--cyan) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+.muted { color: var(--ink-mute); }
+
+.divider { height: 1px; background: var(--line); }
+
+/* — glossary popover — */
+.gloss {
+  border-bottom: 1px dotted var(--ink-mute);
+  cursor: help;
+  position: relative;
+  transition: color 0.15s, border-color 0.15s;
+}
+.gloss:hover,
+.gloss:focus-visible {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+  outline: none;
+}
+.gloss::after {
+  content: '';
+  display: inline-block;
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0.4;
+  margin-left: 4px;
+  vertical-align: super;
+  font-size: 8px;
+}
+.gloss-pop {
+  position: absolute;
+  z-index: 80;
+  bottom: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: clamp(260px, 28vw, 340px);
+  background: var(--bg-1);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-2);
+  padding: var(--s-4);
+  box-shadow: var(--sh-2);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  line-height: 1.5;
+  letter-spacing: -0.005em;
+  color: var(--ink-soft);
+  text-transform: none;
+}
+.gloss-pop::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-top-color: var(--bg-1);
+}
+.gloss-pop .gloss-term {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 6px;
+}
+.gloss-pop .gloss-term-name {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.gloss-pop .gloss-term-tag {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.06em;
+  color: var(--ink-mute);
+}
+.gloss-pop .gloss-cmo {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  font-style: italic;
+  color: var(--ink-mute);
+  font-size: 11.5px;
+}
+@media (max-width: 600px) {
+  .gloss-pop {
+    position: fixed;
+    bottom: 16px;
+    left: 16px;
+    right: 16px;
+    top: auto;
+    transform: none;
+    width: auto;
+  }
+  .gloss-pop::after { display: none; }
+}
+
+/* — accessibility — */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}

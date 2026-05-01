@@ -94,7 +94,8 @@ function buildLcpBounceRow(race: ReportRaceViewModel): ReportAct4ImpactRow | nul
       'Google and Meta raise CPC on slow landing pages. You pay more for clicks that never become sessions.',
       'CPC'
     ),
-    tone: toneFromWaitDeltaMs(race.wait_delta_ms)
+    tone: toneFromWaitDeltaMs(race.wait_delta_ms),
+    glossary_key: 'qs'
   };
 }
 
@@ -112,7 +113,8 @@ function buildInpConversionRow(act3: ReportAct3ViewModel): ReportAct4ImpactRow |
       'Mushy buttons at the point of intent drop conversion. Same ad spend, fewer leads, inflated CPA.',
       'CPA'
     ),
-    tone: toneFromPoorShare(act3.poor_session_share)
+    tone: toneFromPoorShare(act3.poor_session_share),
+    glossary_key: 'cpa'
   };
 }
 
@@ -154,7 +156,8 @@ function buildScriptRoasRow(race: ReportRaceViewModel, act3: ReportAct3ViewModel
       'Mobile-first audiences cannot interact with a script-heavy page. Top-of-funnel reach without bottom-of-funnel ROAS.',
       'ROAS'
     ),
-    tone
+    tone,
+    glossary_key: 'roas'
   };
 }
 
@@ -171,7 +174,8 @@ function buildNetworkReachRow(aggregate: SignalAggregateV1): ReportAct4ImpactRow
       'A real share of your audience lives on constrained networks. Campaigns calibrated for urban speed leak Campaign Efficiency here.',
       'Campaign Efficiency'
     ),
-    tone: toneFromConstrainedShare(constrainedShare)
+    tone: toneFromConstrainedShare(constrainedShare),
+    glossary_key: 'cohort'
   };
 }
 
