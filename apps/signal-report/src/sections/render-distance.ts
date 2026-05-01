@@ -138,17 +138,47 @@ function renderLcpSubparts(rows: ReportLcpSubpartRow[]): string {
 function renderPaidMediaImpact(vm: ReportViewModel): string {
   // Educational consequence cells — pull from race wait-delta + LCP story
   // dominant subpart. Pure presentation; no commercial modelling.
+  // Magnitudes are banded by wait_delta to avoid alarmist phrasing on
+  // contained datasets and underclaim on severe ones.
   const race = vm.race;
-  const cells: Array<{ label: string; value: string; term: string | null }> = [];
+  const eyebrow = vm.editorial.distance_paid_media_eyebrow;
 
-  if (race.wait_delta_ms != null) {
+  if (!race.race_available) {
+    // Honest fallback — no delta to cost. We render the editorial
+    // explanation instead of a fabricated impact ledger.
+    return `
+      <div class="figure">
+        <div class="figure-eyebrow">${escapeHtml(eyebrow)}</div>
+        <p class="section-lede" style="margin-top:var(--stack-sm);">${escapeHtml(
+          vm.editorial.distance_paid_media_unavailable_message ?? ''
+        )}</p>
+      </div>
+    `;
+  }
+
+  const cells: Array<{ label: string; value: string; term: string | null }> = [];
+  const deltaMs = race.wait_delta_ms ?? 0;
+
+  // Three bands — contained / visible / severe. The labels stay diagnostic;
+  // the magnitudes scale with the measured delta rather than asserting a
+  // single industry headline regardless of severity.
+  if (deltaMs < 900) {
+    cells.push({ label: 'Quality Score impact', value: 'sub-tier', term: 'qs' });
+    cells.push({ label: 'CPC pressure (Google)', value: 'negligible at this delta', term: 'cpc' });
+    cells.push({ label: 'Mobile bounce per +1s of delta', value: '+12%', term: null });
+  } else if (deltaMs < 2200) {
     cells.push({ label: 'Quality Score impact', value: '−1 tier', term: 'qs' });
     cells.push({ label: 'CPC pressure (Google)', value: '+8 to +14%', term: 'cpc' });
+    cells.push({ label: 'Mobile bounce per +1s of delta', value: '+24%', term: null });
+  } else {
+    cells.push({ label: 'Quality Score impact', value: '−1 to −2 tiers', term: 'qs' });
+    cells.push({ label: 'CPC pressure (Google)', value: '+12 to +20%', term: 'cpc' });
+    cells.push({ label: 'Mobile bounce per +1s of delta', value: '+32%', term: null });
   }
+
   if (race.lcp_story?.dominant_subpart === 'element_render_delay') {
     cells.push({ label: 'Render-delay dominance', value: 'script-bound', term: 'renderdelay' });
   }
-  cells.push({ label: 'Mobile bounce per +1s', value: '+32%', term: null });
 
   const rows = cells
     .map((c, i, arr) => {
@@ -165,7 +195,7 @@ function renderPaidMediaImpact(vm: ReportViewModel): string {
 
   return `
     <div class="figure">
-      <div class="figure-eyebrow">For paid media · what this delta costs you</div>
+      <div class="figure-eyebrow">${escapeHtml(eyebrow)}</div>
       <div style="margin-top:8px;">${rows}</div>
     </div>
   `;
@@ -179,18 +209,10 @@ export function renderDistanceSection(vm: ReportViewModel): string {
         <div class="act-intro" style="padding-block:0;">
           <div class="act-intro-stack">
             ${renderReveal(`<div class="act-intro-eyebrow"><span class="dot"></span>Act 02 · Temporal comparison</div>`)}
-            ${renderReveal(
-              `<h1>Urban finishes loading. <span class="duotone-text">${escapeHtml(
-                race.comparison_label
-              )} is still mid-paint.</span></h1>`,
-              { delay: 120 }
-            )}
-            ${renderReveal(
-              `<p class="act-intro-lede">Same campaign. Two phones. Both ${renderTerm(
-                'lcp'
-              )} times play in real seconds. The space between them is what the bid auction is quietly pricing in.</p>`,
-              { delay: 240 }
-            )}
+            ${renderReveal(vm.editorial.distance_headline_html, { delay: 120 })}
+            ${renderReveal(`<p class="act-intro-lede">${escapeHtml(vm.editorial.distance_lede_html)}</p>`, {
+              delay: 240
+            })}
           </div>
         </div>
 

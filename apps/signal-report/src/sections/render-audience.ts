@@ -2,7 +2,7 @@
 // Network spread table, device spread table, persona-pair (best vs
 // constrained), form-factor triplet.
 
-import { renderHeroValue, renderReveal, renderTerm } from '../render-helpers.js';
+import { renderHeroValue, renderReveal } from '../render-helpers.js';
 import { escapeHtml } from '../render-utils.js';
 import type { ReportPersonaProfile, ReportViewModel } from '../report-view-model.js';
 
@@ -194,7 +194,7 @@ function renderContextStrip(vm: ReportViewModel): string {
       ${renderReveal(
         `<div class="block-header">
           <div class="section-eyebrow">Context that shapes the experience</div>
-          <p class="section-lede">Measured environment signals that explain why the cohorts above feel different — Save Data uptake, link latency, cellular dependency, and the connection class your audience self-reports.</p>
+          <p class="section-lede">${escapeHtml(vm.editorial.audience_context_strip_lede)}</p>
         </div>`
       )}
       ${renderReveal(`<div class="figure" style="padding:var(--stack-md) var(--stack-md) calc(var(--stack-md) - 1px);">${rows}</div>`)}
@@ -209,16 +209,8 @@ export function renderAudienceSection(vm: ReportViewModel): string {
         <div class="act-intro" style="padding-block:0;">
           <div class="act-intro-stack">
             ${renderReveal(`<div class="act-intro-eyebrow"><span class="dot"></span>Act 01 · Audience shape</div>`)}
-            ${renderReveal(
-              `<h1>Your traffic isn't one user. It's <span class="duotone-text">three different audiences</span> sharing the same checkout.</h1>`,
-              { delay: 120 }
-            )}
-            ${renderReveal(
-              `<p class="act-intro-lede">Every session here is a real person. Each ${renderTerm(
-                'cohort'
-              )} sits in the tier its infrastructure put it in. Same campaign. Different experience.</p>`,
-              { delay: 240 }
-            )}
+            ${renderReveal(vm.editorial.audience_headline_html, { delay: 120 })}
+            ${renderReveal(`<p class="act-intro-lede">${vm.editorial.audience_lede_html}</p>`, { delay: 240 })}
           </div>
         </div>
 
@@ -235,8 +227,8 @@ export function renderAudienceSection(vm: ReportViewModel): string {
         <div class="block">
           ${renderReveal(
             `<div class="block-header">
-              <div class="section-eyebrow">Two cohorts, side by side</div>
-              <p class="section-lede">The most-connected and most-constrained personas in this measurement window.</p>
+              <div class="section-eyebrow">${escapeHtml(vm.editorial.audience_persona_section_eyebrow)}</div>
+              <p class="section-lede">${escapeHtml(vm.editorial.audience_persona_section_lede)}</p>
             </div>`
           )}
           <div class="cohort-pair">

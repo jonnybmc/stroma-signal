@@ -73,17 +73,14 @@ export function renderBusinessSection(vm: ReportViewModel): string {
         <div class="act-intro" style="padding-block:0;">
           <div class="act-intro-stack">
             ${renderReveal(`<div class="act-intro-eyebrow"><span class="dot"></span>Act 04 · KPI translation</div>`)}
-            ${renderReveal(
-              `<h1>Every number above lands on a <span class="duotone-text">KPI you're accountable for.</span></h1>`,
-              { delay: 120 }
-            )}
+            ${renderReveal(vm.editorial.business_headline_html, { delay: 120 })}
             ${renderReveal(`<p class="act-intro-lede">${escapeHtml(vm.act4_lede)}</p>`, { delay: 240 })}
           </div>
         </div>
 
         <div class="business-grid">
           <div class="block">
-            ${renderReveal(`<div class="section-eyebrow">Where the numbers land in your KPIs</div>`)}
+            ${renderReveal(`<div class="section-eyebrow">${escapeHtml(vm.editorial.business_section_eyebrow)}</div>`)}
             ${
               useLedger
                 ? vm.act4_impact_rows
@@ -97,7 +94,7 @@ export function renderBusinessSection(vm: ReportViewModel): string {
             ${renderReveal(
               `<div>
                 <div class="section-eyebrow" style="margin-bottom:8px;">If you want to go deeper</div>
-                <p style="margin:0;font-size:14px;color:var(--ink-soft);line-height:1.55;text-wrap:pretty;">This report proves the <em>shape</em> of the gap. Root cause, business exposure in your own currency, and fix order are the next read — and where a deeper engagement starts.</p>
+                <p style="margin:0;font-size:14px;color:var(--ink-soft);line-height:1.55;text-wrap:pretty;">${vm.editorial.business_aside_lede_html}</p>
               </div>`
             )}
             ${renderReveal(renderRapidFixCta(vm), { as: 'card', delay: 120 })}
@@ -105,10 +102,7 @@ export function renderBusinessSection(vm: ReportViewModel): string {
               `<div class="figure" style="padding:20px;">
                 <div class="section-eyebrow" style="margin-bottom:10px;">What this evidence enables</div>
                 <ul style="margin:0;padding-left:18px;font-size:13px;color:var(--ink-soft);line-height:1.6;">
-                  <li>Bring this report into the next QBR or sprint review.</li>
-                  <li>Pair tier evidence with a landing-page audit before the next paid-media review.</li>
-                  <li>Ship a lighter landing-page variant for the constrained cohort.</li>
-                  <li>Re-test ${renderTerm('qs')} after a hero-image fix.</li>
+                  ${vm.editorial.business_what_this_enables.map((bullet) => `<li>${escapeHtml(bullet)}</li>`).join('')}
                 </ul>
               </div>`,
               { delay: 240 }

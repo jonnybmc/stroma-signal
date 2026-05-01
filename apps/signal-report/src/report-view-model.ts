@@ -29,6 +29,7 @@ import {
 } from '@stroma-labs/signal-contracts';
 
 import { buildAct4ImpactRows } from './view-model/builders/act4-impact.js';
+import { bandWaitDelta, buildEditorialCopy, type ReportEditorialCopy } from './view-model/builders/editorial-copy.js';
 
 // Dominance share threshold below which the LCP / INP story narratives
 // fall back to hedged copy instead of claiming a single dominant cause.
@@ -331,6 +332,11 @@ export interface ReportViewModel {
   // cameo around the KPI word — markup stays declarative.
   act4_impact_rows: ReportAct4ImpactRow[];
   offer_cards: Array<{ title: string; body: string; href: string; cta: string }>;
+  // Editorial copy registry — per-section headlines, ledes, and framing
+  // strings keyed on (mood × data shape). Renderers consume these
+  // verbatim so the artifact never asserts a story the data does not
+  // support. See `view-model/builders/editorial-copy.ts`.
+  editorial: ReportEditorialCopy;
 }
 
 export type ReportAct4ImpactRowId = 'lcp_bounce' | 'inp_conversion' | 'script_roas' | 'network_reach';
@@ -1639,6 +1645,50 @@ export function buildReportViewModel(aggregate: SignalAggregateV1): ReportViewMo
   const mood = selectMoodTier(race, preliminaryAct3);
   const act3 = buildAct3ViewModel(aggregate, mood);
   const heroCopy = buildHeroCopy(aggregate, mood);
+  const personaContrast = buildPersonaContrast(aggregate);
+  const contextStrip = buildContextStripViewModel(aggregate.context_story);
+  const tiers = buildAct1Tiers(aggregate);
+  const deviceTiers = buildAct1DeviceTiers(aggregate);
+  const impactRows = buildAct4ImpactRows(aggregate, race, act3);
+
+  // Classified tiers (>=5% share, EXCLUDING unknown). Headline copy
+  // variants pivot on this count so single-band fixtures do not assert
+  // "three audiences" when only one tier is populated. The unknown tier
+  // gets its own dedicated branch via `unknown_tier_dominant`.
+  const classifiedTierCount = Math.min(4, tiers.filter((t) => t.key !== 'unknown' && t.share >= 5).length) as
+    | 0
+    | 1
+    | 2
+    | 3
+    | 4;
+  const unknownTier = tiers.find((t) => t.key === 'unknown');
+  const unknownTierDominant = (unknownTier?.share ?? 0) >= 50;
+
+  const editorial = buildEditorialCopy(
+    {
+      mood,
+      classified_tier_count: classifiedTierCount,
+      unknown_tier_dominant: unknownTierDominant,
+      classified_share_pct: Math.round(aggregate.coverage.classified_share),
+      race_available: race.race_available,
+      race_metric: race.metric,
+      wait_delta_band: bandWaitDelta(race.wait_delta_ms),
+      comparison_label: race.comparison_label,
+      best_persona_empty: personaContrast.best.is_empty,
+      constrained_persona_empty: personaContrast.constrained.is_empty,
+      context_strip_signals: contextStrip?.rows.map((r) => r.label) ?? [],
+      funnel_mode: act3.mode,
+      funnel_active_stage_count: act3.stages.length,
+      funnel_first_stage_label: act3.stages[0]?.label ?? null,
+      has_ledger: impactRows.length >= 2,
+      shape_proven: race.race_available || act3.stages.length >= 2
+    },
+    race,
+    act3,
+    personaContrast,
+    contextStrip,
+    aggregate.lcp_story?.dominant_culprit_kind ?? null
+  );
 
   return {
     domain: aggregate.domain,
@@ -1663,16 +1713,17 @@ export function buildReportViewModel(aggregate: SignalAggregateV1): ReportViewMo
     credibility_strip: buildCredibilityStrip(aggregate, race),
     form_factor: buildFormFactor(aggregate),
     act1_intro: heroCopy.act1_intro,
-    act1_tiers: buildAct1Tiers(aggregate),
-    act1_device_tiers: buildAct1DeviceTiers(aggregate),
-    persona_contrast: buildPersonaContrast(aggregate),
-    act1_context_strip: buildContextStripViewModel(aggregate.context_story),
+    act1_tiers: tiers,
+    act1_device_tiers: deviceTiers,
+    persona_contrast: personaContrast,
+    act1_context_strip: contextStrip,
     actionable_signals: buildActionableSignals(aggregate),
     race,
     act3,
     act4_lede: heroCopy.act4_lede,
     act4_summary_points: buildAct4SummaryPoints(aggregate, race, act3),
-    act4_impact_rows: buildAct4ImpactRows(aggregate, race, act3),
-    offer_cards: buildOfferCards()
+    act4_impact_rows: impactRows,
+    offer_cards: buildOfferCards(),
+    editorial
   };
 }

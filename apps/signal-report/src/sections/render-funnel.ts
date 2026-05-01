@@ -72,17 +72,13 @@ export function renderFunnelSection(vm: ReportViewModel): string {
       <div class="section-inner">
         <div class="act-intro" style="padding-block:0;">
           <div class="act-intro-stack">
-            ${renderReveal(`<div class="act-intro-eyebrow"><span class="dot"></span>Act 03 · Where the page becomes too late</div>`)}
-            ${renderReveal(`<h1>Where the page <span class="duotone-text">becomes too late.</span></h1>`, {
-              delay: 120
-            })}
-            ${renderReveal(
-              `<p class="act-intro-lede">A meaningful share of your sessions cross into ${renderTerm(
-                'poor',
-                'poor performance'
-              )} territory — first at the moment of paint, again at hero content, and finally at first interaction. Stage by stage, intent leaks out before the page has caught up.</p>`,
-              { delay: 240 }
-            )}
+            ${renderReveal(`<div class="act-intro-eyebrow"><span class="dot"></span>${escapeHtml(vm.editorial.funnel_eyebrow)}</div>`)}
+            ${renderReveal(vm.editorial.funnel_headline_html, { delay: 120 })}
+            ${
+              vm.editorial.funnel_lede_html
+                ? renderReveal(`<p class="act-intro-lede">${vm.editorial.funnel_lede_html}</p>`, { delay: 240 })
+                : ''
+            }
           </div>
         </div>
 
@@ -104,10 +100,7 @@ export function renderFunnelSection(vm: ReportViewModel): string {
                       delayMs: 100,
                       durationMs: 900
                     })}</div>
-                    <div class="figure-cap">of measured sessions cross into ${renderTerm(
-                      'poor',
-                      'poor performance'
-                    )} on at least one stage. Threshold basis: ${escapeHtml(act3.threshold_basis)}.</div>
+                    <div class="figure-cap">${escapeHtml(vm.editorial.funnel_headline_figure_cap)} Threshold basis: ${escapeHtml(act3.threshold_basis)}.</div>
                   </div>`
                 )}
                 ${renderReveal(`<div class="section-eyebrow">Stage progression</div>`)}

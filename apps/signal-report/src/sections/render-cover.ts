@@ -87,7 +87,7 @@ export function renderCoverSection(vm: ReportViewModel): string {
           ${renderReveal(
             `<div class="block-header">
               <div class="section-eyebrow">At a glance</div>
-              <p class="section-lede">The three numbers that frame the entire report.</p>
+              <p class="section-lede">${escapeHtml(vm.editorial.cover_at_a_glance_lede)}</p>
             </div>`
           )}
           <div class="grid-3">
@@ -99,7 +99,7 @@ export function renderCoverSection(vm: ReportViewModel): string {
                   delayMs: 150,
                   durationMs: 900
                 })}</div>
-                <div class="figure-cap">of your traffic loads slower than your urban baseline</div>
+                <div class="figure-cap">${escapeHtml(vm.editorial.cover_headline_card_caption)}</div>
               </div>`,
               { as: 'card', delay: 80 }
             )}
