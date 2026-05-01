@@ -811,6 +811,14 @@ export function decodeSignalReportUrl(value: string | URL): SignalAggregateV1 {
   const url = typeof value === 'string' ? new URL(value) : value;
   const params = url.searchParams;
 
+  // Validate the integer-tuple distributions FIRST so a malformed `nt`
+  // surfaces a clear "Invalid encoded integer tuple" error before any
+  // missing-required-scalar throws. Order is observable contract
+  // (e2e tests assert on the message of the first thrown error for
+  // hostile URLs) — keep these two probes ahead of `s` / `nc` / `p`.
+  const networkDistribution = decodeNetworkDistribution(params);
+  const deviceDistribution = decodeDeviceDistribution(params);
+
   // Required scalars
   const sampleSize = readRequiredNumberParam(params, 's');
   const networkCoverage = readRequiredNumberParam(params, 'nc');
@@ -850,8 +858,8 @@ export function decodeSignalReportUrl(value: string | URL): SignalAggregateV1 {
     sample_size: sampleSize,
     classified_sample_size: Math.round((sampleSize * networkCoverage) / 100),
     period_days: periodDays,
-    network_distribution: decodeNetworkDistribution(params),
-    device_distribution: decodeDeviceDistribution(params),
+    network_distribution: networkDistribution,
+    device_distribution: deviceDistribution,
     comparison_tier: comparisonTier,
     race_metric: raceMetric,
     race_fallback_reason: raceFallbackReason,

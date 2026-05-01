@@ -559,6 +559,18 @@ describe('signal contracts', () => {
     expect(issues.some((i) => i.includes('sample_size × coverage.network_coverage'))).toBe(true);
   });
 
+  it('throws on a malformed integer tuple BEFORE missing-required-scalar checks (observable error-message order)', () => {
+    // Locks in the canonical throw order for malformed URLs: when a
+    // distribution param (nt / dt) is malformed AND a required scalar
+    // (s / nc / p) is missing, the integer-tuple error must surface
+    // first. The /r route's friendly-error UI surfaces this message
+    // verbatim — re-ordering the throws would silently change the
+    // copy a user sees on a hostile or truncated link.
+    expect(() =>
+      decodeSignalReportUrl('https://signal.stroma.design/r?nt=garbage&dt=34,33,33&ct=none&rm=none')
+    ).toThrow('Invalid encoded integer tuple');
+  });
+
   it('rejects incoherent report URLs via the decoder', () => {
     // nt=0,0,0,0,0 with nc=100 means 100% coverage but 0% in every tier — incoherent
     // The decoder runs explainSignalAggregateIssues post-decode, but this specific case
