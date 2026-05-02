@@ -140,20 +140,26 @@ export const DEFAULT_DEVICE_SCORE_BOUNDARIES: SignalDeviceScoreBoundaries = {
 
 // Human-readable network band derived from the canonical thresholds.
 // One helper, one set of glyphs (en-dash, ≥), so report renderers stay
-// in lock-step with the classifier when the numbers move.
+// in lock-step with the classifier when the numbers move. Each band
+// leads with a plain-English real-world equivalent (typical class of
+// connection that lands in this TCP-handshake range) so a non-technical
+// reader gets an immediate mental anchor; the threshold itself follows
+// as the precision tail. The "/" indicates either-of mappings — a TCP
+// time alone can't distinguish wifi-served fibre from strong 4G, so
+// the qualifier names both rather than claiming one.
 export function formatNetworkBand(
   tier: SignalNetworkTier,
   thresholds: SignalNetworkTierThresholds = DEFAULT_NETWORK_THRESHOLDS
 ): string {
   switch (tier) {
     case 'urban':
-      return `< ${thresholds.urban} ms TCP`;
+      return `fast 4G / fibre · < ${thresholds.urban} ms TCP`;
     case 'moderate':
-      return `${thresholds.urban}–${thresholds.moderate} ms TCP`;
+      return `stable 4G · ${thresholds.urban}–${thresholds.moderate} ms TCP`;
     case 'constrained_moderate':
-      return `${thresholds.moderate}–${thresholds.constrained_moderate} ms TCP`;
+      return `slow 4G / fast 3G · ${thresholds.moderate}–${thresholds.constrained_moderate} ms TCP`;
     case 'constrained':
-      return `≥ ${thresholds.constrained_moderate} ms TCP`;
+      return `3G / 2G class · ≥ ${thresholds.constrained_moderate} ms TCP`;
   }
 }
 
