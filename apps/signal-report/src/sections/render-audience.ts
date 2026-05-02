@@ -4,6 +4,7 @@
 
 import { renderHeroValue, renderReveal } from '../render-helpers.js';
 import { escapeHtml } from '../render-utils.js';
+import { renderIcon } from '../report-icons.js';
 import type { ReportPersonaProfile, ReportViewModel } from '../report-view-model.js';
 
 const TIER_COLOR_VAR: Record<string, string> = {
@@ -215,12 +216,16 @@ export function renderAudienceSection(vm: ReportViewModel): string {
         </div>
 
         <div class="block">
-          ${renderReveal(`<div class="section-eyebrow">Network spread</div>`)}
+          ${renderReveal(
+            `<div class="section-eyebrow with-icon">${renderIcon('wifi', 'sr-eyebrow-icon')} <span>Network spread</span></div>`
+          )}
           ${renderReveal(renderTierTable(vm))}
         </div>
 
         <div class="block">
-          ${renderReveal(`<div class="section-eyebrow">Device spread</div>`)}
+          ${renderReveal(
+            `<div class="section-eyebrow with-icon">${renderIcon('monitorSmartphone', 'sr-eyebrow-icon')} <span>Device spread</span></div>`
+          )}
           ${renderReveal(renderDeviceTable(vm))}
         </div>
 

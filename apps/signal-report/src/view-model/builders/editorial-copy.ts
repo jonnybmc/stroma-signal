@@ -86,7 +86,10 @@ export function bandWaitDelta(deltaMs: number | null): WaitDeltaBand {
 export function buildEditorialCopy(
   shape: EditorialDataShape,
   race: ReportRaceViewModel,
-  act3: ReportAct3ViewModel,
+  // act3 reserved for future per-stage / per-mode copy variants the
+  // current pickers don't yet need; keep on the signature so adding
+  // them later doesn't churn every call site.
+  _act3: ReportAct3ViewModel,
   personaContrast: ReportPersonaContrast,
   contextStrip: ReportContextStripViewModel | null,
   dominantCulpritKind: string | null

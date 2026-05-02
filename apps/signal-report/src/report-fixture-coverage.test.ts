@@ -95,7 +95,7 @@ describe('fixture coverage — every scenario renders without null/undefined/NaN
         });
       }
 
-      if (vm.form_factor && vm.form_factor.segments.some((s) => s.share === 0)) {
+      if (vm.form_factor?.segments.some((s) => s.share === 0)) {
         it('form-factor: empty (0%) segments render with data-empty + placeholder copy', () => {
           expect(html, `${fx.id} should mark empty form-factor cells`).toContain('data-empty="true"');
           expect(html, `${fx.id} should label empty form-factor cells honestly`).toContain(

@@ -10,6 +10,10 @@
   --bg-3: #ede7d8;            /* deepest recess */
   --line: rgba(20, 17, 13, 0.08);
   --line-strong: rgba(20, 17, 13, 0.16);
+  /* Stronger horizontal rules for tabular blocks — readable against
+   * the warm-cream paper background where 0.08 fades into the surface. */
+  --line-table: rgba(20, 17, 13, 0.22);
+  --line-table-header: rgba(20, 17, 13, 0.45);
 
   /* — text — */
   --ink: #14110d;             /* primary */
@@ -85,6 +89,8 @@
   --bg-3: #1b1f2a;
   --line: rgba(255, 255, 255, 0.06);
   --line-strong: rgba(255, 255, 255, 0.12);
+  --line-table: rgba(255, 255, 255, 0.22);
+  --line-table-header: rgba(255, 255, 255, 0.45);
 
   --ink: #f5f7fa;
   --ink-soft: #c8ccd6;
