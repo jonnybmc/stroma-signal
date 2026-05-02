@@ -176,7 +176,7 @@ describe('explainReportInteractionIssues', () => {
     });
 
     it('accepts an intent_freeform initial event with a pill_id', () => {
-      const ev = makeValidIntent('intent_freeform', { intent_pill_id: 'weekly_inbox' });
+      const ev = makeValidIntent('intent_freeform', { intent_pill_id: 'multi_page' });
       expect(explainReportInteractionIssues(ev)).toEqual([]);
     });
 
@@ -214,7 +214,7 @@ describe('explainReportInteractionIssues', () => {
 
     it('rejects an unknown intent_pill_id value', () => {
       const ev = makeValidIntent('intent_freeform', {
-        intent_pill_id: 'pdf_export' as unknown as 'weekly_inbox'
+        intent_pill_id: 'pdf_export' as unknown as 'multi_page'
       });
       const issues = explainReportInteractionIssues(ev);
       expect(issues.some((i) => i.includes('intent_pill_id'))).toBe(true);

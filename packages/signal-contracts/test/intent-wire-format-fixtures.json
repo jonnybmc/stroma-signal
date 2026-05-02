@@ -88,18 +88,18 @@
     }
   },
   {
-    "name": "freeform — weekly_inbox pill",
+    "name": "freeform — multi_page pill",
     "payload": {
       "v": 1,
       "event_kind": "intent_freeform",
-      "event_id": "evt_ff_weekly_01",
+      "event_id": "evt_ff_multipage_01",
       "ts": 1777680040000,
       "st": "share_token_e",
       "route": "r",
       "rv": 1,
       "intent_capture_id": "cap_ff_001",
       "intent_stage": "initial",
-      "intent_pill_id": "weekly_inbox"
+      "intent_pill_id": "multi_page"
     }
   },
   {

@@ -37,7 +37,6 @@ export type SignalReportInteractionIntentStage = 'initial' | 'followup';
 export type SignalReportInteractionIntentCadence = 'weekly' | 'monthly';
 
 export type SignalReportInteractionIntentPillId =
-  | 'weekly_inbox'
   | 'multi_page'
   | 'multi_client_portfolio'
   | 'competitor_context'
@@ -110,7 +109,7 @@ export const SIGNAL_REPORT_INTERACTION_VALID_INTENT_CADENCES: ReadonlySet<Signal
   new Set(['weekly', 'monthly']);
 
 export const SIGNAL_REPORT_INTERACTION_VALID_INTENT_PILL_IDS: ReadonlySet<SignalReportInteractionIntentPillId> =
-  new Set(['weekly_inbox', 'multi_page', 'multi_client_portfolio', 'competitor_context', 'something_else']);
+  new Set(['multi_page', 'multi_client_portfolio', 'competitor_context', 'something_else']);
 
 export const SIGNAL_REPORT_INTERACTION_VALID_ROUTES: ReadonlySet<SignalReportInteractionRoute> = new Set(['r']);
 
@@ -245,7 +244,7 @@ export function explainReportInteractionIssues(value: unknown): string[] {
     !SIGNAL_REPORT_INTERACTION_VALID_INTENT_PILL_IDS.has(v.intent_pill_id as SignalReportInteractionIntentPillId)
   ) {
     issues.push(
-      'Expected "intent_pill_id" to be one of: weekly_inbox, multi_page, multi_client_portfolio, competitor_context, something_else when present.'
+      'Expected "intent_pill_id" to be one of: multi_page, multi_client_portfolio, competitor_context, something_else when present.'
     );
   }
   if (v.intent_freeform_text != null) {

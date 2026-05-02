@@ -490,7 +490,7 @@ function pickMonitoringCard(): ReportClosingCard {
   return {
     id: 'monitoring',
     intent_kind: 'intent_monitoring',
-    eyebrow: 'Automated monitoring',
+    eyebrow: 'Scheduled monitoring',
     title: 'Run this report on a schedule.',
     body: 'Re-running the BigQuery query and regenerating the URL by hand is fine for a one-off — less fine as a regular read. Scheduled monitoring would deliver this same report weekly or monthly as the data refreshes. We are collecting interest before we build it.',
     cta_label: 'Tell me when it ships',
@@ -503,7 +503,6 @@ function pickMonitoringCard(): ReportClosingCard {
 
 function pickClosingPills(): ReportClosingPill[] {
   return [
-    { pill_id: 'weekly_inbox', label: 'weekly inbox digest of this domain', collects_freeform_text: false },
     { pill_id: 'multi_page', label: 'same report for another page on this domain', collects_freeform_text: false },
     { pill_id: 'multi_client_portfolio', label: 'multi-client / portfolio rollout', collects_freeform_text: false },
     {
