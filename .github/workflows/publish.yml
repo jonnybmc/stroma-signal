@@ -21,6 +21,12 @@ jobs:
           node-version: 22
           cache: pnpm
           registry-url: https://registry.npmjs.org
+      # Node 22 LTS ships with npm 10.x, which supports `--provenance`
+      # (sigstore signing) but does NOT support OIDC-authenticated publish
+      # PUTs against the npm Trusted Publisher endpoint. The publish PUT
+      # silently 404s without the right OIDC auth header. npm 11.5+ added
+      # the OIDC publish-auth flow, so we upgrade explicitly here.
+      - run: npm install -g npm@latest
       - run: pnpm install --frozen-lockfile
       - run: pnpm run ci
       - run: pnpm exec playwright install --with-deps chromium
