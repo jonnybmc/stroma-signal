@@ -34,13 +34,58 @@ jobs:
           version: 10.28.2
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          # Node 24 ships with npm 11.x bundled. npm Trusted Publishing
+          # requires npm 11.5.1+ (npm docs). Node 22 ships with npm 10.x
+          # which DOES NOT support the OIDC publish-auth flow — that's
+          # the documented cause of the misleading 404 we kept hitting.
+          # In-place `npm i -g npm@latest` corrupts npm's own deps on
+          # hosted runners (MODULE_NOT_FOUND on promise-retry), so we
+          # use a Node version that has the right npm bundled.
+          # Source: https://docs.npmjs.com/trusted-publishers
+          node-version: 24
           cache: pnpm
           registry-url: https://registry.npmjs.org
-      # Node 22 LTS ships with npm 10.x. npm Trusted Publishing (OIDC
-      # publish auth) requires npm 11.5+. Upgrade explicitly so the
-      # `npm publish` step below has the OIDC code path available.
-      - run: npm install -g npm@latest
+
+      # ── DIAGNOSTICS (remove once publish is reliably green) ────────
+      - name: Print runtime versions
+        run: |
+          echo "::group::Runtime versions"
+          echo "node: $(node --version)"
+          echo "npm:  $(npm --version)"
+          echo "pnpm: $(pnpm --version)"
+          echo "::endgroup::"
+
+      - name: Print OIDC token claims (no secrets — claims are safe)
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // Request an OIDC token with the npm audience. This is the same
+            // audience the npm CLI requests at publish time. Decode the JWT
+            // payload to see exactly what claims npm uses to match against
+            // the Trusted Publisher policy on npmjs.com.
+            const audience = 'npm:registry.npmjs.org';
+            let token;
+            try {
+              token = await core.getIDToken(audience);
+            } catch (err) {
+              core.error(`OIDC token request FAILED for audience ${audience}: ${err.message}`);
+              core.error('This usually means the workflow lacks `permissions: id-token: write` at the job level.');
+              throw err;
+            }
+            const [, payloadB64] = token.split('.');
+            const claims = JSON.parse(Buffer.from(payloadB64, 'base64url').toString());
+            core.startGroup('OIDC token claims (audience=npm:registry.npmjs.org)');
+            console.log(JSON.stringify(claims, null, 2));
+            core.endGroup();
+            // Surface the fields npm matches against TP policy as notices
+            // so they show up at the top of the run summary
+            core.notice(`OIDC subject: ${claims.sub}`);
+            core.notice(`OIDC repository: ${claims.repository ?? '(missing)'}`);
+            core.notice(`OIDC workflow_ref: ${claims.workflow_ref ?? '(missing)'}`);
+            core.notice(`OIDC environment: ${claims.environment ?? '(none)'}`);
+            core.notice(`OIDC ref: ${claims.ref ?? '(missing)'}`);
+            core.notice(`OIDC repository_owner: ${claims.repository_owner ?? '(missing)'}`);
+
       - run: pnpm install --frozen-lockfile
       - run: pnpm run ci
       - run: pnpm exec playwright install --with-deps chromium
@@ -83,5 +128,10 @@ jobs:
       # `pnpm run ci` above. No NODE_AUTH_TOKEN env: npm 11+ pulls the
       # OIDC token from the workflow's `id-token: write` permission and
       # exchanges it against the trusted-publisher policy on npmjs.com.
-      - run: npm publish --provenance --access public --tag ${{ steps.npm_tag.outputs.tag }} --ignore-scripts
+      # `--loglevel=verbose` while diagnostics are in place — surfaces the
+      # actual HTTP PUT request/response against the registry. When npm
+      # rejects the OIDC handshake we see the exact registry error code
+      # (e.g. "trusted publisher policy mismatch") instead of the generic
+      # 404 fallback. Drop this flag once the publish is reliably green.
+      - run: npm publish --provenance --access public --tag ${{ steps.npm_tag.outputs.tag }} --ignore-scripts --loglevel=verbose
         working-directory: packages/signal
