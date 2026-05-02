@@ -48,8 +48,8 @@ function generateCaptureId(): string {
   }
   // Fallback for older runtimes — RFC4122-ish v4-shaped string.
   const rand = Array.from({ length: 16 }, () => Math.floor(Math.random() * 256));
-  rand[6] = (rand[6]! & 0x0f) | 0x40;
-  rand[8] = (rand[8]! & 0x3f) | 0x80;
+  rand[6] = ((rand[6] ?? 0) & 0x0f) | 0x40;
+  rand[8] = ((rand[8] ?? 0) & 0x3f) | 0x80;
   const hex = rand.map((b) => b.toString(16).padStart(2, '0')).join('');
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
 }
@@ -95,14 +95,14 @@ interface CardState {
 }
 
 function readCardState(card: HTMLElement): CardState | null {
-  const intentKind = card.dataset['intentKind'] as SignalReportInteractionIntentKind | undefined;
+  const intentKind = card.dataset.intentKind as SignalReportInteractionIntentKind | undefined;
   if (!intentKind) return null;
   return {
     intentKind,
-    captureId: card.dataset['captureId'] ?? generateCaptureId(),
-    ctaHref: card.dataset['ctaHref'] && card.dataset['ctaHref'].length > 0 ? card.dataset['ctaHref'] : null,
-    collectsEmail: card.dataset['collectsEmail'] === 'true',
-    collectsCadence: card.dataset['collectsCadence'] === 'true'
+    captureId: card.dataset.captureId ?? generateCaptureId(),
+    ctaHref: card.dataset.ctaHref && card.dataset.ctaHref.length > 0 ? card.dataset.ctaHref : null,
+    collectsEmail: card.dataset.collectsEmail === 'true',
+    collectsCadence: card.dataset.collectsCadence === 'true'
   };
 }
 
@@ -125,7 +125,7 @@ function basePayload(
 }
 
 function flipCardToConfirmation(card: HTMLElement, message?: string): void {
-  card.dataset['state'] = 'logged';
+  card.dataset.state = 'logged';
   if (message != null) {
     const text = card.querySelector<HTMLElement>('[data-closing-confirmation-text]');
     if (text) text.textContent = message;
@@ -141,7 +141,7 @@ function attachCardClickHandlers(ctx: ResolvedReportContext): void {
   for (const card of document.querySelectorAll<HTMLElement>('[data-closing-card]')) {
     const state = readCardState(card);
     if (!state) continue;
-    card.dataset['captureId'] = state.captureId;
+    card.dataset.captureId = state.captureId;
 
     if (state.ctaHref) {
       attachLinkCtaHandler(card, state, ctx);
@@ -159,7 +159,7 @@ function attachLinkCtaHandler(card: HTMLElement, state: CardState, ctx: Resolved
   if (!cta) return;
 
   cta.addEventListener('click', () => {
-    if (card.dataset['state'] === 'logged') return;
+    if (card.dataset.state === 'logged') return;
     sendIntent(basePayload(ctx, state.intentKind, state.captureId));
     flipCardToConfirmation(card, '✓ noted — opening the booking page');
     // No preventDefault — let the <a> redirect.
@@ -178,7 +178,7 @@ function attachFormSubmitHandler(card: HTMLElement, state: CardState, ctx: Resol
 
   form.addEventListener('submit', (e) => {
     e.preventDefault();
-    if (card.dataset['state'] === 'logged') return;
+    if (card.dataset.state === 'logged') return;
 
     const emailInput = state.collectsEmail ? card.querySelector<HTMLInputElement>('[data-closing-email]') : null;
     const cadenceInput = state.collectsCadence
@@ -230,7 +230,7 @@ function attachMultiselectHandler(ctx: ResolvedReportContext): void {
             ? '1 selected'
             : `${checked.length} selected`;
     }
-    const wantsFreeform = checked.some((cb) => cb.dataset['collectsFreeformText'] === 'true');
+    const wantsFreeform = checked.some((cb) => cb.dataset.collectsFreeformText === 'true');
     if (freeformWrap) freeformWrap.hidden = !wantsFreeform;
   }
   for (const cb of checkboxes) cb.addEventListener('change', refreshSummary);
@@ -238,7 +238,7 @@ function attachMultiselectHandler(ctx: ResolvedReportContext): void {
 
   form.addEventListener('submit', (e) => {
     e.preventDefault();
-    if (form.dataset['state'] === 'logged') return;
+    if (form.dataset.state === 'logged') return;
 
     const checked = Array.from(checkboxes).filter((cb) => cb.checked);
     if (checked.length === 0) return;
@@ -259,7 +259,7 @@ function attachMultiselectHandler(ctx: ResolvedReportContext): void {
       sendIntent(payload);
     }
 
-    form.dataset['state'] = 'logged';
+    form.dataset.state = 'logged';
     const slot = form.querySelector<HTMLElement>('.closing-multiselect-confirmation');
     if (slot) slot.hidden = false;
   });

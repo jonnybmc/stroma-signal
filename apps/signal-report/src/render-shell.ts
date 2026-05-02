@@ -20,7 +20,7 @@ export const SECTION_ORDER = [
 
 export type SectionId = (typeof SECTION_ORDER)[number]['id'];
 
-function renderTopNav(viewModel: ReportViewModel): string {
+function renderTopNav(): string {
   const items = SECTION_ORDER.map(
     (s) => `
       <a href="#${s.id}" data-spy-link="${s.id}" data-active="${s.id === 'cover' ? 'true' : 'false'}">
@@ -55,7 +55,7 @@ function renderFooter(viewModel: ReportViewModel): string {
 export function renderReportShell(viewModel: ReportViewModel): string {
   return `
     <div class="scroll-report" data-theme="light">
-      ${renderTopNav(viewModel)}
+      ${renderTopNav()}
       <main>
         ${renderCoverSection(viewModel)}
         ${renderAudienceSection(viewModel)}

@@ -4,6 +4,19 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
     <meta name="color-scheme" content="light dark" />
+    <!--
+      Defense-in-depth CSP. Every escapeHtml call site is the primary
+      defense; CSP catches the case where a future change misses one.
+      'unsafe-inline' on style-src is required by the SSR-style template
+      literals that emit per-element style="" attributes (74 sites). Once
+      those move to classes (post-RC3), the directive can tighten to a
+      hash / nonce.
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.stroma.design; form-action 'self' https://www.stroma.design; frame-ancestors 'none'; base-uri 'none'"
+    />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
     <title>Signal · Tier Report</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />

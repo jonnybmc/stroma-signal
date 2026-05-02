@@ -319,7 +319,7 @@ export function bootSmoothAnchors(): void {
 export function bootShareCopy(): void {
   const btn = document.querySelector<HTMLButtonElement>('[data-role="share-copy"]');
   if (!btn) return;
-  const defaultLabel = btn.dataset['defaultLabel'] ?? btn.textContent ?? 'copy link';
+  const defaultLabel = btn.dataset.defaultLabel ?? btn.textContent ?? 'copy link';
   let revertTimer: ReturnType<typeof setTimeout> | null = null;
   btn.addEventListener('click', () => {
     if (!navigator.clipboard?.writeText) return;
