@@ -23,7 +23,7 @@ function renderStageRow(stage: ReportExperienceStageViewModel, index: number): s
           <span style="font-size:14px;color:var(--ink);">${renderTerm(STAGE_TERM[stage.key] ?? 'lcp', stage.label)}</span>
           <span class="mono" style="font-size:11px;color:var(--ink-mute);">${escapeHtml(stage.threshold_label)}</span>
         </div>
-        <div class="funnel-bar-track" style="--bar-w:${widthPct}%;--bar-delay:${index * 120}ms;">
+        <div class="funnel-bar-track" style="--bar-scale:${(widthPct / 100).toFixed(4)};--bar-delay:${index * 120}ms;">
           <div class="funnel-bar-fill"></div>
         </div>
       </div>

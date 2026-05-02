@@ -470,12 +470,17 @@ body { overflow-y: auto; overflow-x: hidden; }
 }
 .funnel-bar-fill {
   height: 100%;
+  width: 100%;
   background: linear-gradient(90deg, var(--cyan), var(--accent), var(--red));
   border-radius: 999px;
-  width: 0;
-  transition: width 1100ms cubic-bezier(0.22, 1, 0.36, 1) var(--bar-delay, 0ms);
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 1100ms cubic-bezier(0.22, 1, 0.36, 1) var(--bar-delay, 0ms);
 }
-[data-in="true"] .funnel-bar-fill { width: var(--bar-w, 0); }
+[data-in="true"] .funnel-bar-fill { transform: scaleX(var(--bar-scale, 0)); }
+@media (prefers-reduced-motion: reduce) {
+  .funnel-bar-fill { transition: none; }
+}
 
 /* — phone race grid (Distance) — */
 .race-grid {
