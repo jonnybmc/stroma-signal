@@ -45,7 +45,6 @@ function renderFooter(viewModel: ReportViewModel): string {
     : 'date not provided';
   return `
     <footer class="scroll-footer">
-      <img class="scroll-footer-logo" src="${REPORT_BRAND.wordmarkUrl}" alt="${escapeHtml(REPORT_BRAND.alt)}" />
       <div class="scroll-footer-meta">generated ${escapeHtml(generated)} · ${viewModel.sample_size} sessions · ${viewModel.period_days} day window</div>
       <button class="scroll-footer-copy" data-role="share-copy" data-default-label="copy link" type="button">copy link</button>
     </footer>

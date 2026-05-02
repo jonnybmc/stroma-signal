@@ -1101,12 +1101,6 @@ body { overflow-y: auto; overflow-x: hidden; }
   gap: 24px;
   align-items: center;
 }
-.scroll-footer-logo {
-  height: 22px;
-  width: auto;
-  display: block;
-  justify-self: start;
-}
 .scroll-footer-meta {
   justify-self: center;
   text-align: center;
@@ -1119,7 +1113,6 @@ body { overflow-y: auto; overflow-x: hidden; }
     grid-template-columns: 1fr;
     justify-items: center;
   }
-  .scroll-footer-logo,
   .scroll-footer-copy {
     justify-self: center;
   }
