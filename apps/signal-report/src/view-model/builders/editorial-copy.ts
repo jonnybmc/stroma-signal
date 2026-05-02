@@ -214,18 +214,18 @@ function pickCoverHeadlineCardCaption(shape: EditorialDataShape): string {
 
 function pickAudienceHeadline(shape: EditorialDataShape): string {
   if (shape.unknown_tier_dominant && shape.classified_tier_count === 0) {
-    return `<h1>We couldn't sort this audience into network tiers — but the <span class="duotone-text">device and connection signals</span> still show meaningful spread.</h1>`;
+    return `<h1>We couldn't sort this audience into network tiers — but the <span class="brand-text">device and connection signals</span> still show meaningful spread.</h1>`;
   }
   if (shape.classified_tier_count === 0) {
-    return `<h1>We couldn't sort this audience into network tiers — but the <span class="duotone-text">device and connection signals</span> still show meaningful spread.</h1>`;
+    return `<h1>We couldn't sort this audience into network tiers — but the <span class="brand-text">device and connection signals</span> still show meaningful spread.</h1>`;
   }
   if (shape.classified_tier_count === 1) {
-    return `<h1>Every session here lives in the same network band — but the <span class="duotone-text">device and connection signals</span> still tell different stories.</h1>`;
+    return `<h1>Every session here lives in the same network band — but the <span class="brand-text">device and connection signals</span> still tell different stories.</h1>`;
   }
   if (shape.classified_tier_count === 2) {
-    return `<h1>Your traffic isn't one user. It's <span class="duotone-text">two distinct audiences</span> experiencing the same campaign differently.</h1>`;
+    return `<h1>Your traffic isn't one user. It's <span class="brand-text">two distinct audiences</span> experiencing the same campaign differently.</h1>`;
   }
-  return `<h1>Your traffic isn't one user. It's <span class="duotone-text">three different audiences</span> sharing the same campaign.</h1>`;
+  return `<h1>Your traffic isn't one user. It's <span class="brand-text">three different audiences</span> sharing the same campaign.</h1>`;
 }
 
 function pickAudienceLede(shape: EditorialDataShape): string {
@@ -281,20 +281,20 @@ function pickContextStripLede(strip: ReportContextStripViewModel | null): string
 
 function pickDistanceHeadline(shape: EditorialDataShape, race: ReportRaceViewModel): string {
   if (!shape.race_available) {
-    return `<h1>The race is <span class="duotone-text">not yet defensible.</span> Coverage tells us more than the gap can right now.</h1>`;
+    return `<h1>The race is <span class="brand-text">not yet defensible.</span> Coverage tells us more than the gap can right now.</h1>`;
   }
   const label = race.comparison_label;
   if (shape.race_metric === 'ttfb') {
-    return `<h1>Urban gets a server reply. <span class="duotone-text">${escapeForHtml(label)} is still waiting on first byte.</span></h1>`;
+    return `<h1>Urban gets a server reply. <span class="brand-text">${escapeForHtml(label)} is still waiting on first byte.</span></h1>`;
   }
   if (shape.race_metric === 'fcp') {
-    return `<h1>Urban paints first content. <span class="duotone-text">${escapeForHtml(label)} is still on a blank screen.</span></h1>`;
+    return `<h1>Urban paints first content. <span class="brand-text">${escapeForHtml(label)} is still on a blank screen.</span></h1>`;
   }
   // metric === 'lcp'
   if (shape.wait_delta_band === 'contained') {
-    return `<h1>Urban finishes loading. <span class="duotone-text">${escapeForHtml(label)} catches up</span> — but the gap is contained.</h1>`;
+    return `<h1>Urban finishes loading. <span class="brand-text">${escapeForHtml(label)} catches up</span> — but the gap is contained.</h1>`;
   }
-  return `<h1>Urban finishes loading. <span class="duotone-text">${escapeForHtml(label)} is still mid-paint.</span></h1>`;
+  return `<h1>Urban finishes loading. <span class="brand-text">${escapeForHtml(label)} is still mid-paint.</span></h1>`;
 }
 
 function pickDistanceLede(shape: EditorialDataShape, race: ReportRaceViewModel): string {
@@ -334,21 +334,21 @@ function pickFunnelEyebrow(shape: EditorialDataShape): string {
 
 function pickFunnelHeadline(shape: EditorialDataShape): string {
   if (shape.funnel_mode === 'legacy' || shape.funnel_active_stage_count === 0) {
-    return `<h1>The performance funnel for this report is <span class="duotone-text">unavailable.</span></h1>`;
+    return `<h1>The performance funnel for this report is <span class="brand-text">unavailable.</span></h1>`;
   }
   // Stage count trumps mood — a 1-stage funnel cannot honestly use
   // the 3-stage "mostly holds — and where it slips" framing.
   if (shape.funnel_active_stage_count === 1) {
-    return `<h1>Where the <span class="duotone-text">one stage we can defend</span> starts to slip.</h1>`;
+    return `<h1>Where the <span class="brand-text">one stage we can defend</span> starts to slip.</h1>`;
   }
   if (shape.funnel_active_stage_count === 2) {
-    return `<h1>Where the <span class="duotone-text">measured stages</span> start to slip.</h1>`;
+    return `<h1>Where the <span class="brand-text">measured stages</span> start to slip.</h1>`;
   }
   // 3-stage funnel — mood softens the framing.
   if (shape.mood === 'affirming') {
-    return `<h1>Where the page <span class="duotone-text">mostly holds</span> — and where it slips.</h1>`;
+    return `<h1>Where the page <span class="brand-text">mostly holds</span> — and where it slips.</h1>`;
   }
-  return `<h1>Where the page <span class="duotone-text">becomes too late.</span></h1>`;
+  return `<h1>Where the page <span class="brand-text">becomes too late.</span></h1>`;
 }
 
 function pickFunnelLede(shape: EditorialDataShape): string | null {
@@ -384,12 +384,12 @@ function pickFunnelHeadlineFigureCap(shape: EditorialDataShape): string {
 
 function pickBusinessHeadline(shape: EditorialDataShape): string {
   if (!shape.has_ledger) {
-    return `<h1>Where the evidence lands in <span class="duotone-text">the KPIs you're accountable for.</span></h1>`;
+    return `<h1>Where the evidence lands in <span class="brand-text">the KPIs you're accountable for.</span></h1>`;
   }
   if (shape.mood === 'affirming') {
-    return `<h1>Even at this calmer scale, every number above lands on a <span class="duotone-text">KPI you're accountable for.</span></h1>`;
+    return `<h1>Even at this calmer scale, every number above lands on a <span class="brand-text">KPI you're accountable for.</span></h1>`;
   }
-  return `<h1>Every number above lands on a <span class="duotone-text">KPI you're accountable for.</span></h1>`;
+  return `<h1>Every number above lands on a <span class="brand-text">KPI you're accountable for.</span></h1>`;
 }
 
 function pickBusinessAsideLede(shape: EditorialDataShape): string {

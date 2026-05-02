@@ -25,10 +25,13 @@
   --accent: #b8541b;          /* burnt sienna for cream */
   --accent-soft: rgba(184, 84, 27, 0.10);
   --accent-strong: #8e3f12;
-  --cyan: #1f7e93;            /* duotone counterpoint */
+  --cyan: #1f7e93;
   --cyan-soft: rgba(31, 126, 147, 0.10);
   --green: #2f7a4f;
   --red: #b8362c;
+
+  /* — brand (Signal logo green; used by .brand-text editorial highlight) — */
+  --brand: #556700;
 
   /* — tier colors (semantic; product-owned, fixed) — */
   --tier-urban: #1f7e93;
@@ -154,12 +157,8 @@ html, body {
 }
 
 /* — utility — */
-.duotone-text {
-  background: linear-gradient(90deg, var(--accent) 0%, var(--cyan) 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  color: transparent;
+.brand-text {
+  color: var(--brand);
 }
 
 .muted { color: var(--ink-mute); }
