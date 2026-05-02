@@ -29,7 +29,7 @@ jobs:
           # out THAT tag instead of the default branch HEAD. Lets us
           # re-fire a failed publish against the same release commit.
           ref: ${{ inputs.tag || github.ref }}
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           version: 10.28.2
       - uses: actions/setup-node@v4
