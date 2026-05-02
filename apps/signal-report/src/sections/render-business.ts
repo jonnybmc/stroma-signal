@@ -91,7 +91,7 @@ function renderClosingCard(card: ReportClosingCard): string {
                     <fieldset class="closing-card-cadence" data-closing-cadence>
                       <legend>Cadence</legend>
                       <label><input type="radio" name="cadence-${card.id}" value="weekly" checked> weekly</label>
-                      <label><input type="radio" name="cadence-${card.id}" value="daily"> daily</label>
+                      <label><input type="radio" name="cadence-${card.id}" value="monthly"> monthly</label>
                     </fieldset>
                   `
                   : ''
@@ -179,9 +179,14 @@ function renderClosingMultiselect(vm: ReportViewModel): string {
 }
 
 function renderClosingRouter(vm: ReportViewModel): string {
+  // Bridge composes the canonical boundary statement (verbatim, single
+  // source of truth) + the needs-inquiry question. Anchors the cards
+  // below as the honest extension of what the report did and did not do.
   return `
     <div class="closing-router">
-      ${renderReveal(`<p class="closing-bridge">${vm.editorial.business_closing_bridge_html}</p>`)}
+      ${renderReveal(
+        `<p class="closing-bridge">${escapeHtml(vm.boundary_statement)} ${vm.editorial.business_closing_bridge_html}</p>`
+      )}
       <div class="closing-card-grid">
         ${vm.editorial.business_closing_cards
           .map((card, i) => renderReveal(renderClosingCard(card), { delay: i * 80 }))
@@ -218,14 +223,6 @@ export function renderBusinessSection(vm: ReportViewModel): string {
         </div>
 
         ${renderClosingRouter(vm)}
-
-        ${renderReveal(
-          `<div style="margin-top:var(--stack-xl);padding-top:var(--stack-md);border-top:1px solid var(--line);">
-            <p class="muted" style="font-size:11px;text-align:center;font-family:var(--font-mono);letter-spacing:0.06em;">${escapeHtml(
-              vm.boundary_statement
-            )}</p>
-          </div>`
-        )}
       </div>
     </section>
   `.trim();

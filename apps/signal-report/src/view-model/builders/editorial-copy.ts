@@ -430,14 +430,11 @@ function pickWhatThisEnables(shape: EditorialDataShape, dominantCulpritKind: str
 // ─── Closing-section bridge + cards + pills ───────────────────────────
 
 function pickClosingBridge(): string {
-  // Anchored on the canonical boundary statement. Question-led so the
-  // tone reads as a needs-inquiry, not a packaging menu. Same string
-  // for every fixture — the variation lives in the cards beneath.
-  return [
-    'This report proved the <em>existence and shape</em> of the gap. ',
-    'It did not explain root cause, quantify business exposure in your currency, ',
-    'or prescribe what to fix. <strong>What would help most from here?</strong>'
-  ].join('');
+  // The closing bridge is JUST the needs-inquiry question. The renderer
+  // composes it with the canonical `vm.boundary_statement` verbatim so
+  // the artifact has ONE source of truth for the truth-boundary
+  // language (no duplicate near-paraphrase between bridge + footer).
+  return '<strong>What would help most from here?</strong>';
 }
 
 function pickClosingCards(shape: EditorialDataShape): ReportClosingCard[] {
@@ -493,7 +490,7 @@ function pickMonitoringCard(): ReportClosingCard {
   return {
     id: 'monitoring',
     intent_kind: 'intent_monitoring',
-    eyebrow: 'Coming soon',
+    eyebrow: 'Automated monitoring',
     title: 'Run this report on a schedule.',
     body: 'Re-running the BigQuery query and regenerating the URL by hand is fine for a one-off — less fine as a regular read. Scheduled monitoring would deliver this same report weekly or monthly as the data refreshes. We are collecting interest before we build it.',
     cta_label: 'Tell me when it ships',
