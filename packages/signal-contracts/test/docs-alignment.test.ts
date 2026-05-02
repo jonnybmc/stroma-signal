@@ -330,7 +330,7 @@ describe('docs alignment — sweep B (code-snippet validity)', () => {
           const target = match[1];
           // Strip any version / dist-tag suffix so we compare the bare
           // package name. Acceptable: '@stroma-labs/signal',
-          // '@stroma-labs/signal@next', '@stroma-labs/signal@0.1.0-rc.2'.
+          // '@stroma-labs/signal@next', '@stroma-labs/signal@0.1.0-rc.3'.
           const bareName = target.split('@').slice(0, 2).join('@'); // keeps the leading @scope/name
           if (bareName !== '@stroma-labs/signal') {
             wrong.push(target);

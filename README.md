@@ -4,7 +4,7 @@
 [![npm @next](https://img.shields.io/npm/v/@stroma-labs/signal/next?label=npm%20%40next)](https://www.npmjs.com/package/@stroma-labs/signal)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 
-> 🧪 **Release Candidate** — `0.1.0-rc.2` on the `next` dist-tag. The `0.x` line is pre-stable; the API can change before `1.0`.
+> 🧪 **Release Candidate** — `0.1.0-rc.3` on the `next` dist-tag. The `0.x` line is pre-stable; the API can change before `1.0`.
 
 **Other RUM tools tell you what your average user experiences. Signal tells you _who_ is getting which experience — and lets you act on it.**
 

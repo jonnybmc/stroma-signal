@@ -1,6 +1,6 @@
 # Signal
 
-> 🧪 **Release Candidate** — currently published as `0.1.0-rc.2` on the `next` dist-tag.
+> 🧪 **Release Candidate** — currently published as `0.1.0-rc.3` on the `next` dist-tag.
 > The `0.x` line is pre-stable; the API can change before `1.0`.
 > See [CHANGELOG.md](https://github.com/jonnybmc/stroma-signal/blob/main/CHANGELOG.md) for what shipped and what closes the next version.
 
