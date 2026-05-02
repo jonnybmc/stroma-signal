@@ -124,111 +124,83 @@ function basePayload(
   };
 }
 
-function flipCardToConfirmation(card: HTMLElement, message: string): void {
+function flipCardToConfirmation(card: HTMLElement, message?: string): void {
   card.dataset['state'] = 'logged';
-  const text = card.querySelector<HTMLElement>('[data-closing-confirmation-text]');
-  if (text) text.textContent = message;
-}
-
-/** Pick the initial confirmation message for a given card. Honesty
- * discipline: state ONLY what was actually captured at this moment —
- * never reference future communication or imply something is pending.
- * - cta_href card (Rapid Fix): "opening the booking page" because that's
- *   exactly what happens next
- * - email-collecting card BEFORE follow-up submit: anonymous interest
- *   was logged. No contact captured. The followup form below speaks for
- *   itself; the outer message must not imply we have anything to act on.
- * - cta_href === null + collects nothing: bare acknowledgment */
-function pickInitialConfirmation(state: CardState): string {
-  if (state.ctaHref) {
-    return '✓ noted — opening the booking page';
+  if (message != null) {
+    const text = card.querySelector<HTMLElement>('[data-closing-confirmation-text]');
+    if (text) text.textContent = message;
   }
-  return '✓ interest noted';
 }
 
 function attachCardClickHandlers(ctx: ResolvedReportContext): void {
   for (const card of document.querySelectorAll<HTMLElement>('[data-closing-card]')) {
     const state = readCardState(card);
     if (!state) continue;
-
-    // Persist the capture id on the element so a follow-up email submit
-    // re-uses the same id (server UPSERTs on it).
     card.dataset['captureId'] = state.captureId;
 
-    const cta = card.querySelector<HTMLElement>('[data-closing-cta]');
-    if (!cta) continue;
-
-    cta.addEventListener('click', (e) => {
-      if (card.dataset['state'] === 'logged' && !state.ctaHref) return;
-
-      const payload = basePayload(ctx, state.intentKind, state.captureId);
-      sendIntent(payload);
-
-      if (state.ctaHref) {
-        // External redirect — let the link's default navigation happen.
-        // sendBeacon has already queued the payload; navigation is safe.
-        flipCardToConfirmation(card, pickInitialConfirmation(state));
-        // Do NOT preventDefault — the <a> handles the redirect.
-        return;
-      }
-
-      // In-place capture — no redirect. Prevent default in case the CTA
-      // is a <button> inside a <form> or similar.
-      e.preventDefault();
-      flipCardToConfirmation(card, pickInitialConfirmation(state));
-
-      // Wire the follow-up Send button (only present when the card
-      // collects email or cadence).
-      if (state.collectsEmail || state.collectsCadence) {
-        attachFollowupSend(card, ctx, state);
-      }
-    });
+    if (state.ctaHref) {
+      attachLinkCtaHandler(card, state, ctx);
+    } else {
+      attachFormSubmitHandler(card, state, ctx);
+    }
   }
 }
 
-function attachFollowupSend(card: HTMLElement, ctx: ResolvedReportContext, state: CardState): void {
-  const sendBtn = card.querySelector<HTMLButtonElement>('[data-closing-followup-send]');
-  if (!sendBtn) return;
-  if (sendBtn.dataset['wired'] === 'true') return;
-  sendBtn.dataset['wired'] = 'true';
+/** Rapid-Fix-style card: a single text-link CTA that POSTs the intent
+ *  via sendBeacon (queued at the network layer before navigation) then
+ *  lets the browser follow the link. */
+function attachLinkCtaHandler(card: HTMLElement, state: CardState, ctx: ResolvedReportContext): void {
+  const cta = card.querySelector<HTMLAnchorElement>('a[data-closing-cta]');
+  if (!cta) return;
 
-  sendBtn.addEventListener('click', () => {
+  cta.addEventListener('click', () => {
+    if (card.dataset['state'] === 'logged') return;
+    sendIntent(basePayload(ctx, state.intentKind, state.captureId));
+    flipCardToConfirmation(card, '✓ noted — opening the booking page');
+    // No preventDefault — let the <a> redirect.
+  });
+}
+
+/** PI / Monitoring card: form with email field (and optional cadence)
+ *  visible from the start. Submit POSTs ONE event with all data and
+ *  transforms the card to the quiet confirmation state. The click IS
+ *  the email submit — no two-stage anonymous-then-followup dance, so
+ *  the in-between dishonest copy ("we will let you know" before any
+ *  email exists) can't appear. */
+function attachFormSubmitHandler(card: HTMLElement, state: CardState, ctx: ResolvedReportContext): void {
+  const form = card.querySelector<HTMLFormElement>('[data-closing-form]');
+  if (!form) return;
+
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    if (card.dataset['state'] === 'logged') return;
+
     const emailInput = state.collectsEmail ? card.querySelector<HTMLInputElement>('[data-closing-email]') : null;
     const cadenceInput = state.collectsCadence
       ? card.querySelector<HTMLInputElement>('[data-closing-cadence] input[type="radio"]:checked')
       : null;
 
+    // For email-collecting cards, browser-native `required` + `type=email`
+    // catches empty / malformed input. Belt-and-braces here too.
+    if (state.collectsEmail) {
+      const value = emailInput?.value.trim() ?? '';
+      if (value.length === 0 || !value.includes('@')) {
+        emailInput?.focus();
+        return;
+      }
+    }
+
     const intent_email = emailInput?.value.trim() || undefined;
     const intent_cadence = (cadenceInput?.value as SignalReportInteractionIntentCadence | undefined) ?? undefined;
 
-    if (!intent_email && !intent_cadence) {
-      // Empty followup — nothing to add. Skip the POST.
-      return;
-    }
-
-    const followup: SignalReportInteractionV1 = {
-      ...basePayload(ctx, state.intentKind, state.captureId),
-      event_id: buildEventId(),
-      ts: Date.now(),
-      intent_stage: 'followup'
+    const payload: SignalReportInteractionV1 = {
+      ...basePayload(ctx, state.intentKind, state.captureId)
     };
-    if (intent_email) followup.intent_email = intent_email;
-    if (intent_cadence) followup.intent_cadence = intent_cadence;
+    if (intent_email) payload.intent_email = intent_email;
+    if (intent_cadence) payload.intent_cadence = intent_cadence;
 
-    sendIntent(followup);
-
-    // Update the OUTER confirmation text to reflect ONLY what was
-    // captured — promise email follow-up only when an email was given;
-    // otherwise stay in observation register. Remove the followup form
-    // so the card lands in a single quiet state.
-    const outerText = card.querySelector<HTMLElement>('[data-closing-confirmation-text]');
-    if (outerText) {
-      outerText.textContent = intent_email
-        ? '✓ email saved — we will let you know when it ships'
-        : '✓ preference noted';
-    }
-    const followupBlock = card.querySelector<HTMLElement>('[data-closing-followup]');
-    if (followupBlock) followupBlock.remove();
+    sendIntent(payload);
+    flipCardToConfirmation(card, '✓ thanks — we will let you know when it ships');
   });
 }
 

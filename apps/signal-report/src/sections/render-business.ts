@@ -60,10 +60,15 @@ function renderSummaryFallback(points: string[]): string {
 }
 
 function renderClosingCard(card: ReportClosingCard): string {
-  // The whole card is interactive (clicking the body or the CTA fires
-  // intent telemetry via the boot helper). Data attributes carry every
-  // hint the boot helper needs to construct the wire payload + manage
-  // the in-place transform without a framework runtime.
+  // The whole card is interactive. Two card shapes:
+  //   - cta_href set (Rapid Fix) — single text-link CTA; click logs
+  //     intent then redirects to the booking page
+  //   - cta_href null (PI / Monitoring) — email field (and optional
+  //     cadence selector) visible from the start; click on Send
+  //     submits the event with all data in one go and transforms the
+  //     card to a quiet confirmation
+  // No two-stage anonymous-then-followup dance — the click IS the
+  // submit. Cleaner UX, less dishonest copy at the in-between step.
   const dataAttrs = [
     `data-closing-card="${card.id}"`,
     `data-intent-kind="${card.intent_kind}"`,
@@ -79,43 +84,48 @@ function renderClosingCard(card: ReportClosingCard): string {
       <p class="closing-card-body">${escapeHtml(card.body)}</p>
       ${
         card.cta_href
-          ? `<a class="closing-card-cta" href="${escapeHtml(card.cta_href)}" data-closing-cta>${escapeHtml(card.cta_label)} →</a>`
-          : `<button type="button" class="closing-card-cta" data-closing-cta>${escapeHtml(card.cta_label)}</button>`
+          ? `
+            <a class="closing-card-cta" href="${escapeHtml(card.cta_href)}" data-closing-cta>${escapeHtml(card.cta_label)} →</a>
+            ${card.small_note ? `<p class="closing-card-note">${escapeHtml(card.small_note)}</p>` : ''}
+          `
+          : `
+            <form class="closing-card-form" data-closing-form>
+              ${
+                card.collects_cadence
+                  ? `
+                    <fieldset class="closing-card-cadence" data-closing-cadence>
+                      <legend>Cadence</legend>
+                      <label><input type="radio" name="cadence-${card.id}" value="weekly" checked> weekly</label>
+                      <label><input type="radio" name="cadence-${card.id}" value="daily"> daily</label>
+                    </fieldset>
+                  `
+                  : ''
+              }
+              ${
+                card.collects_email
+                  ? `
+                    <label class="closing-card-email-label">
+                      <span>your email</span>
+                      <input
+                        type="email"
+                        data-closing-email
+                        placeholder="you@company.com"
+                        autocomplete="email"
+                        maxlength="254"
+                        required
+                      >
+                    </label>
+                  `
+                  : ''
+              }
+              <button type="submit" class="closing-card-cta" data-closing-cta>${escapeHtml(card.cta_label)}</button>
+            </form>
+            ${card.small_note ? `<p class="closing-card-note">${escapeHtml(card.small_note)}</p>` : ''}
+          `
       }
-      ${card.small_note ? `<p class="closing-card-note">${escapeHtml(card.small_note)}</p>` : ''}
-      <!-- Confirmation slot — replaces the CTA + note when state flips to "logged" -->
+      <!-- Confirmation slot — replaces the form + note when state flips to "logged" -->
       <div class="closing-card-confirmation" hidden>
-        <p class="closing-card-confirmation-text" data-closing-confirmation-text>✓ noted</p>
-        ${
-          card.collects_email || card.collects_cadence
-            ? `
-              <div class="closing-card-followup" data-closing-followup>
-                ${
-                  card.collects_cadence
-                    ? `
-                      <fieldset class="closing-card-cadence" data-closing-cadence>
-                        <legend>Cadence</legend>
-                        <label><input type="radio" name="cadence-${card.id}" value="weekly" checked> weekly</label>
-                        <label><input type="radio" name="cadence-${card.id}" value="daily"> daily</label>
-                      </fieldset>
-                    `
-                    : ''
-                }
-                ${
-                  card.collects_email
-                    ? `
-                      <label class="closing-card-email-label">
-                        <span>email when it ships</span>
-                        <input type="email" data-closing-email placeholder="you@company.com" autocomplete="email" maxlength="254">
-                      </label>
-                    `
-                    : ''
-                }
-                <button type="button" class="closing-card-followup-send" data-closing-followup-send>send</button>
-              </div>
-            `
-            : ''
-        }
+        <p class="closing-card-confirmation-text" data-closing-confirmation-text>✓ thanks — we will let you know when it ships</p>
       </div>
     </div>
   `;

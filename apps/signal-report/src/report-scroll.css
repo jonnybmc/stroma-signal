@@ -827,6 +827,22 @@ body { overflow-y: auto; overflow-x: hidden; }
   outline-offset: 4px;
   border-radius: 2px;
 }
+/* Submit-button-shaped CTA inside the inline form — same mono text-link
+ * weight, but with a hairline pill border so the reader recognises it
+ * as the action button (not just a link). Still no accent fill, no
+ * shadow — visual restraint preserved. */
+.closing-card-form .closing-card-cta {
+  margin-top: 0;
+  padding: 6px 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  text-decoration: none;
+  color: var(--ink);
+}
+.closing-card-form .closing-card-cta:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
 
 .closing-card-note {
   margin: 0;
@@ -837,7 +853,8 @@ body { overflow-y: auto; overflow-x: hidden; }
 }
 
 .closing-card[data-state="logged"] .closing-card-cta,
-.closing-card[data-state="logged"] .closing-card-note {
+.closing-card[data-state="logged"] .closing-card-note,
+.closing-card[data-state="logged"] .closing-card-form {
   display: none;
 }
 .closing-card[data-state="logged"] .closing-card-confirmation {
@@ -853,6 +870,17 @@ body { overflow-y: auto; overflow-x: hidden; }
   font-size: 12px;
   color: var(--ink-soft);
   letter-spacing: 0.02em;
+}
+
+/* Inline form (visible from start on email-collecting cards). */
+.closing-card-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--stack-sm);
+  margin-top: var(--stack-xs);
+}
+.closing-card[data-state="logged"] .closing-card-form {
+  display: none;
 }
 
 .closing-card-followup {
