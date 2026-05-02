@@ -26,7 +26,7 @@ The classification is not based on browser-estimated labels. It uses the TCP-han
 
 Every page load produces one canonical event. Network tier, device tier, Core Web Vitals, LCP / INP attribution context, and on Chromium 123+, the Long Animation Frame story (worst-frame duration plus dominant cause: script, layout, style, or paint) when coverage is defensible. Enough diagnostic context to understand what the load actually felt like. One event. One beacon. Zero dependencies. No PII.
 
-The base SDK adds under 4 KB gzipped to your page. The GA4 helper and report-builder subpaths are optional and add roughly 0.5 KB and 1 KB respectively when used.
+The base SDK adds around 6 KB gzipped to your page (it carries the per-subpart Navigation Timing breakdown). The GA4 helper and report-builder subpaths are optional and add roughly 0.5 KB and 1 KB respectively when used.
 
 ## Who It Is For
 

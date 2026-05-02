@@ -25,7 +25,7 @@ Four entry points — pick what you need:
 | `@stroma-labs/signal/report`         | A preview helper for local QA without a warehouse.       |
 | `@stroma-labs/signal/summary`        | Plain-text, JSON, and CSV exports for ad-hoc analysis.   |
 
-The base runtime is under 4 KB gzipped. The helpers are optional and add roughly 0.5 KB and 1 KB respectively.
+The base runtime is around 6 KB gzipped (it carries the per-subpart Navigation Timing breakdown). The helpers are optional and add roughly 0.5 KB and 1 KB respectively.
 
 ## Three ways to wire it up
 

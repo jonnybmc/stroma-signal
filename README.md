@@ -18,7 +18,7 @@ A small browser library that classifies every page load by the user's real netwo
 | **Lighthouse**                         | Lab Web Vitals on a single test device            | What real users on real networks actually feel                                 |
 | **CrUX**                               | Aggregated Chrome field data                      | Per-session detail, attribution, your own segmentation                         |
 | **Datadog RUM / NewRelic / SpeedCurve** | Dashboards, alerting, vendor opinions             | Honest segmentation by real network tier; you also pay enterprise pricing      |
-| **Signal**                             | Real-user network + device tier per page load, joined to your own warehouse, in a 4 KB SDK | A dashboard (we don't ship one — you bring your own analytics)                 |
+| **Signal**                             | Real-user network + device tier + Navigation Timing breakdown per page load, joined to your own warehouse, in a ~6 KB SDK | A dashboard (we don't ship one — you bring your own analytics)                 |
 
 Signal sits one layer beneath every option above: it produces the per-session evidence the others can't or won't capture, and you wire it into whatever you already use.
 
