@@ -27,11 +27,12 @@
   --accent-strong: #8e3f12;
   --cyan: #1f7e93;
   --cyan-soft: rgba(31, 126, 147, 0.10);
-  --green: #2f7a4f;
   --red: #b8362c;
 
-  /* — brand (Signal logo green; used by .brand-text editorial highlight) — */
+  /* — brand (Signal logo olive; primary emphasis + supporting tints) — */
   --brand: #556700;
+  --brand-soft: rgba(85, 103, 0, 0.10);
+  --brand-strong: #3d4a00;
 
   /* — tier colors (semantic; product-owned, fixed) — */
   --tier-urban: #1f7e93;
