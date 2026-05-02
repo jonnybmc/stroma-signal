@@ -254,8 +254,12 @@ export function bootScrollSpy(sectionIds: string[]): void {
       { threshold: [0.2, 0.4, 0.6], rootMargin: '-20% 0px -50% 0px' }
     );
     for (const el of els) obs.observe(el);
+    return;
   }
 
+  // Fallback only — pre-IntersectionObserver browsers. probe() reads
+  // getBoundingClientRect for every section on every scroll, which forces
+  // synchronous layout. Skip when the observer path is available.
   window.addEventListener('scroll', probe, { passive: true });
   window.addEventListener('resize', probe);
   probe();
@@ -267,18 +271,31 @@ export function bootReadingProgress(): void {
   const fill = document.querySelector<HTMLElement>('.scroll-progress-fill');
   if (!fill) return;
 
+  // Cache scrollable height — recomputed only on resize / DOM mutation,
+  // not on every scroll-RAF. scrollHeight is layout-reading so reading
+  // it 60×/sec forces synchronous layout whenever the DOM is dirty.
+  let max = computeMax();
+  function computeMax(): number {
+    return document.documentElement.scrollHeight - window.innerHeight;
+  }
+
   let raf: number | null = null;
   const onScroll = (): void => {
     if (raf !== null) return;
     raf = requestAnimationFrame(() => {
-      const max = document.documentElement.scrollHeight - window.innerHeight;
       const p = max > 0 ? Math.min(1, Math.max(0, window.scrollY / max)) : 0;
       fill.style.transform = `scaleX(${p})`;
       raf = null;
     });
   };
 
+  const onResize = (): void => {
+    max = computeMax();
+    onScroll();
+  };
+
   window.addEventListener('scroll', onScroll, { passive: true });
+  window.addEventListener('resize', onResize);
   onScroll();
 }
 
