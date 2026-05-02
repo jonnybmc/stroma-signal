@@ -203,11 +203,11 @@ function renderContextStrip(vm: ReportViewModel): string {
 
 export function renderAudienceSection(vm: ReportViewModel): string {
   return `
-    <section id="audience" class="section" data-tone="cream">
+    <section id="audience" class="section" data-tone="cream" aria-labelledby="audience-eyebrow">
       <div class="section-inner">
         <div class="act-intro" style="padding-block:0;">
           <div class="act-intro-stack">
-            ${renderReveal(`<div class="act-intro-eyebrow"><span class="dot"></span>Act 01 · Audience shape</div>`)}
+            ${renderReveal(`<div id="audience-eyebrow" class="act-intro-eyebrow"><span class="dot"></span>Act 01 · Audience shape</div>`)}
             ${renderReveal(vm.editorial.audience_headline_html, { delay: 120 })}
             ${renderReveal(`<p class="act-intro-lede">${vm.editorial.audience_lede_html}</p>`, { delay: 240 })}
           </div>

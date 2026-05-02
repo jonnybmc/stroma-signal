@@ -68,11 +68,11 @@ export function renderFunnelSection(vm: ReportViewModel): string {
   const overallPoorShare = act3.poor_session_share ?? 0;
 
   return `
-    <section id="funnel" class="section" data-tone="cream">
+    <section id="funnel" class="section" data-tone="cream" aria-labelledby="funnel-eyebrow">
       <div class="section-inner">
         <div class="act-intro" style="padding-block:0;">
           <div class="act-intro-stack">
-            ${renderReveal(`<div class="act-intro-eyebrow"><span class="dot"></span>${escapeHtml(vm.editorial.funnel_eyebrow)}</div>`)}
+            ${renderReveal(`<div id="funnel-eyebrow" class="act-intro-eyebrow"><span class="dot"></span>${escapeHtml(vm.editorial.funnel_eyebrow)}</div>`)}
             ${renderReveal(vm.editorial.funnel_headline_html, { delay: 120 })}
             ${
               vm.editorial.funnel_lede_html

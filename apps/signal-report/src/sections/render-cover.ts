@@ -49,7 +49,7 @@ export function renderCoverSection(vm: ReportViewModel): string {
   const slowerThanUrbanShare = 1 - (vm.act1_tiers.find((t) => t.key === 'urban')?.share ?? 0) / 100;
 
   return `
-    <section id="cover" class="section" data-tone="paper" style="padding-block:0;">
+    <section id="cover" class="section" data-tone="paper" aria-labelledby="cover-heading" style="padding-block:0;">
       <div class="section-inner" style="gap:var(--stack-2xl);">
         <div class="act-intro">
           <div class="act-intro-stack">
@@ -60,7 +60,7 @@ export function renderCoverSection(vm: ReportViewModel): string {
               </div>`
             )}
             ${renderReveal(
-              `<h1 class="display" style="margin:0;font-size:clamp(56px,8vw + 16px,132px);font-weight:400;letter-spacing:-0.045em;line-height:0.94;">${escapeHtml(
+              `<h1 id="cover-heading" class="display" style="margin:0;font-size:clamp(56px,8vw + 16px,132px);font-weight:400;letter-spacing:-0.045em;line-height:0.94;">${escapeHtml(
                 vm.hero_title
               )}</h1>`,
               { delay: 120 }

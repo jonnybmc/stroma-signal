@@ -84,7 +84,8 @@ body { overflow-y: auto; overflow-x: hidden; }
   gap: var(--stack-md);
   max-width: 880px;
 }
-.act-intro h1 {
+.act-intro h1,
+.act-intro h2 {
   margin: 0;
   font-family: var(--font-display);
   font-variation-settings: 'opsz' 144, 'SOFT' 30, 'WONK' 0;

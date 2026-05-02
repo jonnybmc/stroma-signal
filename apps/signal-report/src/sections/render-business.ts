@@ -203,11 +203,11 @@ export function renderBusinessSection(vm: ReportViewModel): string {
   const useLedger = vm.act4_impact_rows.length >= 2;
 
   return `
-    <section id="business" class="section" data-tone="paper">
+    <section id="business" class="section" data-tone="paper" aria-labelledby="business-eyebrow">
       <div class="section-inner">
         <div class="act-intro" style="padding-block:0;">
           <div class="act-intro-stack">
-            ${renderReveal(`<div class="act-intro-eyebrow"><span class="dot"></span>Act 04 · KPI translation</div>`)}
+            ${renderReveal(`<div id="business-eyebrow" class="act-intro-eyebrow"><span class="dot"></span>Act 04 · KPI translation</div>`)}
             ${renderReveal(vm.editorial.business_headline_html, { delay: 120 })}
             ${renderReveal(`<p class="act-intro-lede">${escapeHtml(vm.act4_lede)}</p>`, { delay: 240 })}
           </div>
