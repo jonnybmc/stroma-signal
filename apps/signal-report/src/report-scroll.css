@@ -172,12 +172,10 @@ body { overflow-y: auto; overflow-x: hidden; }
   font-weight: 500;
   text-decoration: none;
 }
-.scroll-nav-brand .brand-dot {
-  width: 18px;
-  height: 18px;
-  border-radius: 4px;
-  background: linear-gradient(135deg, var(--cyan), var(--accent));
-  display: inline-block;
+.scroll-nav-brand-logo {
+  height: 22px;
+  width: auto;
+  display: block;
 }
 .scroll-nav-brand .brand-mute { color: var(--ink-mute); }
 .scroll-nav-toc {
@@ -1131,6 +1129,11 @@ body { overflow-y: auto; overflow-x: hidden; }
   gap: 24px;
   justify-content: space-between;
   align-items: center;
+}
+.scroll-footer-logo {
+  height: 22px;
+  width: auto;
+  display: block;
 }
 .scroll-footer-copy {
   font-family: inherit;

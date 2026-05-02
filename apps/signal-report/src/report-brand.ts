@@ -1,4 +1,4 @@
-import signalWordmarkUrl from '../../../docs/images/signal_stroma_logo_white.png';
+import signalWordmarkUrl from '../../../docs/images/signal-stroma-logo.png';
 
 export const REPORT_BRAND = {
   wordmarkUrl: signalWordmarkUrl,
