@@ -143,7 +143,19 @@ It restates what the report has already proven — who is affected, how far apar
 
 The KPI ledger is rendered from `act4_impact_rows` — each row carries a measured `metric_value`, a `kpi_label` cameo, an `impact_sentence_html` body, and an optional `glossary_key` anchor. Rows are emitted only when underlying aggregate evidence supports them (per the act4-impact builder gates). When fewer than two rows qualify, the renderer falls back to flat `act4_summary_points` bullets so the artifact never ships an anaemic one-row ledger.
 
-A single optional CTA points at `Rapid Fix Plan` for teams that want help executing on the gap. `Rapid Fix Plan` is a Stroma consultancy engagement that traces the proven gap to the landing pages and routes causing the most drag and returns a sequenced fix order. The CTA is opt-in; the report stands on its own without it.
+After the ledger, the section closes with a **needs-inquiry router** — three co-equal cards + a five-pill freeform demand-signal row, anchored on the boundary statement. Visual restraint is load-bearing: the router uses the same `.figure` token surface as the rest of the section (no accent backgrounds, no button chrome on CTAs, mono text-link CTAs, hairline-bottom-only email inputs). Editorial register is needs-inquiry — every card title is a question ("Wondering which campaigns are exposed?", "Need a sequenced fix list for this page?", "Want this report on a schedule?"), never a packaged offer. Confirmations stay in observation register (`✓ noted`, never `Thanks!` or `You're in!`).
+
+The three cards capture latent demand for, in order:
+
+1. **Campaign-attribution layer early access** (`intent_pi_early_access`) — joins substrate × spend × conversions; not yet shipped, free at click; collects optional email follow-up.
+2. **Rapid Fix Plan** (`intent_rapid_fix`) — Stroma consulting engagement. Click logs intent then redirects to the booking page on `stroma.design`. Project-scoped pricing disclosed only on the booking page, never on the card.
+3. **Scheduled monitoring** (`intent_monitoring`) — automated weekly/daily report regeneration; not yet shipped, free at click; collects optional email + cadence follow-up.
+
+The five pills capture freeform demand we haven't yet productized: weekly-inbox digest of this domain, multi-page reports for the same domain, multi-client / portfolio rollout, competitor / market context, and "something else" (which expands inline into a 200-char freeform text field).
+
+Every CTA emits a `SignalReportInteractionV1` event with the relevant `intent_*` kind via `navigator.sendBeacon()` to `https://api.stroma.design/api/v1/intent` (the snapshot-engine ingest endpoint). Server-side persistence + observability live in the `stroma-snapshot-engine` repo's `src/features/intent/` module — fully encapsulated, deletable in a single mount-call removal. A stable client-generated `intent_capture_id` UPSERTs initial-click + follow-up-email events into one demand-signal row.
+
+**Pricing posture**: every CTA is FREE at the click. Pricing decisions get made post-demand-signal, not pre-data — the artifact must never feel like a paywall lobby.
 
 ## Truth Boundary
 

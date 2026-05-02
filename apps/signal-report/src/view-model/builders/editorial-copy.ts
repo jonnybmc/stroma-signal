@@ -10,7 +10,11 @@
 //   not make.
 // - Mood (urgent / sober / affirming) shifts tone within an honest frame.
 
-import type { SignalRaceMetric } from '@stroma-labs/signal-contracts';
+import type {
+  SignalRaceMetric,
+  SignalReportInteractionIntentKind,
+  SignalReportInteractionIntentPillId
+} from '@stroma-labs/signal-contracts';
 
 import type {
   ReportAct3ViewModel,
@@ -45,6 +49,43 @@ export interface EditorialDataShape {
   shape_proven: boolean;
 }
 
+/** One of the three closing-section cards. Each card is a needs-inquiry
+ * (question-led title, empathetic body) — never a packaged offer. CTA
+ * label reads as a quiet text-link, never a button. Visual restraint
+ * lives in the renderer; the editorial register lives here. */
+export interface ReportClosingCard {
+  id: 'pi_early_access' | 'rapid_fix' | 'monitoring';
+  /** SignalReportInteractionKind value emitted to the snapshot-engine
+   * `/api/v1/intent` endpoint when the CTA is clicked. */
+  intent_kind: SignalReportInteractionIntentKind;
+  eyebrow: string;
+  /** Question-led title. e.g. "Wondering which campaigns are exposed?" */
+  title: string;
+  /** 1-2 sentence empathetic body. Mood + shape aware. */
+  body: string;
+  cta_label: string;
+  /** When set, the card click POSTs the intent then redirects here.
+   *  When null, the click logs intent + transforms in place to ✓ noted. */
+  cta_href: string | null;
+  /** When true, card transforms to reveal an optional inline email
+   *  field after the initial click logs anonymously. */
+  collects_email: boolean;
+  /** Monitoring card only — reveals a Weekly / Daily selector. */
+  collects_cadence: boolean;
+  /** Optional honesty footnote shown beneath the CTA. */
+  small_note: string | null;
+}
+
+/** One pill in the freeform-demand row beneath the cards. Single-line
+ *  mono-small text, NOT a button. */
+export interface ReportClosingPill {
+  pill_id: SignalReportInteractionIntentPillId;
+  label: string;
+  /** When true, clicking expands the pill into a short freeform text
+   *  field (capped 200 chars). Only true for `something_else`. */
+  collects_freeform_text: boolean;
+}
+
 export interface ReportEditorialCopy {
   // Cover
   cover_at_a_glance_lede: string;
@@ -74,6 +115,18 @@ export interface ReportEditorialCopy {
   business_section_eyebrow: string;
   business_aside_lede_html: string;
   business_what_this_enables: string[];
+
+  /** Boundary-statement-anchored bridge sentence rendered above the
+   *  closing-card row. Question-led ("What would help most from here?"),
+   *  not packaging-led ("Choose your next step"). */
+  business_closing_bridge_html: string;
+  /** Three co-equal cards. Visual primary is conveyed by the editorial
+   *  bridge above, never by card weight. */
+  business_closing_cards: ReportClosingCard[];
+  /** Lead-in label for the freeform pill row. */
+  business_closing_pill_lead_in: string;
+  /** Five inline pills capturing demand we haven't yet productized. */
+  business_closing_pills: ReportClosingPill[];
 }
 
 export function bandWaitDelta(deltaMs: number | null): WaitDeltaBand {
@@ -123,7 +176,12 @@ export function buildEditorialCopy(
       ? 'Where the numbers land in your KPIs'
       : 'Where the evidence lands in your KPIs',
     business_aside_lede_html: pickBusinessAsideLede(shape),
-    business_what_this_enables: pickWhatThisEnables(shape, dominantCulpritKind)
+    business_what_this_enables: pickWhatThisEnables(shape, dominantCulpritKind),
+
+    business_closing_bridge_html: pickClosingBridge(),
+    business_closing_cards: pickClosingCards(shape),
+    business_closing_pill_lead_in: 'Or tell us what would actually help —',
+    business_closing_pills: pickClosingPills()
   };
 }
 
@@ -367,6 +425,94 @@ function pickWhatThisEnables(shape: EditorialDataShape, dominantCulpritKind: str
   }
 
   return bullets;
+}
+
+// ─── Closing-section bridge + cards + pills ───────────────────────────
+
+function pickClosingBridge(): string {
+  // Anchored on the canonical boundary statement. Question-led so the
+  // tone reads as a needs-inquiry, not a packaging menu. Same string
+  // for every fixture — the variation lives in the cards beneath.
+  return [
+    'This report proved the <em>existence and shape</em> of the gap. ',
+    'It did not explain root cause, quantify business exposure in your currency, ',
+    'or prescribe what to fix. <strong>What would help most from here?</strong>'
+  ].join('');
+}
+
+function pickClosingCards(shape: EditorialDataShape): ReportClosingCard[] {
+  return [pickPiCard(shape), pickRapidFixCard(shape), pickMonitoringCard()];
+}
+
+function pickPiCard(shape: EditorialDataShape): ReportClosingCard {
+  const body =
+    shape.mood === 'affirming'
+      ? 'If you ever want to see which campaigns are exposed to this gap, Performance Intelligence will join substrate to spend and conversions. We will let you know when early access opens.'
+      : 'Substrate × spend × conversions joins are coming as Performance Intelligence — early access opens to a small cohort first. We will let you know when you can connect this report to your campaign data.';
+
+  return {
+    id: 'pi_early_access',
+    intent_kind: 'intent_pi_early_access',
+    eyebrow: 'Performance Intelligence',
+    title: 'Wondering which campaigns are exposed?',
+    body,
+    cta_label: 'Add me to early access',
+    cta_href: null,
+    collects_email: true,
+    collects_cadence: false,
+    small_note: 'Currently a small cohort. No availability promised.'
+  };
+}
+
+function pickRapidFixCard(shape: EditorialDataShape): ReportClosingCard {
+  // Rapid Fix Plan body softens slightly when the report shows
+  // little measured pressure — the offer still applies but the framing
+  // shouldn't read as if the page is on fire when it isn't.
+  const body = shape.has_ledger
+    ? 'If a single high-value page is dragging the funnel above and you want a short, ship-ready fix order, the Rapid Fix Plan traces the cause and returns it. Booked through stroma.design.'
+    : 'If you have a single high-value page where you want a short, ship-ready fix order — the Rapid Fix Plan traces the cause and returns it. Booked through stroma.design.';
+
+  return {
+    id: 'rapid_fix',
+    intent_kind: 'intent_rapid_fix',
+    eyebrow: 'Stroma engagement',
+    title: 'Need a sequenced fix list for this page?',
+    body,
+    cta_label: 'Open the booking page',
+    cta_href: 'https://www.stroma.design/book?service=rapid-fix',
+    collects_email: false,
+    collects_cadence: false,
+    small_note: 'Project-scoped engagement. Booked, not bought.'
+  };
+}
+
+function pickMonitoringCard(): ReportClosingCard {
+  return {
+    id: 'monitoring',
+    intent_kind: 'intent_monitoring',
+    eyebrow: 'Coming soon',
+    title: 'Want this report on a schedule?',
+    body: 'Re-running the BigQuery query and regenerating the URL by hand is fine for a one-off — less fine as a regular read. Scheduled monitoring would deliver this same report weekly or daily as the data refreshes. We are collecting interest before we build it.',
+    cta_label: 'Add me to monitoring early access',
+    cta_href: null,
+    collects_email: true,
+    collects_cadence: true,
+    small_note: 'Not yet shipped — collecting demand first.'
+  };
+}
+
+function pickClosingPills(): ReportClosingPill[] {
+  return [
+    { pill_id: 'weekly_inbox', label: 'weekly inbox digest of this domain', collects_freeform_text: false },
+    { pill_id: 'multi_page', label: 'same report for another page on this domain', collects_freeform_text: false },
+    { pill_id: 'multi_client_portfolio', label: 'multi-client / portfolio rollout', collects_freeform_text: false },
+    {
+      pill_id: 'competitor_context',
+      label: 'competitor / market context for this report',
+      collects_freeform_text: false
+    },
+    { pill_id: 'something_else', label: 'something else', collects_freeform_text: true }
+  ];
 }
 
 // ─── Helpers ───────────────────────────────────────────────────────────

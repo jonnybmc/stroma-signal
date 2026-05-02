@@ -31,6 +31,12 @@ import {
 import { buildAct4ImpactRows } from './view-model/builders/act4-impact.js';
 import { bandWaitDelta, buildEditorialCopy, type ReportEditorialCopy } from './view-model/builders/editorial-copy.js';
 
+export type {
+  ReportClosingCard,
+  ReportClosingPill,
+  ReportEditorialCopy
+} from './view-model/builders/editorial-copy.js';
+
 // Dominance share threshold below which the LCP / INP story narratives
 // fall back to hedged copy instead of claiming a single dominant cause.
 // Kept as a named constant so future buyer-research feedback

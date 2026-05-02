@@ -18,6 +18,17 @@ Bump the exact pin example whenever a new `-rc.N` is cut so onboarders default t
 
 ## [Unreleased]
 
+### Added (RC3 — Closing-section needs-inquiry router + intent-capture telemetry)
+
+- `/r` closing section reframed from a single CTA card into a co-equal three-card needs-inquiry router + five-pill freeform demand-signal row, anchored on the boundary statement. Editorial register: question-led card titles, mono text-link CTAs, no accent backgrounds, no button chrome, no celebration confirmations. Visual register reads as a continuation of body content, not a sales footer. Pricing posture: every CTA is FREE at the click — pricing decisions get made post-demand-signal.
+- Three intent-capture cards: (1) campaign-attribution-layer early access with optional email follow-up, (2) **Rapid Fix Plan** (logs intent then redirects to `stroma.design/book?service=rapid-fix`), (3) **Scheduled monitoring** with optional email + cadence (weekly/daily) follow-up.
+- Five freeform pills capture demand we haven't yet productized: weekly inbox digest, multi-page report, multi-client portfolio rollout, competitor / market context, and "something else" (expands to a 200-char freeform field).
+- New `SignalReportInteractionKind` values: `intent_pi_early_access`, `intent_rapid_fix`, `intent_monitoring`, `intent_freeform`. Plus optional payload fields `intent_capture_id`, `intent_stage` (initial / followup), `intent_email`, `intent_cadence` (weekly / daily), `intent_pill_id`, `intent_freeform_text` on `SignalReportInteractionV1`.
+- New `SIGNAL_REPORT_INTERACTION_INGEST_URL_DEFAULT = 'https://api.stroma.design/api/v1/intent'` — canonical full URL for cross-origin sendBeacon delivery to the snapshot-engine's encapsulated `intent` feature module.
+- Client-side telemetry via `apps/signal-report/src/intent-telemetry.ts` — uses `navigator.sendBeacon()` (avoids CORS preflight, survives navigation, critical for the Rapid Fix click which redirects after queueing). Stable client-generated `intent_capture_id` lets the server UPSERT initial-click + follow-up-email events into ONE demand-signal row.
+- New `report-render-honesty.test.ts` guards scoped to the business section: 15 sales-register tokens (`unlock`, `upgrade to`, `pro`, `premium`, `transform`, `revolutionize`, `costing you r`, etc.) + 11 celebration tokens (`thanks!`, `you're in!`, `welcome!`, `choose your`, `three paths`, etc.) mechanically blocked across all 19 fixtures.
+- New `intent-wire-format-fixtures.json` cross-repo drift detection — 10 representative payloads parsed by both the signal-contracts validator AND the stroma-snapshot-engine zod validator. CI fails on either side if the wire format drifts.
+
 ### Changed (RC3 — Tier Report `/r` visual + editorial refactor)
 
 - **Layout**: `/r` rewrites the four-act horizontal slide deck as a five-section vertical scroll narrative (`cover` · `audience` · `distance` · `funnel` · `business`). New top scroll-spy nav, smooth-scroll TOC anchors, and a bottom reading-progress hairline. Section IDs are semantic (no more `data-act="N"` chrome).

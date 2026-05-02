@@ -306,4 +306,9 @@ export function bootReport(sectionIds: string[]): void {
   bootScrollSpy(sectionIds);
   bootReadingProgress();
   bootSmoothAnchors();
+  // Imported lazily so the intent-telemetry module isn't pulled into
+  // contexts that boot the report without a closing section (e.g.
+  // builder snapshots). Runtime-side, the dynamic import is hoisted by
+  // Vite into the same chunk during build.
+  void import('./intent-telemetry.js').then((mod) => mod.bootIntentTelemetry());
 }

@@ -1,10 +1,26 @@
-// Section `business` (Act 04) — KPI ledger + Rapid Fix Plan CTA.
-// Translates measured findings into the reader's KPI vocabulary.
-// Diagnostic-only — no prescription, no exclusion language.
+// Section `business` (Act 04) — KPI ledger + needs-inquiry closing.
+// Translates measured findings into the reader's KPI vocabulary, then
+// hands off through three co-equal cards anchored on the boundary
+// statement. Diagnostic-only — no prescription, no exclusion language,
+// no sales register.
+//
+// Visual register discipline (load-bearing, see plan file):
+// - Closing cards use the same .figure surface as the rest of the
+//   section. NO accent backgrounds. NO accent borders. NO button chrome.
+// - CTAs are mono-text-link, NOT styled buttons.
+// - Pill row sits at body-copy weight; pills are inline links, not
+//   buttons.
+// - Confirmation copy stays in observation register (✓ noted, not
+//   Thanks! / You're in!).
 
 import { renderHeroValue, renderReveal, renderTerm } from '../render-helpers.js';
 import { escapeHtml } from '../render-utils.js';
-import type { ReportAct4ImpactRow, ReportViewModel } from '../report-view-model.js';
+import type {
+  ReportAct4ImpactRow,
+  ReportClosingCard,
+  ReportClosingPill,
+  ReportViewModel
+} from '../report-view-model.js';
 
 function renderImpactRow(row: ReportAct4ImpactRow): string {
   const kpiLabels = row.kpi_label
@@ -43,23 +59,98 @@ function renderSummaryFallback(points: string[]): string {
   `;
 }
 
-function renderRapidFixCta(vm: ReportViewModel): string {
-  const offer = vm.offer_cards[0];
-  if (!offer) return '';
+function renderClosingCard(card: ReportClosingCard): string {
+  // The whole card is interactive (clicking the body or the CTA fires
+  // intent telemetry via the boot helper). Data attributes carry every
+  // hint the boot helper needs to construct the wire payload + manage
+  // the in-place transform without a framework runtime.
+  const dataAttrs = [
+    `data-closing-card="${card.id}"`,
+    `data-intent-kind="${card.intent_kind}"`,
+    `data-cta-href="${card.cta_href ? escapeHtml(card.cta_href) : ''}"`,
+    `data-collects-email="${card.collects_email ? 'true' : 'false'}"`,
+    `data-collects-cadence="${card.collects_cadence ? 'true' : 'false'}"`
+  ].join(' ');
+
   return `
-    <div class="cta-card">
-      <div class="figure-eyebrow" style="color:var(--accent);margin-bottom:8px;">Optional · Stroma engagement</div>
-      <div style="font-size:22px;font-weight:500;margin-bottom:8px;font-family:var(--font-display);letter-spacing:-0.02em;">${escapeHtml(
-        offer.title
-      )}</div>
-      <p style="margin:0;font-size:13px;color:var(--ink-soft);line-height:1.5;text-wrap:pretty;">${escapeHtml(offer.body)}</p>
-      <a href="${escapeHtml(offer.href)}" class="cta-button">
-        <span>${escapeHtml(offer.cta)}</span>
-        <span aria-hidden="true">→</span>
-      </a>
-      <div class="mono" style="font-size:9.5px;margin-top:10px;color:var(--ink-mute);letter-spacing:0.08em;">
-        REPORT STANDS ON ITS OWN · CTA IS OPT-IN
+    <div class="closing-card" ${dataAttrs} data-state="idle">
+      <div class="closing-card-eyebrow">${escapeHtml(card.eyebrow)}</div>
+      <h3 class="closing-card-title">${escapeHtml(card.title)}</h3>
+      <p class="closing-card-body">${escapeHtml(card.body)}</p>
+      ${
+        card.cta_href
+          ? `<a class="closing-card-cta" href="${escapeHtml(card.cta_href)}" data-closing-cta>${escapeHtml(card.cta_label)} →</a>`
+          : `<button type="button" class="closing-card-cta" data-closing-cta>${escapeHtml(card.cta_label)}</button>`
+      }
+      ${card.small_note ? `<p class="closing-card-note">${escapeHtml(card.small_note)}</p>` : ''}
+      <!-- Confirmation slot — replaces the CTA + note when state flips to "logged" -->
+      <div class="closing-card-confirmation" hidden>
+        <p class="closing-card-confirmation-text" data-closing-confirmation-text>✓ noted</p>
+        ${
+          card.collects_email || card.collects_cadence
+            ? `
+              <div class="closing-card-followup" data-closing-followup>
+                ${
+                  card.collects_cadence
+                    ? `
+                      <fieldset class="closing-card-cadence" data-closing-cadence>
+                        <legend>Cadence</legend>
+                        <label><input type="radio" name="cadence-${card.id}" value="weekly" checked> weekly</label>
+                        <label><input type="radio" name="cadence-${card.id}" value="daily"> daily</label>
+                      </fieldset>
+                    `
+                    : ''
+                }
+                ${
+                  card.collects_email
+                    ? `
+                      <label class="closing-card-email-label">
+                        <span>email when it ships</span>
+                        <input type="email" data-closing-email placeholder="you@company.com" autocomplete="email" maxlength="254">
+                      </label>
+                    `
+                    : ''
+                }
+                <button type="button" class="closing-card-followup-send" data-closing-followup-send>send</button>
+              </div>
+            `
+            : ''
+        }
       </div>
+    </div>
+  `;
+}
+
+function renderClosingPill(pill: ReportClosingPill): string {
+  return `
+    <button
+      type="button"
+      class="closing-pill"
+      data-closing-pill="${pill.pill_id}"
+      data-collects-freeform-text="${pill.collects_freeform_text ? 'true' : 'false'}"
+      data-state="idle"
+    >${escapeHtml(pill.label)}</button>
+  `;
+}
+
+function renderClosingRouter(vm: ReportViewModel): string {
+  const pills = vm.editorial.business_closing_pills.map(renderClosingPill).join('');
+
+  return `
+    <div class="closing-router">
+      ${renderReveal(`<p class="closing-bridge">${vm.editorial.business_closing_bridge_html}</p>`)}
+      <div class="closing-card-grid">
+        ${vm.editorial.business_closing_cards
+          .map((card, i) => renderReveal(renderClosingCard(card), { delay: i * 80 }))
+          .join('')}
+      </div>
+      ${renderReveal(
+        `<div class="closing-pill-row">
+          <span class="closing-pill-lead-in">${escapeHtml(vm.editorial.business_closing_pill_lead_in)}</span>
+          ${pills}
+        </div>`,
+        { delay: 240 }
+      )}
     </div>
   `;
 }
@@ -78,37 +169,18 @@ export function renderBusinessSection(vm: ReportViewModel): string {
           </div>
         </div>
 
-        <div class="business-grid">
-          <div class="block">
-            ${renderReveal(`<div class="section-eyebrow">${escapeHtml(vm.editorial.business_section_eyebrow)}</div>`)}
-            ${
-              useLedger
-                ? vm.act4_impact_rows
-                    .map((row, i) => renderReveal(renderImpactRow(row), { as: 'card', delay: i * 80 }))
-                    .join('')
-                : renderReveal(renderSummaryFallback(vm.act4_summary_points))
-            }
-          </div>
-
-          <aside style="display:flex;flex-direction:column;gap:20px;position:sticky;top:88px;align-self:start;">
-            ${renderReveal(
-              `<div>
-                <div class="section-eyebrow" style="margin-bottom:8px;">If you want to go deeper</div>
-                <p style="margin:0;font-size:14px;color:var(--ink-soft);line-height:1.55;text-wrap:pretty;">${vm.editorial.business_aside_lede_html}</p>
-              </div>`
-            )}
-            ${renderReveal(renderRapidFixCta(vm), { as: 'card', delay: 120 })}
-            ${renderReveal(
-              `<div class="figure" style="padding:20px;">
-                <div class="section-eyebrow" style="margin-bottom:10px;">What this evidence enables</div>
-                <ul style="margin:0;padding-left:18px;font-size:13px;color:var(--ink-soft);line-height:1.6;">
-                  ${vm.editorial.business_what_this_enables.map((bullet) => `<li>${escapeHtml(bullet)}</li>`).join('')}
-                </ul>
-              </div>`,
-              { delay: 240 }
-            )}
-          </aside>
+        <div class="block">
+          ${renderReveal(`<div class="section-eyebrow">${escapeHtml(vm.editorial.business_section_eyebrow)}</div>`)}
+          ${
+            useLedger
+              ? vm.act4_impact_rows
+                  .map((row, i) => renderReveal(renderImpactRow(row), { as: 'card', delay: i * 80 }))
+                  .join('')
+              : renderReveal(renderSummaryFallback(vm.act4_summary_points))
+          }
         </div>
+
+        ${renderClosingRouter(vm)}
 
         ${renderReveal(
           `<div style="margin-top:var(--stack-xl);padding-top:var(--stack-md);border-top:1px solid var(--line);">

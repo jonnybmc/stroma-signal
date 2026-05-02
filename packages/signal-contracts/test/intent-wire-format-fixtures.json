@@ -1,0 +1,149 @@
+[
+  {
+    "name": "pi_early_access — initial",
+    "payload": {
+      "v": 1,
+      "event_kind": "intent_pi_early_access",
+      "event_id": "evt_pi_initial_01",
+      "ts": 1777680000000,
+      "st": "share_token_a",
+      "route": "r",
+      "rv": 1,
+      "intent_capture_id": "cap_pi_001",
+      "intent_stage": "initial"
+    }
+  },
+  {
+    "name": "pi_early_access — followup with email",
+    "payload": {
+      "v": 1,
+      "event_kind": "intent_pi_early_access",
+      "event_id": "evt_pi_followup_01",
+      "ts": 1777680005000,
+      "st": "share_token_a",
+      "route": "r",
+      "rv": 1,
+      "intent_capture_id": "cap_pi_001",
+      "intent_stage": "followup",
+      "intent_email": "cmo@example.co.za"
+    }
+  },
+  {
+    "name": "rapid_fix — initial (no followup expected — redirects to booking)",
+    "payload": {
+      "v": 1,
+      "event_kind": "intent_rapid_fix",
+      "event_id": "evt_rf_initial_01",
+      "ts": 1777680010000,
+      "st": "share_token_b",
+      "route": "r",
+      "rv": 1,
+      "intent_capture_id": "cap_rf_001",
+      "intent_stage": "initial"
+    }
+  },
+  {
+    "name": "monitoring — initial",
+    "payload": {
+      "v": 1,
+      "event_kind": "intent_monitoring",
+      "event_id": "evt_mon_initial_01",
+      "ts": 1777680020000,
+      "st": "share_token_c",
+      "route": "r",
+      "rv": 1,
+      "intent_capture_id": "cap_mon_001",
+      "intent_stage": "initial"
+    }
+  },
+  {
+    "name": "monitoring — followup with email + weekly cadence",
+    "payload": {
+      "v": 1,
+      "event_kind": "intent_monitoring",
+      "event_id": "evt_mon_followup_01",
+      "ts": 1777680025000,
+      "st": "share_token_c",
+      "route": "r",
+      "rv": 1,
+      "intent_capture_id": "cap_mon_001",
+      "intent_stage": "followup",
+      "intent_email": "ops@example.com",
+      "intent_cadence": "weekly"
+    }
+  },
+  {
+    "name": "monitoring — followup with daily cadence only (no email)",
+    "payload": {
+      "v": 1,
+      "event_kind": "intent_monitoring",
+      "event_id": "evt_mon_followup_02",
+      "ts": 1777680030000,
+      "st": "share_token_d",
+      "route": "r",
+      "rv": 1,
+      "intent_capture_id": "cap_mon_002",
+      "intent_stage": "followup",
+      "intent_cadence": "daily"
+    }
+  },
+  {
+    "name": "freeform — weekly_inbox pill",
+    "payload": {
+      "v": 1,
+      "event_kind": "intent_freeform",
+      "event_id": "evt_ff_weekly_01",
+      "ts": 1777680040000,
+      "st": "share_token_e",
+      "route": "r",
+      "rv": 1,
+      "intent_capture_id": "cap_ff_001",
+      "intent_stage": "initial",
+      "intent_pill_id": "weekly_inbox"
+    }
+  },
+  {
+    "name": "freeform — multi_client_portfolio pill",
+    "payload": {
+      "v": 1,
+      "event_kind": "intent_freeform",
+      "event_id": "evt_ff_portfolio_01",
+      "ts": 1777680050000,
+      "st": "share_token_f",
+      "route": "r",
+      "rv": 1,
+      "intent_capture_id": "cap_ff_002",
+      "intent_stage": "initial",
+      "intent_pill_id": "multi_client_portfolio"
+    }
+  },
+  {
+    "name": "freeform — something_else with freeform_text (followup)",
+    "payload": {
+      "v": 1,
+      "event_kind": "intent_freeform",
+      "event_id": "evt_ff_else_01",
+      "ts": 1777680060000,
+      "st": "share_token_g",
+      "route": "r",
+      "rv": 1,
+      "intent_capture_id": "cap_ff_003",
+      "intent_stage": "followup",
+      "intent_pill_id": "something_else",
+      "intent_freeform_text": "Branded PDF export with our colors would land in the QBR deck"
+    }
+  },
+  {
+    "name": "pi_early_access — initial without share_token (direct load)",
+    "payload": {
+      "v": 1,
+      "event_kind": "intent_pi_early_access",
+      "event_id": "evt_pi_no_st_01",
+      "ts": 1777680070000,
+      "st": "",
+      "route": "r",
+      "intent_capture_id": "cap_pi_002",
+      "intent_stage": "initial"
+    }
+  }
+]

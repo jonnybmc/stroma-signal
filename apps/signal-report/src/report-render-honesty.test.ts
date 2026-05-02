@@ -73,6 +73,78 @@ function extractHeadlineSlots(html: string): string[] {
   return slots;
 }
 
+// ─── Closing-section discipline ──────────────────────────────────────
+//
+// The closing section (Act 04 / Business) handles the conversion CTAs.
+// It must read as a continuation of the editorial body, NOT as a sales
+// footer. Two scoped guards (case-insensitive, business-section scope):
+//
+//   - Sales-register tokens: paywall verbs, premium/pro tier language,
+//     hype verbs, R-currency overclaims
+//   - Celebration tokens: transactional / packaging / "thanks!" register
+//     that breaks the observation tone established by the rest of the
+//     report
+
+const FORBIDDEN_BUSINESS_SECTION_SALES_TOKENS: string[] = [
+  'unlock',
+  'upgrade to',
+  ' pro ',
+  ' premium ',
+  'get more',
+  'discover more',
+  'fix your',
+  'costing you r',
+  'costing you $',
+  'transform',
+  'revolutionize',
+  'limited time',
+  'limited offer',
+  'special offer',
+  'exclusive access'
+];
+
+const FORBIDDEN_BUSINESS_SECTION_CELEBRATION_TOKENS: string[] = [
+  'thanks!',
+  "you're in!",
+  'welcome!',
+  'joined!',
+  'congrats',
+  'choose your',
+  'pick your',
+  'select your plan',
+  'three paths',
+  'three packages',
+  'three options to choose'
+];
+
+function extractBusinessSection(html: string): string {
+  const start = html.indexOf('id="business"');
+  if (start === -1) return '';
+  // Walk forward to find the matching </section> close. The shell only
+  // emits one section per id, so the next </section> after the id
+  // attribute is the right closer.
+  const end = html.indexOf('</section>', start);
+  if (end === -1) return html.slice(start);
+  return html.slice(start, end + '</section>'.length);
+}
+
+// Strip inline style + script attributes before scanning prose. The
+// forbidden-words guards target editorial copy (text content + plain
+// attribute values), NOT CSS property names like `transform:` that
+// appear inside `style="..."` blocks. Without this, "transform" would
+// fire on every reveal-animation transform CSS property.
+function stripPresentationAttrs(html: string): string {
+  return (
+    html
+      .replaceAll(/style="[^"]*"/g, '')
+      .replaceAll(/style='[^']*'/g, '')
+      // Also strip class= attribute values — class names like
+      // `closing-pill` etc. are not editorial copy.
+      .replaceAll(/class="[^"]*"/g, '')
+      .replaceAll(/class='[^']*'/g, '')
+  );
+}
+
 describe('render-honesty: forbidden-words discipline across rendered shell', () => {
   describe('whole-doc forbidden tokens never appear anywhere in the rendered shell', () => {
     for (const fixture of signalReportScenarioFixtures) {
@@ -82,6 +154,32 @@ describe('render-honesty: forbidden-words discipline across rendered shell', () 
       for (const forbidden of FORBIDDEN_WHOLEDOC) {
         it(`${fixture.name}: does not contain "${forbidden}"`, () => {
           expect(html).not.toContain(forbidden.toLowerCase());
+        });
+      }
+    }
+  });
+
+  describe('business-section sales-register tokens are mechanically blocked', () => {
+    for (const fixture of signalReportScenarioFixtures) {
+      const vm = buildReportViewModel(fixture.aggregate);
+      const businessProse = stripPresentationAttrs(extractBusinessSection(renderReportShell(vm))).toLowerCase();
+
+      for (const forbidden of FORBIDDEN_BUSINESS_SECTION_SALES_TOKENS) {
+        it(`${fixture.name}: business section does not contain "${forbidden.trim()}"`, () => {
+          expect(businessProse).not.toContain(forbidden.toLowerCase());
+        });
+      }
+    }
+  });
+
+  describe('business-section celebration / packaging tokens are mechanically blocked', () => {
+    for (const fixture of signalReportScenarioFixtures) {
+      const vm = buildReportViewModel(fixture.aggregate);
+      const businessProse = stripPresentationAttrs(extractBusinessSection(renderReportShell(vm))).toLowerCase();
+
+      for (const forbidden of FORBIDDEN_BUSINESS_SECTION_CELEBRATION_TOKENS) {
+        it(`${fixture.name}: business section does not contain "${forbidden}"`, () => {
+          expect(businessProse).not.toContain(forbidden.toLowerCase());
         });
       }
     }
