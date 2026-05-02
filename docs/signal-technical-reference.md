@@ -402,12 +402,12 @@ The Tier Report is not a diagnostic, attribution, or commercial modelling artifa
 
 | Module | Import path | Contents | Approximate size |
 |---|---|---|---|
-| **Base** | `@stroma-labs/signal` | Tier classification, vitals capture, beacon and callback sinks | < 4 KB gzipped |
+| **Base** | `@stroma-labs/signal` | Tier classification, vitals capture (incl. per-subpart Navigation Timing breakdown), beacon and callback sinks | ~6 KB gzipped |
 | **GA4 helper** | `@stroma-labs/signal/ga4` | dataLayer sink, GA4 event formatting | ~0.5 KB |
 | **Report builder** | `@stroma-labs/signal/report` | In-memory aggregation, `getReportUrl()`, URL encoding | ~1 KB |
 | **Summary helpers** | `@stroma-labs/signal/summary` | `formatSignalSummary`, JSON / CSV exports for events and aggregates | ~0.8 KB |
 
-Tree-shaking ensures unused modules are excluded from production builds. A minimal installation importing only the base package stays under 4 KB.
+Tree-shaking ensures unused modules are excluded from production builds. A minimal installation importing only the base package stays around 6 KB gzipped.
 
 ---
 
