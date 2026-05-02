@@ -980,7 +980,7 @@ function buildAct3Narrative(activeStages: SignalExperienceStage[], mood: ReportM
 
   if (mood === 'urgent') {
     return activeStages.length >= 3
-      ? 'A meaningful share of measured classified sessions crosses poor-performance thresholds at first paint, at main content, and at interaction-ready — stage by stage.'
+      ? 'A meaningful share of measured classified sessions crosses poor-performance thresholds at first paint, at main content, and at interaction-ready.'
       : 'A meaningful share of measured classified sessions crosses poor-performance thresholds at first paint and at main content before coverage thins out.';
   }
 

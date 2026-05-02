@@ -230,7 +230,7 @@ function pickAudienceHeadline(shape: EditorialDataShape): string {
 
 function pickAudienceLede(shape: EditorialDataShape): string {
   if (shape.classified_tier_count === 0) {
-    return 'Every session here is a real person. The classifier could not place them into a network tier — typically Safari / privacy-mode reused connections — so the spread shows in the device and form-factor signals instead.';
+    return 'Every session here is a real person. The classifier could not place them into a network tier (typically Safari or privacy-mode reused connections), so the spread shows in the device and form-factor signals instead.';
   }
   if (shape.mood === 'affirming') {
     return 'Every session here is a real person. Each cohort sits in the tier its infrastructure put it in — and the experience holds together across more of them than the average implies.';
@@ -299,7 +299,7 @@ function pickDistanceHeadline(shape: EditorialDataShape, race: ReportRaceViewMod
 
 function pickDistanceLede(shape: EditorialDataShape, race: ReportRaceViewModel): string {
   if (!shape.race_available) {
-    return 'The race needs more comparable cohort data than this window holds. The diagnosis below is what we can defend right now — coverage shape, persona spread, and the funnel where data permits.';
+    return 'The race needs more comparable cohort data than this window holds. The diagnosis below is what we can defend right now: coverage shape, persona spread, and the funnel where data permits.';
   }
   const metricName = race.metric_label;
   if (shape.wait_delta_band === 'contained') {
@@ -369,7 +369,7 @@ function pickFunnelLede(shape: EditorialDataShape): string | null {
   if (shape.mood === 'sober') {
     return 'Sessions cross into poor performance territory at paint, at hero content, and at first interaction. The leak is real but uneven, stage to stage.';
   }
-  return 'A meaningful share of your sessions cross into poor performance territory — first at the moment of paint, again at hero content, and finally at first interaction. Stage by stage, intent leaks out before the page has caught up.';
+  return 'A meaningful share of your sessions cross into poor performance at paint, at hero content, and at first interaction. The leak compounds across stages before the page has caught up.';
 }
 
 function pickFunnelHeadlineFigureCap(shape: EditorialDataShape): string {
@@ -394,9 +394,9 @@ function pickBusinessHeadline(shape: EditorialDataShape): string {
 
 function pickBusinessAsideLede(shape: EditorialDataShape): string {
   if (!shape.shape_proven) {
-    return 'This report shows what the data could and could not say. The next read — root cause, business exposure in your own currency, fix order — needs a richer sample, and is where a deeper engagement starts.';
+    return 'This report shows what the data could and could not say. Root cause, business exposure in your own currency, and a fix order need a richer sample to defend.';
   }
-  return 'This report proves the <em>shape</em> of the gap. Root cause, business exposure in your own currency, and fix order are the next read — and where a deeper engagement starts.';
+  return 'This report proves the <em>shape</em> of the gap. Root cause, business exposure in your own currency, and a fix order are the next read.';
 }
 
 function pickWhatThisEnables(shape: EditorialDataShape, dominantCulpritKind: string | null): string[] {
@@ -469,8 +469,8 @@ function pickRapidFixCard(shape: EditorialDataShape): ReportClosingCard {
   // offer still applies but the framing shouldn't read as if the page
   // is on fire when it isn't.
   const body = shape.has_ledger
-    ? 'If a single high-value page is dragging the funnel above and you want a short, ship-ready fix order, this traces the cause and returns it. Booked through stroma.design.'
-    : 'If you have a single high-value page where you want a short, ship-ready fix order — this traces the cause and returns it. Booked through stroma.design.';
+    ? 'If a single high-value page is dragging the funnel above and you want a short, prioritised fix list, this traces the cause and returns it. Booked through stroma.design.'
+    : 'If you have a single high-value page that needs a short, prioritised fix list, this traces the cause and returns it. Booked through stroma.design.';
 
   return {
     id: 'rapid_fix',
