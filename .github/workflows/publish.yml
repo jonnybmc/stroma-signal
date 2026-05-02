@@ -3,6 +3,17 @@ name: Publish
 on:
   release:
     types: [published]
+  # Allow manual re-firing of the publish from the Actions tab — useful
+  # when a previous publish failed at the npm step (e.g. transient OIDC
+  # auth issue) and we want to retry without deleting / recreating the
+  # release tag. Provide the release tag as the input so the workflow
+  # checks out the same commit the release points at.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to publish (e.g. v0.1.0-rc.3)'
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -13,6 +24,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # When triggered via workflow_dispatch with a tag input, check
+          # out THAT tag instead of the default branch HEAD. Lets us
+          # re-fire a failed publish against the same release commit.
+          ref: ${{ inputs.tag || github.ref }}
       - uses: pnpm/action-setup@v4
         with:
           version: 10.28.2
@@ -21,11 +37,9 @@ jobs:
           node-version: 22
           cache: pnpm
           registry-url: https://registry.npmjs.org
-      # Node 22 LTS ships with npm 10.x, which supports `--provenance`
-      # (sigstore signing) but does NOT support OIDC-authenticated publish
-      # PUTs against the npm Trusted Publisher endpoint. The publish PUT
-      # silently 404s without the right OIDC auth header. npm 11.5+ added
-      # the OIDC publish-auth flow, so we upgrade explicitly here.
+      # Node 22 LTS ships with npm 10.x. npm Trusted Publishing (OIDC
+      # publish auth) requires npm 11.5+. Upgrade explicitly so the
+      # `npm publish` step below has the OIDC code path available.
       - run: npm install -g npm@latest
       - run: pnpm install --frozen-lockfile
       - run: pnpm run ci
@@ -38,20 +52,36 @@ jobs:
       - name: Resolve npm dist-tag from release type
         id: npm_tag
         # Pre-releases publish to the `next` dist-tag; stable releases
-        # publish to `latest`. The GitHub Release `prerelease` flag is
-        # the source of truth so the publish lane mirrors what was
-        # reviewed in the Release UI. A casual `pnpm add @stroma-labs/
-        # signal` always resolves to the latest stable, never to an RC.
+        # publish to `latest`. For release-event triggers the source of
+        # truth is the GitHub Release `prerelease` flag. For
+        # workflow_dispatch retries we infer from the tag string (any
+        # tag containing `-` is treated as a pre-release per semver
+        # convention; e.g. v0.1.0-rc.3, v1.0.0-beta.1).
         run: |
-          if [[ "${{ github.event.release.prerelease }}" == "true" ]]; then
-            echo "tag=next" >> "$GITHUB_OUTPUT"
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            if [[ "${{ inputs.tag }}" == *-* ]]; then
+              echo "tag=next" >> "$GITHUB_OUTPUT"
+            else
+              echo "tag=latest" >> "$GITHUB_OUTPUT"
+            fi
           else
-            echo "tag=latest" >> "$GITHUB_OUTPUT"
+            if [[ "${{ github.event.release.prerelease }}" == "true" ]]; then
+              echo "tag=next" >> "$GITHUB_OUTPUT"
+            else
+              echo "tag=latest" >> "$GITHUB_OUTPUT"
+            fi
           fi
-      - run: pnpm --filter @stroma-labs/signal publish --provenance --access public --no-git-checks --tag ${{ steps.npm_tag.outputs.tag }}
-        # No NODE_AUTH_TOKEN here. npm Trusted Publishing uses the
-        # GitHub OIDC token (enabled by `permissions: id-token: write`
-        # at the job level) to authenticate this workflow run against
-        # the trusted-publisher policy configured for @stroma-labs/signal
-        # at npmjs.com → settings → packages → trusted publishers.
-        # No long-lived NPM_TOKEN secret needs to exist.
+      # Use `npm publish` directly (not `pnpm publish`). pnpm's publish
+      # wrapper requests an OIDC token for sigstore (provenance signing)
+      # but does NOT request the OIDC token for npm publish auth — its
+      # publish PUT goes out anonymously, which npm rejects with a 404
+      # ("Not Found"). Only the npm CLI 11.5+ implements the full OIDC
+      # publish-auth flow against npm Trusted Publishers.
+      #
+      # `--ignore-scripts` skips the package's prepublishOnly hook
+      # (which would re-run the build); the workflow already built via
+      # `pnpm run ci` above. No NODE_AUTH_TOKEN env: npm 11+ pulls the
+      # OIDC token from the workflow's `id-token: write` permission and
+      # exchanges it against the trusted-publisher policy on npmjs.com.
+      - run: npm publish --provenance --access public --tag ${{ steps.npm_tag.outputs.tag }} --ignore-scripts
+        working-directory: packages/signal
