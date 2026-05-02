@@ -447,8 +447,8 @@ function pickPiCard(shape: EditorialDataShape): ReportClosingCard {
   // give themselves. Imperative declarative, no questions.
   const body =
     shape.mood === 'affirming'
-      ? 'Signal stops at substrate. If you want to see which campaigns, audiences, or creatives are exposed to this gap, that join is a separate piece we are exploring.'
-      : 'Signal stops at substrate. The campaign-side question — which spend, audiences, or creatives are exposed to this gap — is a separate join we are exploring.';
+      ? 'If you ever want to know which specific campaigns or audiences are most exposed to a gap like this, we are working on a separate tool that links this report to your ad-platform data. Not built yet — collecting interest first.'
+      : 'This report shows the gap, but it does not tell you which specific campaigns or audiences are most exposed to it. We are working on a separate tool that links this report to your ad-platform data. Not built yet — collecting interest first.';
 
   return {
     id: 'pi_early_access',
