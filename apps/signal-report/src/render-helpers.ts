@@ -241,25 +241,20 @@ export function bootScrollSpy(sectionIds: string[]): void {
   };
 
   if (typeof IntersectionObserver !== 'undefined') {
-    const obs = new IntersectionObserver(
-      (entries) => {
-        let best: IntersectionObserverEntry | null = null;
-        for (const e of entries) {
-          if (e.isIntersecting && (!best || e.intersectionRatio > best.intersectionRatio)) {
-            best = e;
-          }
-        }
-        if (best) setActive(best.target.id);
-      },
-      { threshold: [0.2, 0.4, 0.6], rootMargin: '-20% 0px -50% 0px' }
-    );
+    // Observer is the trigger; probe() is the picker. Observer fires
+    // when any section's intersection state changes (not on every
+    // scroll event), so probe() runs O(intersection-events) instead of
+    // O(scroll-frames) — no per-scroll forced reflow. probe() picks
+    // the section closest to a focusY anchor (more reliable than
+    // ratio-based picking when sections are >> viewport height).
+    const obs = new IntersectionObserver(() => probe(), { threshold: 0, rootMargin: '0px' });
     for (const el of els) obs.observe(el);
+    probe();
     return;
   }
 
-  // Fallback only — pre-IntersectionObserver browsers. probe() reads
-  // getBoundingClientRect for every section on every scroll, which forces
-  // synchronous layout. Skip when the observer path is available.
+  // Fallback only — pre-IntersectionObserver browsers (effectively zero
+  // in 2026). probe() on every scroll forces synchronous layout.
   window.addEventListener('scroll', probe, { passive: true });
   window.addEventListener('resize', probe);
   probe();
