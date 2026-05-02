@@ -10,13 +10,13 @@ dist-tag. The `latest` dist-tag is reserved for stable releases.
 
 ```
 pnpm add @stroma-labs/signal@next            # latest pre-release
-pnpm add @stroma-labs/signal@0.1.0-rc.2      # exact rc.2 pin
+pnpm add @stroma-labs/signal@0.1.0-rc.3      # exact rc.3 pin
 pnpm add @stroma-labs/signal                 # latest stable (when published)
 ```
 
 Bump the exact pin example whenever a new `-rc.N` is cut so onboarders default to the freshest pinned snapshot.
 
-## [Unreleased]
+## [0.1.0-rc.3] - 2026-05-02
 
 ### Added (RC3 — Closing-section needs-inquiry router + intent-capture telemetry)
 
