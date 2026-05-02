@@ -130,6 +130,11 @@ function flipCardToConfirmation(card: HTMLElement, message?: string): void {
     const text = card.querySelector<HTMLElement>('[data-closing-confirmation-text]');
     if (text) text.textContent = message;
   }
+  // Clear the hidden attribute so AT picks up the role="status" announcement.
+  // CSS reveals via display:flex !important regardless, but `hidden` would
+  // suppress the live-region read.
+  const slot = card.querySelector<HTMLElement>('.closing-card-confirmation');
+  if (slot) slot.hidden = false;
 }
 
 function attachCardClickHandlers(ctx: ResolvedReportContext): void {
@@ -255,6 +260,8 @@ function attachMultiselectHandler(ctx: ResolvedReportContext): void {
     }
 
     form.dataset['state'] = 'logged';
+    const slot = form.querySelector<HTMLElement>('.closing-multiselect-confirmation');
+    if (slot) slot.hidden = false;
   });
 }
 

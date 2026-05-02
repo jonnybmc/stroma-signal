@@ -121,7 +121,7 @@ function renderClosingCard(card: ReportClosingCard): string {
           `
       }
       <!-- Confirmation slot — replaces the form + note when state flips to "logged" -->
-      <div class="closing-card-confirmation" hidden>
+      <div class="closing-card-confirmation" role="status" hidden>
         <p class="closing-card-confirmation-text" data-closing-confirmation-text>✓ noted — we will be in touch</p>
       </div>
     </div>
@@ -173,7 +173,7 @@ function renderClosingMultiselect(vm: ReportViewModel): string {
         ></textarea>
       </label>
       <button type="submit" class="closing-card-cta closing-multiselect-send" data-closing-multiselect-send>send</button>
-      <div class="closing-multiselect-confirmation" hidden>
+      <div class="closing-multiselect-confirmation" role="status" hidden>
         <p class="closing-card-confirmation-text" data-closing-multiselect-confirmation-text>✓ thanks — noted</p>
       </div>
     </form>

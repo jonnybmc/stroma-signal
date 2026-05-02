@@ -47,7 +47,7 @@ function renderFooter(viewModel: ReportViewModel): string {
   return `
     <footer class="scroll-footer">
       <div class="scroll-footer-meta">generated ${escapeHtml(generated)} · ${viewModel.sample_size} sessions · ${viewModel.period_days} day window</div>
-      <button class="scroll-footer-copy" data-role="share-copy" data-default-label="copy link" type="button">copy link</button>
+      <button class="scroll-footer-copy" data-role="share-copy" data-default-label="copy link" type="button" aria-live="polite">copy link</button>
     </footer>
   `.trim();
 }
