@@ -34,7 +34,7 @@ export type SignalReportInteractionIntentKind = Extract<SignalReportInteractionK
  * == one demand-signal row, not one event-per-interaction. */
 export type SignalReportInteractionIntentStage = 'initial' | 'followup';
 
-export type SignalReportInteractionIntentCadence = 'weekly' | 'daily';
+export type SignalReportInteractionIntentCadence = 'weekly' | 'monthly';
 
 export type SignalReportInteractionIntentPillId =
   | 'weekly_inbox'
@@ -107,7 +107,7 @@ export const SIGNAL_REPORT_INTERACTION_VALID_INTENT_STAGES: ReadonlySet<SignalRe
 ]);
 
 export const SIGNAL_REPORT_INTERACTION_VALID_INTENT_CADENCES: ReadonlySet<SignalReportInteractionIntentCadence> =
-  new Set(['weekly', 'daily']);
+  new Set(['weekly', 'monthly']);
 
 export const SIGNAL_REPORT_INTERACTION_VALID_INTENT_PILL_IDS: ReadonlySet<SignalReportInteractionIntentPillId> =
   new Set(['weekly_inbox', 'multi_page', 'multi_client_portfolio', 'competitor_context', 'something_else']);
@@ -238,7 +238,7 @@ export function explainReportInteractionIssues(value: unknown): string[] {
     v.intent_cadence != null &&
     !SIGNAL_REPORT_INTERACTION_VALID_INTENT_CADENCES.has(v.intent_cadence as SignalReportInteractionIntentCadence)
   ) {
-    issues.push('Expected "intent_cadence" to be "weekly" | "daily" when present.');
+    issues.push('Expected "intent_cadence" to be "weekly" | "monthly" when present.');
   }
   if (
     v.intent_pill_id != null &&

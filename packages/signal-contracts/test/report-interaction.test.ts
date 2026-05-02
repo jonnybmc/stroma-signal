@@ -257,7 +257,7 @@ describe('explainReportInteractionIssues', () => {
     it('rejects an unknown intent_cadence value', () => {
       const ev = makeValidIntent('intent_monitoring', {
         intent_stage: 'followup',
-        intent_cadence: 'monthly' as unknown as 'weekly'
+        intent_cadence: 'daily' as unknown as 'weekly'
       });
       const issues = explainReportInteractionIssues(ev);
       expect(issues.some((i) => i.includes('intent_cadence'))).toBe(true);

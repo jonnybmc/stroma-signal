@@ -204,61 +204,63 @@ function attachFormSubmitHandler(card: HTMLElement, state: CardState, ctx: Resol
   });
 }
 
-function attachPillClickHandlers(ctx: ResolvedReportContext): void {
-  for (const pill of document.querySelectorAll<HTMLButtonElement>('[data-closing-pill]')) {
-    const pillId = pill.dataset['closingPill'] as SignalReportInteractionIntentPillId | undefined;
-    if (!pillId) continue;
-    const collectsFreeform = pill.dataset['collectsFreeformText'] === 'true';
-    const captureId = generateCaptureId();
-    pill.dataset['captureId'] = captureId;
+function attachMultiselectHandler(ctx: ResolvedReportContext): void {
+  const form = document.querySelector<HTMLFormElement>('[data-closing-multiselect]');
+  if (!form) return;
 
-    pill.addEventListener('click', () => {
-      if (pill.dataset['state'] === 'logged') return;
+  const summaryLabel = form.querySelector<HTMLElement>('[data-closing-multiselect-label]');
+  const freeformWrap = form.querySelector<HTMLElement>('[data-closing-multiselect-freeform]');
+  const freeformText = form.querySelector<HTMLTextAreaElement>('[data-closing-multiselect-freeform-text]');
+  const checkboxes = form.querySelectorAll<HTMLInputElement>('input[type="checkbox"][name="closing-pill"]');
 
-      // For pills that DON'T collect freeform text, log immediately and
-      // flip to ✓ noted in place.
-      if (!collectsFreeform) {
-        sendIntent({
-          ...basePayload(ctx, 'intent_freeform', captureId),
-          intent_pill_id: pillId
-        });
-        pill.dataset['state'] = 'logged';
-        return;
-      }
-
-      // For "something_else", expand the pill into an inline textarea +
-      // Send link. Don't log the intent until the user submits — a bare
-      // click on "something else" without text is noise.
-      if (pill.dataset['state'] === 'expanded') return;
-      pill.dataset['state'] = 'expanded';
-      const wrap = document.createElement('div');
-      wrap.className = 'closing-pill-freeform';
-      wrap.innerHTML = `
-        <textarea maxlength="200" placeholder="What would actually help? (200 chars max)"></textarea>
-        <button type="button" class="closing-pill-freeform-send">send</button>
-      `;
-      pill.insertAdjacentElement('afterend', wrap);
-      const textarea = wrap.querySelector<HTMLTextAreaElement>('textarea');
-      const sendLink = wrap.querySelector<HTMLButtonElement>('button');
-      sendLink?.addEventListener('click', () => {
-        const text = textarea?.value.trim() ?? '';
-        if (!text) return;
-        sendIntent({
-          ...basePayload(ctx, 'intent_freeform', captureId),
-          intent_stage: 'followup',
-          intent_pill_id: 'something_else',
-          intent_freeform_text: text.slice(0, 200)
-        });
-        wrap.innerHTML = '<p class="closing-card-confirmation-text">✓ noted — thank you</p>';
-        pill.dataset['state'] = 'logged';
-      });
-    });
+  // Update the summary label as checkboxes flip + reveal the freeform
+  // textarea when "something else" is among the checked.
+  function refreshSummary(): void {
+    const checked = Array.from(checkboxes).filter((cb) => cb.checked);
+    if (summaryLabel) {
+      summaryLabel.textContent =
+        checked.length === 0
+          ? 'Choose any that apply'
+          : checked.length === 1
+            ? '1 selected'
+            : `${checked.length} selected`;
+    }
+    const wantsFreeform = checked.some((cb) => cb.dataset['collectsFreeformText'] === 'true');
+    if (freeformWrap) freeformWrap.hidden = !wantsFreeform;
   }
+  for (const cb of checkboxes) cb.addEventListener('change', refreshSummary);
+  refreshSummary();
+
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    if (form.dataset['state'] === 'logged') return;
+
+    const checked = Array.from(checkboxes).filter((cb) => cb.checked);
+    if (checked.length === 0) return;
+
+    // Fire one intent event per checked option. Each gets its own
+    // capture_id so the snapshot-engine row count == demand-signal
+    // count. The "something_else" event carries the freeform text.
+    const freeformValue = freeformText?.value.trim() ?? '';
+    for (const cb of checked) {
+      const pillId = cb.value as SignalReportInteractionIntentPillId;
+      const payload: SignalReportInteractionV1 = {
+        ...basePayload(ctx, 'intent_freeform', generateCaptureId()),
+        intent_pill_id: pillId
+      };
+      if (pillId === 'something_else' && freeformValue) {
+        payload.intent_freeform_text = freeformValue.slice(0, 200);
+      }
+      sendIntent(payload);
+    }
+
+    form.dataset['state'] = 'logged';
+  });
 }
 
 export function bootIntentTelemetry(): void {
   if (typeof document === 'undefined') return;
   const ctx = resolveReportContext();
   attachCardClickHandlers(ctx);
-  attachPillClickHandlers(ctx);
+  attachMultiselectHandler(ctx);
 }

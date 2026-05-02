@@ -15,12 +15,7 @@
 
 import { renderHeroValue, renderReveal, renderTerm } from '../render-helpers.js';
 import { escapeHtml } from '../render-utils.js';
-import type {
-  ReportAct4ImpactRow,
-  ReportClosingCard,
-  ReportClosingPill,
-  ReportViewModel
-} from '../report-view-model.js';
+import type { ReportAct4ImpactRow, ReportClosingCard, ReportViewModel } from '../report-view-model.js';
 
 function renderImpactRow(row: ReportAct4ImpactRow): string {
   const kpiLabels = row.kpi_label
@@ -131,21 +126,59 @@ function renderClosingCard(card: ReportClosingCard): string {
   `;
 }
 
-function renderClosingPill(pill: ReportClosingPill): string {
+function renderClosingMultiselect(vm: ReportViewModel): string {
+  // Native HTML disclosure (<details>) used as a clean multi-select
+  // dropdown. Checkbox per option. The "something else" option reveals
+  // a 200-char textarea on check (handled by intent-telemetry.ts).
+  // Single Send button submits N intent events — one per checked
+  // option. No JS required for the dropdown itself.
+  const pills = vm.editorial.business_closing_pills;
+  const options = pills
+    .map(
+      (pill) => `
+        <label class="closing-multiselect-option">
+          <input
+            type="checkbox"
+            name="closing-pill"
+            value="${pill.pill_id}"
+            data-collects-freeform-text="${pill.collects_freeform_text ? 'true' : 'false'}"
+          >
+          <span>${escapeHtml(pill.label)}</span>
+        </label>
+      `
+    )
+    .join('');
+
   return `
-    <button
-      type="button"
-      class="closing-pill"
-      data-closing-pill="${pill.pill_id}"
-      data-collects-freeform-text="${pill.collects_freeform_text ? 'true' : 'false'}"
-      data-state="idle"
-    >${escapeHtml(pill.label)}</button>
+    <form class="closing-multiselect" data-closing-multiselect data-state="idle">
+      <p class="closing-multiselect-lead-in">${escapeHtml(vm.editorial.business_closing_pill_lead_in)}</p>
+      <details class="closing-multiselect-details">
+        <summary class="closing-multiselect-summary">
+          <span data-closing-multiselect-label>Choose any that apply</span>
+          <span class="closing-multiselect-chevron" aria-hidden="true">▾</span>
+        </summary>
+        <div class="closing-multiselect-options">
+          ${options}
+        </div>
+      </details>
+      <label class="closing-multiselect-freeform" data-closing-multiselect-freeform hidden>
+        <span>Tell us more</span>
+        <textarea
+          maxlength="200"
+          rows="2"
+          placeholder="What would actually help? (200 chars max)"
+          data-closing-multiselect-freeform-text
+        ></textarea>
+      </label>
+      <button type="submit" class="closing-card-cta closing-multiselect-send" data-closing-multiselect-send>send</button>
+      <div class="closing-multiselect-confirmation" hidden>
+        <p class="closing-card-confirmation-text" data-closing-multiselect-confirmation-text>✓ thanks — noted</p>
+      </div>
+    </form>
   `;
 }
 
 function renderClosingRouter(vm: ReportViewModel): string {
-  const pills = vm.editorial.business_closing_pills.map(renderClosingPill).join('');
-
   return `
     <div class="closing-router">
       ${renderReveal(`<p class="closing-bridge">${vm.editorial.business_closing_bridge_html}</p>`)}
@@ -154,13 +187,7 @@ function renderClosingRouter(vm: ReportViewModel): string {
           .map((card, i) => renderReveal(renderClosingCard(card), { delay: i * 80 }))
           .join('')}
       </div>
-      ${renderReveal(
-        `<div class="closing-pill-row">
-          <span class="closing-pill-lead-in">${escapeHtml(vm.editorial.business_closing_pill_lead_in)}</span>
-          ${pills}
-        </div>`,
-        { delay: 240 }
-      )}
+      ${renderReveal(renderClosingMultiselect(vm), { delay: 240 })}
     </div>
   `;
 }

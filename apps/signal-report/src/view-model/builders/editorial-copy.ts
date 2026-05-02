@@ -445,18 +445,21 @@ function pickClosingCards(shape: EditorialDataShape): ReportClosingCard[] {
 }
 
 function pickPiCard(shape: EditorialDataShape): ReportClosingCard {
+  // Card titles tonally extend the bridge question "What would help most
+  // from here?" — read as natural answers a thoughtful operator would
+  // give themselves. Imperative declarative, no questions.
   const body =
     shape.mood === 'affirming'
-      ? 'If you ever want to see which campaigns are exposed to this gap, Performance Intelligence will join substrate to spend and conversions. We will let you know when early access opens.'
-      : 'Substrate × spend × conversions joins are coming as Performance Intelligence — early access opens to a small cohort first. We will let you know when you can connect this report to your campaign data.';
+      ? 'If you ever want to see which campaigns are exposed to this gap, the campaign-attribution layer will join substrate to spend and conversions. We will let you know when early access opens.'
+      : 'Substrate × spend × conversions joins are coming as a paid layer — early access opens to a small cohort first. We will let you know when you can connect this report to your campaign data.';
 
   return {
     id: 'pi_early_access',
     intent_kind: 'intent_pi_early_access',
-    eyebrow: 'Performance Intelligence',
-    title: 'Wondering which campaigns are exposed?',
+    eyebrow: 'Campaign-attribution layer',
+    title: 'See which campaigns this affects.',
     body,
-    cta_label: 'Add me to early access',
+    cta_label: 'Tell me when it ships',
     cta_href: null,
     collects_email: true,
     collects_cadence: false,
@@ -465,24 +468,24 @@ function pickPiCard(shape: EditorialDataShape): ReportClosingCard {
 }
 
 function pickRapidFixCard(shape: EditorialDataShape): ReportClosingCard {
-  // Rapid Fix Plan body softens slightly when the report shows
-  // little measured pressure — the offer still applies but the framing
-  // shouldn't read as if the page is on fire when it isn't.
+  // Body softens when the report shows little measured pressure — the
+  // offer still applies but the framing shouldn't read as if the page
+  // is on fire when it isn't.
   const body = shape.has_ledger
-    ? 'If a single high-value page is dragging the funnel above and you want a short, ship-ready fix order, the Rapid Fix Plan traces the cause and returns it. Booked through stroma.design.'
-    : 'If you have a single high-value page where you want a short, ship-ready fix order — the Rapid Fix Plan traces the cause and returns it. Booked through stroma.design.';
+    ? 'If a single high-value page is dragging the funnel above and you want a short, ship-ready fix order, this traces the cause and returns it. Booked through stroma.design.'
+    : 'If you have a single high-value page where you want a short, ship-ready fix order — this traces the cause and returns it. Booked through stroma.design.';
 
   return {
     id: 'rapid_fix',
     intent_kind: 'intent_rapid_fix',
-    eyebrow: 'Stroma engagement',
-    title: 'Need a sequenced fix list for this page?',
+    eyebrow: 'Rapid Fix Plan',
+    title: 'Get a fix list for this page.',
     body,
-    cta_label: 'Open the booking page',
+    cta_label: 'Get a fix plan',
     cta_href: 'https://www.stroma.design/book?service=rapid-fix',
     collects_email: false,
     collects_cadence: false,
-    small_note: 'Project-scoped engagement. Booked, not bought.'
+    small_note: 'Project-scoped. Booked, not bought.'
   };
 }
 
@@ -491,9 +494,9 @@ function pickMonitoringCard(): ReportClosingCard {
     id: 'monitoring',
     intent_kind: 'intent_monitoring',
     eyebrow: 'Coming soon',
-    title: 'Want this report on a schedule?',
-    body: 'Re-running the BigQuery query and regenerating the URL by hand is fine for a one-off — less fine as a regular read. Scheduled monitoring would deliver this same report weekly or daily as the data refreshes. We are collecting interest before we build it.',
-    cta_label: 'Add me to monitoring early access',
+    title: 'Run this report on a schedule.',
+    body: 'Re-running the BigQuery query and regenerating the URL by hand is fine for a one-off — less fine as a regular read. Scheduled monitoring would deliver this same report weekly or monthly as the data refreshes. We are collecting interest before we build it.',
+    cta_label: 'Tell me when it ships',
     cta_href: null,
     collects_email: true,
     collects_cadence: true,

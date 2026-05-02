@@ -742,12 +742,13 @@ body { overflow-y: auto; overflow-x: hidden; }
 }
 
 .closing-bridge {
-  margin: 0;
+  margin: 0 auto;
   max-width: 60ch;
   font-size: clamp(15px, 0.6vw + 13px, 17px);
   line-height: 1.55;
   color: var(--ink-soft);
   text-wrap: pretty;
+  text-align: center;
 }
 
 .closing-card-grid {
@@ -958,58 +959,105 @@ body { overflow-y: auto; overflow-x: hidden; }
   text-underline-offset: 3px;
 }
 
-.closing-pill-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: var(--stack-sm);
-}
-
-.closing-pill-lead-in {
-  font-size: 13px;
-  color: var(--ink-soft);
-  line-height: 1.55;
-}
-
-.closing-pill {
-  appearance: none;
-  background: none;
-  border: 1px solid transparent;
-  padding: 4px 10px;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--ink-soft);
-  letter-spacing: 0.02em;
-  border-radius: 999px;
-  cursor: pointer;
-  transition: border-color 180ms, color 180ms;
-}
-.closing-pill:hover {
-  border-color: var(--line-strong);
-  color: var(--ink);
-}
-.closing-pill:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-.closing-pill[data-state="logged"] {
-  color: var(--ink-faint);
-  border-color: transparent;
-  pointer-events: none;
-}
-.closing-pill[data-state="logged"]::before {
-  content: '✓ ';
-  color: var(--ink-soft);
-}
-
-.closing-pill-freeform {
+/* Closing multi-select dropdown — replaces the prior pill row.
+ * Native <details> as the disclosure mechanism; checkbox per option;
+ * "something else" reveals the textarea. Single Send button submits.
+ * Visual register stays quiet — same hairline borders as the cards
+ * above. NO accent fill, NO button chrome, NO heavy shadows. */
+.closing-multiselect {
   display: flex;
   flex-direction: column;
-  gap: var(--stack-xs);
-  width: 100%;
-  margin-top: var(--stack-sm);
+  gap: var(--stack-sm);
+  max-width: 520px;
+  margin-inline: auto;
+  margin-top: var(--stack-md);
+  align-items: stretch;
 }
-.closing-pill-freeform textarea {
+
+.closing-multiselect-lead-in {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink-soft);
+  text-align: center;
+}
+
+.closing-multiselect-details {
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-2);
+  background: var(--bg-1);
+}
+.closing-multiselect-details[open] {
+  border-color: var(--accent);
+}
+
+.closing-multiselect-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--stack-xs);
+  padding: 10px 14px;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink);
+  list-style: none;
+}
+.closing-multiselect-summary::-webkit-details-marker { display: none; }
+
+.closing-multiselect-chevron {
+  font-size: 11px;
+  color: var(--ink-mute);
+  transition: transform 180ms ease;
+}
+.closing-multiselect-details[open] .closing-multiselect-chevron {
+  transform: rotate(180deg);
+}
+
+.closing-multiselect-options {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 8px 10px;
+  border-top: 1px solid var(--line);
+}
+
+.closing-multiselect-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--r-1);
+  font-size: 13px;
+  color: var(--ink-soft);
+  line-height: 1.4;
+  cursor: pointer;
+  transition: background 180ms;
+}
+.closing-multiselect-option:hover {
+  background: color-mix(in oklab, var(--accent) 6%, transparent);
+}
+.closing-multiselect-option input[type="checkbox"] {
+  margin: 2px 0 0 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.closing-multiselect-option input[type="checkbox"]:checked + span {
+  color: var(--ink);
+}
+
+.closing-multiselect-freeform {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-mute);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+.closing-multiselect-freeform[hidden] { display: none; }
+.closing-multiselect-freeform textarea {
   appearance: none;
   border: 1px solid var(--line-strong);
   background: var(--bg-1);
@@ -1019,13 +1067,30 @@ body { overflow-y: auto; overflow-x: hidden; }
   color: var(--ink);
   border-radius: var(--r-2);
   resize: vertical;
+  text-transform: none;
+  letter-spacing: 0;
   min-height: 60px;
-  max-width: 480px;
 }
-.closing-pill-freeform textarea:focus {
+.closing-multiselect-freeform textarea:focus {
   outline: none;
   border-color: var(--accent);
 }
+
+.closing-multiselect-send {
+  align-self: center;
+  margin-top: var(--stack-xs);
+}
+
+.closing-multiselect[data-state="logged"] .closing-multiselect-details,
+.closing-multiselect[data-state="logged"] .closing-multiselect-freeform,
+.closing-multiselect[data-state="logged"] .closing-multiselect-send {
+  display: none;
+}
+.closing-multiselect[data-state="logged"] .closing-multiselect-confirmation {
+  display: block !important;
+  text-align: center;
+}
+.closing-multiselect-confirmation[hidden] { display: none; }
 
 /* — final CTA card (Business) — */
 .cta-card {

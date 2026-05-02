@@ -73,7 +73,7 @@
     }
   },
   {
-    "name": "monitoring — followup with daily cadence only (no email)",
+    "name": "monitoring — followup with monthly cadence only (no email)",
     "payload": {
       "v": 1,
       "event_kind": "intent_monitoring",
@@ -84,7 +84,7 @@
       "rv": 1,
       "intent_capture_id": "cap_mon_002",
       "intent_stage": "followup",
-      "intent_cadence": "daily"
+      "intent_cadence": "monthly"
     }
   },
   {
