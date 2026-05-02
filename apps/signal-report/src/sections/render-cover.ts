@@ -82,7 +82,7 @@ export function renderCoverSection(vm: ReportViewModel): string {
         <div class="block" style="gap:var(--stack-md);">
           ${renderReveal(
             `<div class="block-header">
-              <div class="section-eyebrow">At a glance</div>
+              <h3 class="section-eyebrow">At a glance</h3>
               <p class="section-lede">${escapeHtml(vm.editorial.cover_at_a_glance_lede)}</p>
             </div>`
           )}
@@ -130,7 +130,7 @@ export function renderCoverSection(vm: ReportViewModel): string {
 
         ${renderReveal(
           `<div>
-            <div class="section-eyebrow" style="margin-bottom:12px;">How the audience splits, at a glance</div>
+            <h3 class="section-eyebrow" style="margin-bottom:12px;">How the audience splits, at a glance</h3>
             <div style="display:flex;height:36px;border-radius:var(--r-2);overflow:hidden;border:1px solid var(--line);">
               ${tiers.map(tierStripSegment).join('')}
             </div>

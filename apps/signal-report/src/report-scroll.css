@@ -254,6 +254,7 @@ body { overflow-y: auto; overflow-x: hidden; }
 
 /* — section header — */
 .section-eyebrow {
+  margin: 0;
   font-family: var(--font-mono);
   font-size: 10.5px;
   letter-spacing: 0.16em;

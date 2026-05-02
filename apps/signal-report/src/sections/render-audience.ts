@@ -143,7 +143,7 @@ function renderFormFactor(vm: ReportViewModel): string {
 
   return `
     <div class="block">
-      ${renderReveal(`<div class="section-eyebrow">Form factor</div>`)}
+      ${renderReveal(`<h3 class="section-eyebrow">Form factor</h3>`)}
       <div class="grid-3">
         ${segments
           .map((s, i) => {
@@ -192,7 +192,7 @@ function renderContextStrip(vm: ReportViewModel): string {
     <div class="block">
       ${renderReveal(
         `<div class="block-header">
-          <div class="section-eyebrow">Context that shapes the experience</div>
+          <h3 class="section-eyebrow">Context that shapes the experience</h3>
           <p class="section-lede">${escapeHtml(vm.editorial.audience_context_strip_lede)}</p>
         </div>`
       )}
@@ -215,14 +215,14 @@ export function renderAudienceSection(vm: ReportViewModel): string {
 
         <div class="block">
           ${renderReveal(
-            `<div class="section-eyebrow with-icon">${renderIcon('wifi', 'sr-eyebrow-icon')} <span>Network spread</span></div>`
+            `<h3 class="section-eyebrow with-icon">${renderIcon('wifi', 'sr-eyebrow-icon')} <span>Network spread</span></h3>`
           )}
           ${renderReveal(renderTierTable(vm))}
         </div>
 
         <div class="block">
           ${renderReveal(
-            `<div class="section-eyebrow with-icon">${renderIcon('monitorSmartphone', 'sr-eyebrow-icon')} <span>Device spread</span></div>`
+            `<h3 class="section-eyebrow with-icon">${renderIcon('monitorSmartphone', 'sr-eyebrow-icon')} <span>Device spread</span></h3>`
           )}
           ${renderReveal(renderDeviceTable(vm))}
         </div>
@@ -230,7 +230,7 @@ export function renderAudienceSection(vm: ReportViewModel): string {
         <div class="block">
           ${renderReveal(
             `<div class="block-header">
-              <div class="section-eyebrow">${escapeHtml(vm.editorial.audience_persona_section_eyebrow)}</div>
+              <h3 class="section-eyebrow">${escapeHtml(vm.editorial.audience_persona_section_eyebrow)}</h3>
               <p class="section-lede">${escapeHtml(vm.editorial.audience_persona_section_lede)}</p>
             </div>`
           )}

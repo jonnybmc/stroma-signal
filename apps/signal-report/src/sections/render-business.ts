@@ -214,7 +214,7 @@ export function renderBusinessSection(vm: ReportViewModel): string {
         </div>
 
         <div class="block">
-          ${renderReveal(`<div class="section-eyebrow">${escapeHtml(vm.editorial.business_section_eyebrow)}</div>`)}
+          ${renderReveal(`<h3 class="section-eyebrow">${escapeHtml(vm.editorial.business_section_eyebrow)}</h3>`)}
           ${
             useLedger
               ? vm.act4_impact_rows

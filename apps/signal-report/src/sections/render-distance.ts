@@ -222,7 +222,7 @@ export function renderDistanceSection(vm: ReportViewModel): string {
               ? renderReveal(
                   `<div class="block-header">
                     <div class="row-between" style="flex-wrap:wrap;gap:12px;">
-                      <div class="section-eyebrow">${escapeHtml(race.metric_label)} race · played in real seconds</div>
+                      <h3 class="section-eyebrow">${escapeHtml(race.metric_label)} race · played in real seconds</h3>
                       <div class="mono" style="font-size:11px;color:var(--ink-mute);">${renderTerm('p75')} · ${
                         race.urban_coverage != null ? `${Math.round(race.urban_coverage)}%` : 'n/a'
                       } / ${

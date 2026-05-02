@@ -103,12 +103,12 @@ export function renderFunnelSection(vm: ReportViewModel): string {
                     <div class="figure-cap">${escapeHtml(vm.editorial.funnel_headline_figure_cap)} Threshold basis: ${escapeHtml(act3.threshold_basis)}.</div>
                   </div>`
                 )}
-                ${renderReveal(`<div class="section-eyebrow">Stage progression</div>`)}
+                ${renderReveal(`<h3 class="section-eyebrow">Stage progression</h3>`)}
                 <div class="stack stack-md">${act3.stages.map((s, i) => renderReveal(renderStageRow(s, i))).join('')}</div>
               </div>
 
               <div class="block">
-                ${renderReveal(`<div class="section-eyebrow">Per-stage detail</div>`)}
+                ${renderReveal(`<h3 class="section-eyebrow">Per-stage detail</h3>`)}
                 <div class="grid-3">
                   ${act3.stages.map((s, i) => renderReveal(renderStageDetail(s, i), { as: 'card', delay: i * 80 })).join('')}
                 </div>
