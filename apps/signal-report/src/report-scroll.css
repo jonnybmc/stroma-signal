@@ -221,6 +221,13 @@ body { overflow-y: auto; overflow-x: hidden; }
   transform: scaleX(0);
   transition: transform 80ms linear;
 }
+@media (prefers-reduced-motion: reduce) {
+  .scroll-progress-fill { transition: none; }
+}
+.hero-value-num,
+.hero-value-unit {
+  font-variant-numeric: tabular-nums;
+}
 
 /* — reveal: fade + lift on view — */
 [data-reveal] {
