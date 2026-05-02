@@ -94,6 +94,10 @@ function deviceCriteriaFor(key: string): string {
   }
 }
 
+function composeRowValue(value: string, note: string | null): string {
+  return note ? `${escapeHtml(value)} <span class="row-note">· ${escapeHtml(note)}</span>` : escapeHtml(value);
+}
+
 function renderPersonaCard(persona: ReportPersonaProfile, accentVar: string): string {
   if (persona.is_empty) {
     return `
@@ -106,11 +110,13 @@ function renderPersonaCard(persona: ReportPersonaProfile, accentVar: string): st
 
   const rows: Array<[string, string]> = [
     ['Network', `${escapeHtml(persona.network_tier)} · ${escapeHtml(persona.network_criteria)}`],
-    persona.effective_type ? ['Connection class', escapeHtml(persona.effective_type)] : null,
-    persona.downlink_label ? ['Bandwidth', escapeHtml(persona.downlink_label)] : null,
-    persona.rtt_label ? ['Round-trip', escapeHtml(persona.rtt_label)] : null,
-    ['CPU', escapeHtml(persona.cores_label)],
-    ['Memory', escapeHtml(persona.memory_label)],
+    persona.effective_type
+      ? ['Connection class', composeRowValue(persona.effective_type, persona.effective_type_note)]
+      : null,
+    persona.downlink_label ? ['Bandwidth', composeRowValue(persona.downlink_label, persona.downlink_note)] : null,
+    persona.rtt_label ? ['Round-trip', composeRowValue(persona.rtt_label, persona.rtt_note)] : null,
+    ['CPU', composeRowValue(persona.cores_label, persona.cores_note)],
+    ['Memory', composeRowValue(persona.memory_label, persona.memory_note)],
     persona.browser ? ['Browser', escapeHtml(persona.browser)] : null,
     persona.save_data && persona.save_data_share > 0
       ? ['Data Saver', `${Math.round(persona.save_data_share)}% of cohort on save-data`]

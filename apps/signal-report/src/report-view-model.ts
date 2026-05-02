@@ -30,6 +30,13 @@ import {
 
 import { buildAct4ImpactRows } from './view-model/builders/act4-impact.js';
 import { bandWaitDelta, buildEditorialCopy, type ReportEditorialCopy } from './view-model/builders/editorial-copy.js';
+import {
+  bandwidthNote,
+  coresNote,
+  effectiveTypeNote,
+  memoryNote,
+  rttNote
+} from './view-model/builders/persona-paid-media-notes.js';
 
 export type {
   ReportClosingCard,
@@ -276,10 +283,15 @@ export interface ReportPersonaProfile {
   network_tier: string;
   network_criteria: string;
   effective_type: string | null;
+  effective_type_note: string | null;
   downlink_label: string | null;
+  downlink_note: string | null;
   rtt_label: string | null;
+  rtt_note: string | null;
   cores_label: string;
+  cores_note: string | null;
   memory_label: string;
+  memory_note: string | null;
   browser: string | null;
   save_data: boolean;
   // Share of sessions in this persona's tier that browse with Data Saver
@@ -1400,47 +1412,47 @@ function buildPersonaContrast(aggregate: SignalAggregateV1): ReportPersonaContra
   const hasNetworkEffectiveSignal = ns != null && histogramHasAnyObservations(ns.effective_type_hist);
   const hasEnvironmentBrowserSignal = env != null && histogramHasAnyObservations(env.browser_hist);
 
-  const bestCores = hasHardwareCoresSignal && hw ? (CORES_LABEL[dominantBucket(hw.cores_hist, '4')] ?? '—') : '—';
-  const bestMemory =
-    hasHardwareMemorySignal && hw ? (MEMORY_LABEL[dominantBucket(hw.memory_gb_hist, 'unknown')] ?? '—') : '—';
-  const bestEffective =
-    hasNetworkEffectiveSignal && ns
-      ? (EFFECTIVE_TYPE_LABEL[dominantBucket(ns.effective_type_hist, 'unknown')] ?? null)
-      : null;
-  const bestDownlink = ns?.downlink_mbps ? `${ns.downlink_mbps.p75} Mbps` : null;
-  const bestRtt = ns?.rtt_ms ? `${ns.rtt_ms.p25} ms` : null;
+  const bestCoresKey = hasHardwareCoresSignal && hw ? dominantBucket(hw.cores_hist, '4') : null;
+  const bestCores = bestCoresKey ? (CORES_LABEL[bestCoresKey] ?? '—') : '—';
+  const bestMemoryKey = hasHardwareMemorySignal && hw ? dominantBucket(hw.memory_gb_hist, 'unknown') : null;
+  const bestMemory = bestMemoryKey ? (MEMORY_LABEL[bestMemoryKey] ?? '—') : '—';
+  const bestEffectiveKey = hasNetworkEffectiveSignal && ns ? dominantBucket(ns.effective_type_hist, 'unknown') : null;
+  const bestEffective = bestEffectiveKey ? (EFFECTIVE_TYPE_LABEL[bestEffectiveKey] ?? null) : null;
+  const bestDownlinkMbps = ns?.downlink_mbps ? ns.downlink_mbps.p75 : null;
+  const bestDownlink = bestDownlinkMbps != null ? `${bestDownlinkMbps} Mbps` : null;
+  const bestRttMs = ns?.rtt_ms ? ns.rtt_ms.p25 : null;
+  const bestRtt = bestRttMs != null ? `${bestRttMs} ms` : null;
   const bestBrowser = hasEnvironmentBrowserSignal && env ? dominantBucket(env.browser_hist, 'other') : null;
 
-  const constrainedCores =
+  const constrainedCoresKey =
     hasHardwareCoresSignal && hw
-      ? (CORES_LABEL[
-          hw.cores_hist['1'] + hw.cores_hist['2'] > 0
-            ? hw.cores_hist['1'] >= hw.cores_hist['2']
-              ? '1'
-              : '2'
-            : dominantBucket(hw.cores_hist, '2')
-        ] ?? '—')
-      : '—';
-  const constrainedMemory =
-    hasHardwareMemorySignal && hw
-      ? (MEMORY_LABEL[
-          hw.memory_gb_hist['0_5'] + hw.memory_gb_hist['1'] + hw.memory_gb_hist['2'] > 0
-            ? '2'
-            : dominantBucket(hw.memory_gb_hist, 'unknown')
-        ] ?? '—')
-      : '—';
-  const constrainedEffective =
-    hasNetworkEffectiveSignal && ns
-      ? (EFFECTIVE_TYPE_LABEL[
-          ns.effective_type_hist['3g'] + ns.effective_type_hist['2g'] + ns.effective_type_hist.slow_2g > 0
-            ? ns.effective_type_hist['3g'] > 0
-              ? '3g'
-              : '2g'
-            : dominantBucket(ns.effective_type_hist, 'unknown')
-        ] ?? null)
+      ? hw.cores_hist['1'] + hw.cores_hist['2'] > 0
+        ? hw.cores_hist['1'] >= hw.cores_hist['2']
+          ? '1'
+          : '2'
+        : dominantBucket(hw.cores_hist, '2')
       : null;
-  const constrainedDownlink = ns?.downlink_mbps ? `${ns.downlink_mbps.p25} Mbps` : null;
-  const constrainedRtt = ns?.rtt_ms ? `${ns.rtt_ms.p75} ms` : null;
+  const constrainedCores = constrainedCoresKey ? (CORES_LABEL[constrainedCoresKey] ?? '—') : '—';
+  const constrainedMemoryKey =
+    hasHardwareMemorySignal && hw
+      ? hw.memory_gb_hist['0_5'] + hw.memory_gb_hist['1'] + hw.memory_gb_hist['2'] > 0
+        ? '2'
+        : dominantBucket(hw.memory_gb_hist, 'unknown')
+      : null;
+  const constrainedMemory = constrainedMemoryKey ? (MEMORY_LABEL[constrainedMemoryKey] ?? '—') : '—';
+  const constrainedEffectiveKey =
+    hasNetworkEffectiveSignal && ns
+      ? ns.effective_type_hist['3g'] + ns.effective_type_hist['2g'] + ns.effective_type_hist.slow_2g > 0
+        ? ns.effective_type_hist['3g'] > 0
+          ? '3g'
+          : '2g'
+        : dominantBucket(ns.effective_type_hist, 'unknown')
+      : null;
+  const constrainedEffective = constrainedEffectiveKey ? (EFFECTIVE_TYPE_LABEL[constrainedEffectiveKey] ?? null) : null;
+  const constrainedDownlinkMbps = ns?.downlink_mbps ? ns.downlink_mbps.p25 : null;
+  const constrainedDownlink = constrainedDownlinkMbps != null ? `${constrainedDownlinkMbps} Mbps` : null;
+  const constrainedRttMs = ns?.rtt_ms ? ns.rtt_ms.p75 : null;
+  const constrainedRtt = constrainedRttMs != null ? `${constrainedRttMs} ms` : null;
 
   return {
     best: {
@@ -1450,10 +1462,15 @@ function buildPersonaContrast(aggregate: SignalAggregateV1): ReportPersonaContra
       network_tier: TIER_LABELS.urban,
       network_criteria: formatNetworkBand('urban'),
       effective_type: bestEffective !== 'Unknown' ? bestEffective : null,
+      effective_type_note: bestEffectiveKey ? effectiveTypeNote(bestEffectiveKey) : null,
       downlink_label: bestDownlink,
+      downlink_note: bandwidthNote(bestDownlinkMbps),
       rtt_label: bestRtt,
+      rtt_note: rttNote(bestRttMs),
       cores_label: bestCores,
+      cores_note: bestCoresKey ? coresNote(bestCoresKey) : null,
       memory_label: bestMemory,
+      memory_note: bestMemoryKey ? memoryNote(bestMemoryKey) : null,
       browser: bestBrowser ? bestBrowser.charAt(0).toUpperCase() + bestBrowser.slice(1) : null,
       save_data: false,
       save_data_share: 0,
@@ -1475,10 +1492,15 @@ function buildPersonaContrast(aggregate: SignalAggregateV1): ReportPersonaContra
           ? formatNetworkBand('constrained')
           : formatNetworkBand('constrained_moderate'),
       effective_type: constrainedEffective !== 'Unknown' ? constrainedEffective : null,
+      effective_type_note: constrainedEffectiveKey ? effectiveTypeNote(constrainedEffectiveKey) : null,
       downlink_label: constrainedDownlink,
+      downlink_note: bandwidthNote(constrainedDownlinkMbps),
       rtt_label: constrainedRtt,
+      rtt_note: rttNote(constrainedRttMs),
       cores_label: constrainedCores,
+      cores_note: constrainedCoresKey ? coresNote(constrainedCoresKey) : null,
       memory_label: constrainedMemory,
+      memory_note: constrainedMemoryKey ? memoryNote(constrainedMemoryKey) : null,
       browser: bestBrowser ? bestBrowser.charAt(0).toUpperCase() + bestBrowser.slice(1) : null,
       save_data: (ns?.save_data_share ?? 0) > 0,
       save_data_share: ns?.save_data_share ?? 0,

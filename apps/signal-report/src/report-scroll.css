@@ -1164,3 +1164,7 @@ body { overflow-y: auto; overflow-x: hidden; }
   justify-content: space-between;
   align-items: center;
 }
+.row-note {
+  color: var(--ink-mute);
+  font-weight: 400;
+}
