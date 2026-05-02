@@ -77,10 +77,6 @@ export function renderCoverSection(vm: ReportViewModel): string {
               delay: 360
             })}
           </div>
-          <div class="scroll-cue">
-            <span class="scroll-cue-line"></span>
-            <span>scroll</span>
-          </div>
         </div>
 
         <div class="block" style="gap:var(--stack-md);">

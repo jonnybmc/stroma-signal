@@ -31,9 +31,8 @@ function renderTopNav(viewModel: ReportViewModel): string {
 
   return `
     <nav class="scroll-nav" aria-label="Sections">
-      <a href="#cover" data-spy-link="cover" class="scroll-nav-brand">
+      <a href="#cover" data-spy-link="cover" class="scroll-nav-brand" aria-label="Signal — return to cover">
         <img class="scroll-nav-brand-logo" src="${REPORT_BRAND.wordmarkUrl}" alt="${escapeHtml(REPORT_BRAND.alt)}" />
-        <span class="brand-mute">${escapeHtml(viewModel.domain)}</span>
       </a>
       <div class="scroll-nav-toc">${items}</div>
     </nav>
