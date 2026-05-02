@@ -2,10 +2,20 @@
 // Network spread table, device spread table, persona-pair (best vs
 // constrained), form-factor triplet.
 
+import {
+  formatDeviceSignature,
+  formatNetworkBand,
+  type SignalDeviceTier,
+  type SignalNetworkTier
+} from '@stroma-labs/signal-contracts';
+
 import { renderHeroValue, renderReveal } from '../render-helpers.js';
 import { escapeHtml } from '../render-utils.js';
 import { renderIcon } from '../report-icons.js';
 import type { ReportPersonaProfile, ReportViewModel } from '../report-view-model.js';
+
+const NETWORK_TIER_KEYS: ReadonlySet<string> = new Set(['urban', 'moderate', 'constrained_moderate', 'constrained']);
+const DEVICE_TIER_KEYS: ReadonlySet<string> = new Set(['high', 'mid', 'low']);
 
 const TIER_COLOR_VAR: Record<string, string> = {
   urban: 'var(--tier-urban)',
@@ -42,18 +52,8 @@ function renderTierTable(vm: ReportViewModel): string {
 }
 
 function criteriaForTier(key: string): string {
-  switch (key) {
-    case 'urban':
-      return '< 50ms TCP';
-    case 'moderate':
-      return '50–150ms TCP';
-    case 'constrained_moderate':
-      return '150–400ms TCP';
-    case 'constrained':
-      return '≥ 400ms TCP';
-    default:
-      return 'Not classifiable';
-  }
+  if (NETWORK_TIER_KEYS.has(key)) return formatNetworkBand(key as SignalNetworkTier);
+  return 'Not classifiable';
 }
 
 function renderDeviceTable(vm: ReportViewModel): string {
@@ -82,16 +82,8 @@ function renderDeviceTable(vm: ReportViewModel): string {
 }
 
 function deviceCriteriaFor(key: string): string {
-  switch (key) {
-    case 'high':
-      return '6+ cores · 4+ GB · 1280px+';
-    case 'mid':
-      return '4–6 cores · 2–4 GB · 768px+';
-    case 'low':
-      return '≤ 2 cores · ≤ 1 GB · < 768px';
-    default:
-      return '';
-  }
+  if (DEVICE_TIER_KEYS.has(key)) return formatDeviceSignature(key as SignalDeviceTier);
+  return '';
 }
 
 function composeRowValue(value: string, note: string | null): string {
