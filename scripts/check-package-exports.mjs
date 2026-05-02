@@ -46,3 +46,31 @@ assert.equal(
   'function',
   'Expected summary subpath to export formatSignalSummary()'
 );
+
+// CLI bin presence + executability + shebang preservation + signal-contracts
+// bundling guard. The bin is part of the public surface; if any of these
+// invariants regress, npm bin will silently fail on some installers OR the
+// published artifact will reference a workspace-private package that the
+// consumer never has installed.
+assert.equal(packageJson.bin?.signal, './dist/cli.mjs', 'Expected packageJson.bin.signal to point at ./dist/cli.mjs');
+const cliPath = path.join(packageDir, packageJson.bin.signal);
+assert.ok(fs.existsSync(cliPath), `Missing built CLI bin: ${cliPath}`);
+const cliSource = fs.readFileSync(cliPath, 'utf8');
+assert.ok(
+  cliSource.startsWith('#!/usr/bin/env node'),
+  'CLI bin must start with #!/usr/bin/env node — npm bin silently fails on some installers without it'
+);
+assert.ok(
+  !/from\s+['"]@stroma-labs\/signal-contracts/.test(cliSource),
+  'CLI bin must NOT import @stroma-labs/signal-contracts at runtime — it must be bundled inline (workspace-private package)'
+);
+const cliStat = fs.statSync(cliPath);
+// 0o100 mask checks the owner-execute bit. On Windows the executable bit
+// concept doesn't apply the same way, but the npm shim handles invocation
+// via the bin field directly. Skip the chmod assertion on win32.
+if (process.platform !== 'win32') {
+  assert.ok(
+    (cliStat.mode & 0o100) !== 0,
+    `CLI bin must have owner-execute bit set (chmod +x). Current mode: ${cliStat.mode.toString(8)}`
+  );
+}
