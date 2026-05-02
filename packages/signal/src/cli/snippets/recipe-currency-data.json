@@ -1,0 +1,92 @@
+{
+  "$schema_version": 1,
+  "comment": "Per-recipe currency metadata. Consumed by packages/signal/src/cli/snippets/matrix.ts at build time. Updated by the quarterly sweep documented in docs/internal/recipe-currency-sweep.md. Each recipe entry must be re-verified by an actual WebFetch of upstream_doc_url at sweep time — do NOT trust this file's snapshot for sweep audits.",
+  "last_full_sweep_at": "2026-05-03",
+  "next_sweep_due": "2026-08-03",
+  "recipes": {
+    "next-app-router": {
+      "verified_against_version": "next@16.2",
+      "last_verified_at": "2026-05-03",
+      "upstream_doc_url": "https://nextjs.org/docs/app/getting-started/server-and-client-components",
+      "canonical_pattern": "Client Component with 'use client' directive, rendered as child boundary inside Server Layout. NOT a side-effect import from layout.tsx — the canonical pattern composes Client Components into Server Components, not via side effects.",
+      "notes": "Next 16 ships React 19 canary; 'use client' directive unchanged. Min Node 20.9 (informational warning to user when detected Next ≥ 16)."
+    },
+    "next-pages-router": {
+      "verified_against_version": "next@16.2",
+      "last_verified_at": "2026-05-03",
+      "upstream_doc_url": "https://nextjs.org/docs/pages",
+      "canonical_pattern": "Side-effect import from pages/_app.tsx into a guarded module that checks typeof window !== 'undefined'.",
+      "notes": "Pages Router still maintained in Next 16 but App Router is the default for create-next-app."
+    },
+    "react-router-v7": {
+      "verified_against_version": "react-router@7.14",
+      "last_verified_at": "2026-05-03",
+      "upstream_doc_url": "https://reactrouter.com/start/framework/route-module",
+      "canonical_pattern": "entry.client.tsx is the framework-conventions browser entry. Initialize browser-only libs there before/around hydrateRoot.",
+      "notes": "React Router v7 framework mode (formerly Remix). Distinct project from Remix v2 — separate detection by react-router@>=7.0.0 dep + (react-router.config.ts | app/entry.client.tsx) presence."
+    },
+    "remix-v2": {
+      "verified_against_version": "remix@2 (legacy)",
+      "last_verified_at": "2026-05-03",
+      "upstream_doc_url": "https://v2.remix.run/docs/file-conventions/entry.client",
+      "canonical_pattern": "entry.client.tsx (exposed via `npx remix reveal` if not present). startTransition + hydrateRoot is the foundation; browser-only init goes in this file.",
+      "notes": "Standalone Remix v2 product still maintained alongside React Router v7. Separate detection by @remix-run/* deps."
+    },
+    "nuxt": {
+      "verified_against_version": "nuxt@4",
+      "last_verified_at": "2026-05-03",
+      "upstream_doc_url": "https://nuxt.com/docs/guide/directory-structure/plugins",
+      "canonical_pattern": "plugins/<name>.client.ts file. The .client suffix isolates browser-only init from SSR.",
+      "notes": "Pattern unchanged from Nuxt 3."
+    },
+    "sveltekit": {
+      "verified_against_version": "sveltekit@2 + svelte@5",
+      "last_verified_at": "2026-05-03",
+      "upstream_doc_url": "https://svelte.dev/docs/svelte/v5-migration-guide",
+      "canonical_pattern": "+layout.svelte using Svelte 5 runes: `let { children } = $props()`; browser-only init via $effect (does NOT run on server) OR the `browser` import from $app/environment as a guard.",
+      "notes": "Svelte 5 runes are standard. Svelte 4 reactive syntax (let / $:) still works but is no longer the canonical recipe. Wizard generates runes-first; manual recipes-doc retains a Svelte 4 fallback note."
+    },
+    "plain-vue": {
+      "verified_against_version": "vue@3 + vite@6",
+      "last_verified_at": "2026-05-03",
+      "upstream_doc_url": "https://vuejs.org/guide/quick-start.html",
+      "canonical_pattern": "src/main.ts side-effect import before createApp(App).mount('#app').",
+      "notes": "Composition API + <script setup> still recommended; entry-file pattern unchanged."
+    },
+    "plain-svelte": {
+      "verified_against_version": "svelte@5",
+      "last_verified_at": "2026-05-03",
+      "upstream_doc_url": "https://svelte.dev/docs/svelte/getting-started",
+      "canonical_pattern": "src/main.ts side-effect import before mount(App, { target }). Svelte 5 mount() replaces the legacy `new App({ target })` constructor pattern.",
+      "notes": "For Vite-scaffolded projects without SvelteKit. Svelte 5 mount API is the runes-mode entry point."
+    },
+    "plain-react": {
+      "verified_against_version": "react@19 + vite@6",
+      "last_verified_at": "2026-05-03",
+      "upstream_doc_url": "https://vite.dev/guide/",
+      "canonical_pattern": "src/main.tsx side-effect import before createRoot(...).render(<App />).",
+      "notes": "Pre-existing pattern; no SSR concerns. Works for Vite, CRA (legacy), Parcel."
+    },
+    "angular-standalone": {
+      "verified_against_version": "angular@21",
+      "last_verified_at": "2026-05-03",
+      "upstream_doc_url": "https://angular.dev/api/platform-browser/bootstrapApplication",
+      "canonical_pattern": "main.ts: bootstrapApplication(AppComponent) from @angular/platform-browser. Side-effect import a signal-init module before the bootstrapApplication call. AppComponent must be standalone.",
+      "notes": "Standalone is default since Angular v17; v21 retains this. NgModule still works but ngmodule is the legacy fallback in our matrix."
+    },
+    "angular-ngmodule": {
+      "verified_against_version": "angular@21 (legacy NgModule path)",
+      "last_verified_at": "2026-05-03",
+      "upstream_doc_url": "https://angular.dev/reference/migrations/standalone",
+      "canonical_pattern": "main.ts: platformBrowserDynamic().bootstrapModule(AppModule). Side-effect import a signal-init module before the bootstrapModule call.",
+      "notes": "Maintained for legacy Angular projects pre-standalone migration. Wizard surfaces a soft note suggesting the standalone migration when this pattern is detected."
+    },
+    "vanilla": {
+      "verified_against_version": "html@*",
+      "last_verified_at": "2026-05-03",
+      "upstream_doc_url": "https://developer.mozilla.org/en-US/docs/Web/HTML/Element/script",
+      "canonical_pattern": "<script type=\"module\"> tag in HTML, or import from main.js entry. No SSR concerns.",
+      "notes": "Stable forever. Spot-check at sweep time only."
+    }
+  }
+}
