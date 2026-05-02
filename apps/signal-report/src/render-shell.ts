@@ -33,7 +33,6 @@ function renderTopNav(viewModel: ReportViewModel): string {
     <nav class="scroll-nav" aria-label="Sections">
       <a href="#cover" data-spy-link="cover" class="scroll-nav-brand">
         <img class="scroll-nav-brand-logo" src="${REPORT_BRAND.wordmarkUrl}" alt="${escapeHtml(REPORT_BRAND.alt)}" />
-        <span>/ r /</span>
         <span class="brand-mute">${escapeHtml(viewModel.domain)}</span>
       </a>
       <div class="scroll-nav-toc">${items}</div>
@@ -48,8 +47,7 @@ function renderFooter(viewModel: ReportViewModel): string {
   return `
     <footer class="scroll-footer">
       <img class="scroll-footer-logo" src="${REPORT_BRAND.wordmarkUrl}" alt="${escapeHtml(REPORT_BRAND.alt)}" />
-      <div>signal · r · ${escapeHtml(viewModel.domain)}</div>
-      <div>generated ${escapeHtml(generated)} · ${viewModel.sample_size} sessions · ${viewModel.period_days} day window</div>
+      <div class="scroll-footer-meta">generated ${escapeHtml(generated)} · ${viewModel.sample_size} sessions · ${viewModel.period_days} day window</div>
       <button class="scroll-footer-copy" data-role="share-copy" data-default-label="copy link" type="button">copy link</button>
     </footer>
   `.trim();

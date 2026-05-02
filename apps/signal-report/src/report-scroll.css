@@ -1124,16 +1124,33 @@ body { overflow-y: auto; overflow-x: hidden; }
   font-size: 11px;
   letter-spacing: 0.06em;
   color: var(--ink-mute);
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   gap: 24px;
-  justify-content: space-between;
   align-items: center;
 }
 .scroll-footer-logo {
   height: 22px;
   width: auto;
   display: block;
+  justify-self: start;
+}
+.scroll-footer-meta {
+  justify-self: center;
+  text-align: center;
+}
+.scroll-footer-copy {
+  justify-self: end;
+}
+@media (max-width: 640px) {
+  .scroll-footer {
+    grid-template-columns: 1fr;
+    justify-items: center;
+  }
+  .scroll-footer-logo,
+  .scroll-footer-copy {
+    justify-self: center;
+  }
 }
 .scroll-footer-copy {
   font-family: inherit;
