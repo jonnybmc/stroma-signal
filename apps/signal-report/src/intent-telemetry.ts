@@ -124,10 +124,26 @@ function basePayload(
   };
 }
 
-function flipCardToConfirmation(card: HTMLElement, message = '✓ noted — we will let you know when it is ready'): void {
+function flipCardToConfirmation(card: HTMLElement, message: string): void {
   card.dataset['state'] = 'logged';
   const text = card.querySelector<HTMLElement>('[data-closing-confirmation-text]');
   if (text) text.textContent = message;
+}
+
+/** Pick the initial confirmation message for a given card. Honesty
+ * discipline: state ONLY what was actually captured at this moment —
+ * never reference future communication or imply something is pending.
+ * - cta_href card (Rapid Fix): "opening the booking page" because that's
+ *   exactly what happens next
+ * - email-collecting card BEFORE follow-up submit: anonymous interest
+ *   was logged. No contact captured. The followup form below speaks for
+ *   itself; the outer message must not imply we have anything to act on.
+ * - cta_href === null + collects nothing: bare acknowledgment */
+function pickInitialConfirmation(state: CardState): string {
+  if (state.ctaHref) {
+    return '✓ noted — opening the booking page';
+  }
+  return '✓ interest noted';
 }
 
 function attachCardClickHandlers(ctx: ResolvedReportContext): void {
@@ -151,7 +167,7 @@ function attachCardClickHandlers(ctx: ResolvedReportContext): void {
       if (state.ctaHref) {
         // External redirect — let the link's default navigation happen.
         // sendBeacon has already queued the payload; navigation is safe.
-        flipCardToConfirmation(card, '✓ noted — opening the booking page');
+        flipCardToConfirmation(card, pickInitialConfirmation(state));
         // Do NOT preventDefault — the <a> handles the redirect.
         return;
       }
@@ -159,7 +175,7 @@ function attachCardClickHandlers(ctx: ResolvedReportContext): void {
       // In-place capture — no redirect. Prevent default in case the CTA
       // is a <button> inside a <form> or similar.
       e.preventDefault();
-      flipCardToConfirmation(card);
+      flipCardToConfirmation(card, pickInitialConfirmation(state));
 
       // Wire the follow-up Send button (only present when the card
       // collects email or cadence).
@@ -201,13 +217,18 @@ function attachFollowupSend(card: HTMLElement, ctx: ResolvedReportContext, state
 
     sendIntent(followup);
 
-    // Replace the followup form with a quiet confirmation.
-    const followupBlock = card.querySelector<HTMLElement>('[data-closing-followup]');
-    if (followupBlock) {
-      followupBlock.innerHTML = `<p class="closing-card-confirmation-text">${
-        intent_email ? '✓ email saved — we will be in touch when it ships' : '✓ noted'
-      }</p>`;
+    // Update the OUTER confirmation text to reflect ONLY what was
+    // captured — promise email follow-up only when an email was given;
+    // otherwise stay in observation register. Remove the followup form
+    // so the card lands in a single quiet state.
+    const outerText = card.querySelector<HTMLElement>('[data-closing-confirmation-text]');
+    if (outerText) {
+      outerText.textContent = intent_email
+        ? '✓ email saved — we will let you know when it ships'
+        : '✓ preference noted';
     }
+    const followupBlock = card.querySelector<HTMLElement>('[data-closing-followup]');
+    if (followupBlock) followupBlock.remove();
   });
 }
 
