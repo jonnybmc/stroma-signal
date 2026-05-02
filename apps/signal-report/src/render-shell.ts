@@ -49,6 +49,7 @@ function renderFooter(viewModel: ReportViewModel): string {
       <div>signal · r · ${escapeHtml(viewModel.domain)}</div>
       <div>generated ${escapeHtml(generated)} · ${viewModel.sample_size} sessions · ${viewModel.period_days} day window</div>
       <div>stroma · post-click telemetry</div>
+      <button class="scroll-footer-copy" data-role="share-copy" data-default-label="copy link" type="button">copy link</button>
     </footer>
   `.trim();
 }

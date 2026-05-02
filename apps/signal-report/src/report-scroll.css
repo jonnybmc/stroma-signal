@@ -1130,6 +1130,32 @@ body { overflow-y: auto; overflow-x: hidden; }
   flex-wrap: wrap;
   gap: 24px;
   justify-content: space-between;
+  align-items: center;
+}
+.scroll-footer-copy {
+  font-family: inherit;
+  font-size: inherit;
+  letter-spacing: inherit;
+  color: var(--ink-mute);
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: var(--line-strong);
+  text-underline-offset: 3px;
+  transition: color 120ms ease, text-decoration-color 120ms ease;
+}
+.scroll-footer-copy:hover,
+.scroll-footer-copy:focus-visible {
+  color: var(--accent);
+  text-decoration-color: currentColor;
+  outline: none;
+}
+.scroll-footer-copy[data-copied="true"] {
+  color: var(--ink-soft);
+  text-decoration: none;
+  cursor: default;
 }
 
 /* — utility — */

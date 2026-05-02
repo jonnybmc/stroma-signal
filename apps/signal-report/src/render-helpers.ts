@@ -299,6 +299,26 @@ export function bootSmoothAnchors(): void {
 
 // ─── One-shot boot for the whole report ────────────────────────────────
 
+export function bootShareCopy(): void {
+  const btn = document.querySelector<HTMLButtonElement>('[data-role="share-copy"]');
+  if (!btn) return;
+  const defaultLabel = btn.dataset['defaultLabel'] ?? btn.textContent ?? 'copy link';
+  let revertTimer: ReturnType<typeof setTimeout> | null = null;
+  btn.addEventListener('click', () => {
+    if (!navigator.clipboard?.writeText) return;
+    void navigator.clipboard.writeText(window.location.href).then(() => {
+      btn.textContent = '✓ copied';
+      btn.setAttribute('data-copied', 'true');
+      if (revertTimer) clearTimeout(revertTimer);
+      revertTimer = setTimeout(() => {
+        btn.textContent = defaultLabel;
+        btn.removeAttribute('data-copied');
+        revertTimer = null;
+      }, 2000);
+    });
+  });
+}
+
 export function bootReport(sectionIds: string[]): void {
   bootRevealObserver();
   bootCounterTweens();
@@ -306,6 +326,7 @@ export function bootReport(sectionIds: string[]): void {
   bootScrollSpy(sectionIds);
   bootReadingProgress();
   bootSmoothAnchors();
+  bootShareCopy();
   // Imported lazily so the intent-telemetry module isn't pulled into
   // contexts that boot the report without a closing section (e.g.
   // builder snapshots). Runtime-side, the dynamic import is hoisted by
