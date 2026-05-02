@@ -10,6 +10,7 @@ import type {
   SignalLoafCause,
   SignalVitals,
   SignalVitalsLoaf,
+  SignalVitalsNavigationTiming,
   SignalVitalsThirdParty
 } from '@stroma-labs/signal-contracts';
 
@@ -234,6 +235,176 @@ function inferInteractionType(name: string | undefined): SignalInteractionType |
 function roundPositive(value: number | undefined): number | null {
   if (value == null || !Number.isFinite(value)) return null;
   return Math.max(0, Math.round(value));
+}
+
+// Duration guardrail. Returns null on any of:
+//   - non-finite start or end (null / undefined / NaN / Infinity / -Infinity)
+//   - end < start (clock-skew or measurement-order pathology)
+//   - start === 0 unless `allowZeroStart: true` (a 0 start usually
+//     means "this phase didn't happen"; opt-in for cases like
+//     `nav_ttfb_ms = responseStart - startTime` where startTime is
+//     legitimately the 0 baseline)
+// Returns Math.round(end - start) otherwise. Use everywhere across
+// derive helpers so negative / NaN / order bugs cannot escape.
+export function duration(
+  start: number | undefined,
+  end: number | undefined,
+  opts: { allowZeroStart?: boolean } = {}
+): number | null {
+  if (start == null || end == null) return null;
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return null;
+  if (!opts.allowZeroStart && start === 0) return null;
+  if (end < start) return null;
+  return Math.round(end - start);
+}
+
+// Local extended DOM type. PerformanceNavigationTiming in lib.dom.d.ts
+// may lag for `firstInterimResponseStart`, `finalResponseHeadersStart`,
+// `deliveryType`, `responseStatus`, `contentEncoding`, `decodedBodySize`
+// in 2026 environments. Read them through this typed extension so the
+// access stays type-safe without forcing a `lib.dom.d.ts` upgrade.
+type ExtendedNavigationTiming = PerformanceNavigationTiming & {
+  firstInterimResponseStart?: number;
+  finalResponseHeadersStart?: number;
+  deliveryType?: string;
+  responseStatus?: number;
+  contentEncoding?: string;
+  // activationStart is in the spec but lib.dom.d.ts may lag; declare
+  // here to keep access type-safe across TS versions.
+  activationStart?: number;
+};
+
+function readNumberField(value: number | undefined): number | null {
+  if (value == null || !Number.isFinite(value)) return null;
+  return value;
+}
+
+function readStringField(value: string | undefined): string | null {
+  if (typeof value !== 'string' || value.length === 0) return null;
+  return value;
+}
+
+// Derives the navigation_timing block. Returns null only when the
+// PerformanceNavigationTiming entry itself is missing — within the
+// block, each subpart is independently null/0 per its own input
+// availability (different from lcp_breakdown's strict all-or-nothing).
+export function deriveNavigationTiming(
+  navigation: PerformanceNavigationTiming | null
+): SignalVitalsNavigationTiming | null {
+  if (!navigation) return null;
+  const entry = navigation as ExtendedNavigationTiming;
+
+  // Anchor timestamps (relative to nav startTime, ms).
+  const firstInterimResponseStartRaw = readNumberField(entry.firstInterimResponseStart);
+  const finalResponseHeadersStartRaw = readNumberField(entry.finalResponseHeadersStart);
+  const first_interim_response_start_ms =
+    firstInterimResponseStartRaw != null && firstInterimResponseStartRaw > 0
+      ? Math.round(firstInterimResponseStartRaw)
+      : null;
+  const final_response_headers_start_ms =
+    finalResponseHeadersStartRaw != null && finalResponseHeadersStartRaw > 0
+      ? Math.round(finalResponseHeadersStartRaw)
+      : null;
+
+  // Subpart durations. `duration()` enforces null-vs-zero,
+  // negative-rejection, and finite-input guards.
+  const dns_ms = duration(entry.domainLookupStart, entry.domainLookupEnd);
+  const tcp_ms =
+    entry.connectStart != null && entry.connectEnd != null && entry.connectEnd > entry.connectStart
+      ? duration(entry.connectStart, entry.connectEnd)
+      : null;
+  const tls_ms =
+    entry.secureConnectionStart != null &&
+    entry.secureConnectionStart > 0 &&
+    entry.secureConnectionStart !== entry.connectStart
+      ? duration(entry.secureConnectionStart, entry.connectEnd)
+      : null;
+  const redirect_ms = duration(entry.redirectStart, entry.redirectEnd, { allowZeroStart: true });
+  const service_worker_ms =
+    entry.workerStart != null && entry.workerStart > 0 ? duration(entry.workerStart, entry.fetchStart) : null;
+  const request_to_first_byte_ms = duration(entry.requestStart, entry.responseStart);
+  const request_to_final_headers_ms =
+    finalResponseHeadersStartRaw != null && finalResponseHeadersStartRaw > 0
+      ? duration(entry.requestStart, finalResponseHeadersStartRaw)
+      : null;
+  const response_download_ms = duration(entry.responseStart, entry.responseEnd);
+  const interim_to_final_response_ms =
+    firstInterimResponseStartRaw != null &&
+    firstInterimResponseStartRaw > 0 &&
+    finalResponseHeadersStartRaw != null &&
+    finalResponseHeadersStartRaw > 0
+      ? duration(firstInterimResponseStartRaw, finalResponseHeadersStartRaw)
+      : null;
+
+  // Three TTFB definitions.
+  const nav_ttfb_ms = duration(entry.startTime, entry.responseStart, { allowZeroStart: true });
+  const connection_ttfb_ms = duration(entry.domainLookupStart, entry.responseStart);
+  // Activation-adjusted TTFB clamped to >= 0. responseStart can precede
+  // activationStart on prerender (response cached before user activated).
+  const activationStart = readNumberField(entry.activationStart);
+  const activation_adjusted_ttfb_ms =
+    activationStart != null && activationStart > 0 && Number.isFinite(entry.responseStart)
+      ? Math.max(0, Math.round(entry.responseStart - activationStart))
+      : null;
+
+  // Protocol + payload metadata.
+  const next_hop_protocol = readStringField(entry.nextHopProtocol);
+  const transfer_size = readNumberField(entry.transferSize);
+  const encoded_body_size = readNumberField(entry.encodedBodySize);
+  const decoded_body_size = readNumberField(entry.decodedBodySize);
+  const content_encoding = readStringField(entry.contentEncoding);
+
+  // Provenance flags. Each is true / false / null per the discipline:
+  // null only when the underlying signal is itself unavailable.
+  const early_hints_present =
+    firstInterimResponseStartRaw != null
+      ? firstInterimResponseStartRaw > 0
+      : finalResponseHeadersStartRaw != null
+        ? false
+        : null;
+  const activation_adjusted = activationStart != null ? activationStart > 0 : null;
+  // Suspected redaction: multiple fields zero in a pattern consistent
+  // with TAO masking. Single-zero heuristics are unsafe.
+  const responseStartIsZero = entry.responseStart === 0;
+  const requestStartIsZero = entry.requestStart === 0;
+  const transferSizeIsZero = entry.transferSize === 0;
+  const timing_redacted_suspected =
+    responseStartIsZero && requestStartIsZero && transferSizeIsZero
+      ? true
+      : entry.responseStart != null && entry.requestStart != null
+        ? false
+        : null;
+  const delivery_type = readStringField(entry.deliveryType);
+  const response_status = readNumberField(entry.responseStatus);
+
+  return {
+    dns_ms,
+    tcp_ms,
+    tls_ms,
+    redirect_ms,
+    service_worker_ms,
+    request_to_first_byte_ms,
+    request_to_final_headers_ms,
+    response_download_ms,
+    interim_to_final_response_ms,
+    nav_ttfb_ms,
+    connection_ttfb_ms,
+    activation_adjusted_ttfb_ms,
+    first_interim_response_start_ms,
+    final_response_headers_start_ms,
+    next_hop_protocol,
+    transfer_size,
+    encoded_body_size,
+    decoded_body_size,
+    content_encoding,
+    provenance: {
+      early_hints_present,
+      activation_adjusted,
+      timing_redacted_suspected,
+      delivery_type,
+      response_status
+    }
+  };
 }
 
 function classifyLcpCulprit(

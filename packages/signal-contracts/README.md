@@ -28,7 +28,10 @@ Splitting the contract from the SDK gives:
 ## What ships
 
 - `src/types.ts` — `SignalEventV1`, `SignalAggregateV1`, network/device tier
-  unions, threshold constants.
+  unions, threshold constants. Includes the `SignalVitalsNavigationTiming`
+  decomposition (DNS / TCP / TLS / request / response / redirect / SW
+  subparts + three named TTFB definitions + protocol/payload + provenance)
+  and its companion `SignalNavigationTimingStory` aggregate block.
 - `src/guards.ts` — `explainSignalAggregateIssues` and the type guards used by
   the `/build` validator.
 - `src/report-codec.ts` — `encodeSignalReportUrl` / `decodeSignalReportUrl`

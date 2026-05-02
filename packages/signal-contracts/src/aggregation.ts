@@ -4,15 +4,18 @@ import {
   createInpStoryAccumulator,
   createLcpStoryAccumulator,
   createLoafStoryAccumulator,
+  createNavigationTimingStoryAccumulator,
   createThirdPartyStoryAccumulator,
   finalizeContextStory,
   finalizeInpStory,
   finalizeLcpStory,
   finalizeLoafStory,
+  finalizeNavigationTimingStory,
   finalizeThirdPartyStory,
   ingestInpStoryEvent,
   ingestLcpStoryEvent,
   ingestLoafStoryEvent,
+  ingestNavigationTimingStoryEvent,
   ingestThirdPartyStoryEvent
 } from './stories/index.js';
 import type {
@@ -533,6 +536,7 @@ export function aggregateSignalEvents(
   const inpStoryAcc = createInpStoryAccumulator();
   const thirdPartyStoryAcc = createThirdPartyStoryAccumulator();
   const loafStoryAcc = createLoafStoryAccumulator();
+  const navTimingStoryAcc = createNavigationTimingStoryAccumulator();
 
   for (const event of reportEvents) {
     if (!hasTimestamp) {
@@ -608,6 +612,7 @@ export function aggregateSignalEvents(
     ingestInpStoryEvent(inpStoryAcc, event);
     ingestThirdPartyStoryEvent(thirdPartyStoryAcc, event);
     ingestLoafStoryEvent(loafStoryAcc, event);
+    ingestNavigationTimingStoryEvent(navTimingStoryAcc, event);
   }
 
   const classifiedSampleSize = total - networkDistribution.unknown;
@@ -752,6 +757,7 @@ export function aggregateSignalEvents(
     inp_story: finalizeInpStory(inpStoryAcc),
     third_party_story: finalizeThirdPartyStory(thirdPartyStoryAcc),
     loaf_story: finalizeLoafStory(loafStoryAcc),
+    navigation_timing_story: finalizeNavigationTimingStory(navTimingStoryAcc),
     context_story: contextStory,
     top_page_path: computeTopPagePathFromCounts(topPathCounts),
     warnings

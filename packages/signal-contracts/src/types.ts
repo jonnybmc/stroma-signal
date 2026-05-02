@@ -233,6 +233,75 @@ export interface SignalVitalsLoaf {
   script_origin_count: number | null;
 }
 
+// Navigation Timing breakdown — decomposes the full navigation into
+// named subparts (DNS / TCP / TLS / redirect / SW / request-response
+// phases) plus three TTFB definitions plus protocol/payload metadata
+// plus a provenance sub-block.
+//
+// Field discipline:
+//   null = unavailable / not exposed / not applicable
+//   0    = exposed and genuinely zero-duration (cached DNS, reused
+//          connection, no redirect — meaningful zeros)
+//
+// This differs from `lcp_breakdown` (strict all-or-nothing): nav-timing
+// subparts have legitimate independent absence (a reused connection
+// has dns_ms=null but request_to_first_byte_ms can still be measured).
+// The BLOCK is null only when no Navigation Timing entry exists.
+export interface SignalVitalsNavigationTimingProvenance {
+  // Each flag is true only when we have positive evidence; false when
+  // we have positive evidence the condition does NOT apply; null when
+  // the underlying signal is itself unavailable. Avoids encoding
+  // "absence of signal" as "absence of condition."
+  early_hints_present: boolean | null;
+  activation_adjusted: boolean | null;
+  timing_redacted_suspected: boolean | null;
+  // ResourceTiming editor's draft (e.g. 'cache', 'navigational-prefetch').
+  delivery_type: string | null;
+  // HTTP status code if exposed.
+  response_status: number | null;
+}
+
+export interface SignalVitalsNavigationTiming {
+  // Subparts. Each ms-duration uses null vs 0 discipline.
+  dns_ms: number | null;
+  tcp_ms: number | null;
+  tls_ms: number | null;
+  redirect_ms: number | null;
+  service_worker_ms: number | null;
+
+  // Request/response phase split — disambiguated names per the 2026
+  // API. responseStart can resolve to firstInterimResponseStart when
+  // a 1xx response exists; finalResponseHeadersStart is the clean
+  // anchor for "time to actual HTML response."
+  request_to_first_byte_ms: number | null;
+  request_to_final_headers_ms: number | null;
+  response_download_ms: number | null;
+  interim_to_final_response_ms: number | null;
+
+  // Three named TTFB definitions — the "TTFB doesn't mean what you
+  // think it means" central insight.
+  nav_ttfb_ms: number | null;
+  connection_ttfb_ms: number | null;
+  // Math.max(0, responseStart - activationStart) — clamped because
+  // responseStart can precede activationStart on prerender.
+  activation_adjusted_ttfb_ms: number | null;
+
+  // Raw anchor timestamps for downstream verification + future TTFB
+  // recalculation (ms relative to nav startTime).
+  first_interim_response_start_ms: number | null;
+  final_response_headers_start_ms: number | null;
+
+  // Protocol + payload — useful for h2/h3/http/1.1 cohort splits.
+  next_hop_protocol: string | null;
+  transfer_size: number | null;
+  encoded_body_size: number | null;
+  // 2026 ResourceTiming editor's draft fields (gated on availability).
+  decoded_body_size: number | null;
+  content_encoding: string | null;
+
+  provenance: SignalVitalsNavigationTimingProvenance;
+}
+
 export interface SignalVitals {
   lcp_ms: number | null;
   cls: number | null;
@@ -249,6 +318,10 @@ export interface SignalVitals {
   third_party?: SignalVitalsThirdParty | null;
   // LoAF worst-frame attribution. Chromium 123+; null otherwise.
   loaf?: SignalVitalsLoaf | null;
+  // Navigation Timing decomposition. Block is null when no
+  // PerformanceNavigationTiming entry exists; subparts are
+  // independently null/0 per their own input availability.
+  navigation_timing?: SignalVitalsNavigationTiming | null;
 }
 
 export interface SignalContext {
@@ -355,6 +428,35 @@ export interface SignalWarehouseRowV1 {
   third_party_origin_count?: number | null;
   loaf_dominant_cause?: SignalLoafCause | null;
   context_visibility_hidden_at_load?: boolean | null;
+  // Navigation Timing breakdown columns. Warehouse-only — these do
+  // NOT enter the GA4 compact subset (which is at the 24-field cap).
+  // Per-subpart null vs 0 discipline mirrors the SignalVitalsNavigationTiming
+  // interface. Optional on the type so historical warehouse rows
+  // round-trip unchanged.
+  navigation_timing_dns_ms?: number | null;
+  navigation_timing_tcp_ms?: number | null;
+  navigation_timing_tls_ms?: number | null;
+  navigation_timing_redirect_ms?: number | null;
+  navigation_timing_service_worker_ms?: number | null;
+  navigation_timing_request_to_first_byte_ms?: number | null;
+  navigation_timing_request_to_final_headers_ms?: number | null;
+  navigation_timing_response_download_ms?: number | null;
+  navigation_timing_interim_to_final_response_ms?: number | null;
+  navigation_timing_nav_ttfb_ms?: number | null;
+  navigation_timing_connection_ttfb_ms?: number | null;
+  navigation_timing_activation_adjusted_ttfb_ms?: number | null;
+  navigation_timing_first_interim_response_start_ms?: number | null;
+  navigation_timing_final_response_headers_start_ms?: number | null;
+  navigation_timing_next_hop_protocol?: string | null;
+  navigation_timing_transfer_size?: number | null;
+  navigation_timing_encoded_body_size?: number | null;
+  navigation_timing_decoded_body_size?: number | null;
+  navigation_timing_content_encoding?: string | null;
+  navigation_timing_provenance_early_hints_present?: boolean | null;
+  navigation_timing_provenance_activation_adjusted?: boolean | null;
+  navigation_timing_provenance_timing_redacted_suspected?: boolean | null;
+  navigation_timing_provenance_delivery_type?: string | null;
+  navigation_timing_provenance_response_status?: number | null;
   // Optional identity / attribution columns. Mirror the optional fields
   // on `SignalEventV1`; populated by the host site or an SDK extension
   // when warehouse-side joins to other analytics or ad-platform data
@@ -589,6 +691,63 @@ export interface SignalContextStory {
   effective_type_dominant: SignalEffectiveTypeDominant | null;
 }
 
+// Per-subpart summary used by the navigation-timing story.
+// Observation count exposed alongside quartiles per the rule that
+// quartiles without coverage will overclaim — especially load-bearing
+// for DNS/TCP/TLS because reused connections systematically remove
+// those subparts from the sample.
+export interface SignalNavigationTimingSubpartSummary {
+  observations: number;
+  p25: number | null;
+  p50: number | null;
+  p75: number | null;
+}
+
+// Subpart of nav_ttfb that carries the largest typical contribution
+// across the cohort. Computed under STRICT denominator: only events
+// where ALL of {dns, tcp, tls, request_to_first_byte, response_download,
+// redirect} are non-null contribute. Otherwise DNS-20-samples gets
+// unfairly compared to request-200-samples.
+export type SignalNavigationTimingDominantSubpart = 'dns' | 'tcp' | 'tls' | 'redirect' | 'request' | 'response';
+
+// Aggregator narrative — adds up the per-event vitals.navigation_timing
+// captures into per-subpart distributions plus a strict-denominator
+// dominant TTFB subpart, a protocol histogram, and a provenance
+// roll-up. Gated on SIGNAL_MIN_RACE_OBSERVATIONS to avoid surfacing a
+// subpart distribution from a single stray sample.
+export interface SignalNavigationTimingStory {
+  subparts: {
+    dns_ms: SignalNavigationTimingSubpartSummary;
+    tcp_ms: SignalNavigationTimingSubpartSummary;
+    tls_ms: SignalNavigationTimingSubpartSummary;
+    redirect_ms: SignalNavigationTimingSubpartSummary;
+    service_worker_ms: SignalNavigationTimingSubpartSummary;
+    request_to_first_byte_ms: SignalNavigationTimingSubpartSummary;
+    request_to_final_headers_ms: SignalNavigationTimingSubpartSummary;
+    response_download_ms: SignalNavigationTimingSubpartSummary;
+    nav_ttfb_ms: SignalNavigationTimingSubpartSummary;
+    connection_ttfb_ms: SignalNavigationTimingSubpartSummary;
+    activation_adjusted_ttfb_ms: SignalNavigationTimingSubpartSummary;
+  };
+  dominant_ttfb_subpart: SignalNavigationTimingDominantSubpart | null;
+  // Number of events that contributed to the dominance calculation
+  // (i.e. had every comparable subpart non-null). Surfaced for honesty
+  // — a dominance verdict over 18 events is not the same as one over
+  // 1,800 events.
+  dominant_ttfb_subpart_strict_observations: number;
+  next_hop_protocol_histogram: {
+    h2: number;
+    h3: number;
+    'http/1.1': number;
+    other: number;
+  };
+  provenance_roll_up: {
+    early_hints_share_pct: number;
+    activation_adjusted_share_pct: number;
+    timing_redacted_suspected_share_pct: number;
+  };
+}
+
 export interface SignalAggregateV1 {
   v: typeof SIGNAL_EVENT_VERSION;
   rv: typeof SIGNAL_REPORT_VERSION;
@@ -625,6 +784,11 @@ export interface SignalAggregateV1 {
   third_party_story?: SignalThirdPartyStory;
   loaf_story?: SignalLoafStory;
   context_story?: SignalContextStory;
+  // Navigation Timing decomposition story. Per-subpart distributions
+  // + strict-denominator dominance + protocol histogram + provenance
+  // roll-up. Optional — undefined when below SIGNAL_MIN_RACE_OBSERVATIONS
+  // events carried a SignalVitalsNavigationTiming block.
+  navigation_timing_story?: SignalNavigationTimingStory;
   top_page_path: string | null;
   warnings: string[];
 }

@@ -153,6 +153,41 @@ export function toSignalWarehouseRow(event: SignalEventV1): SignalWarehouseRowV1
     third_party_pre_lcp_script_share_pct: event.vitals.third_party?.pre_lcp_script_share_pct ?? null,
     third_party_origin_count: event.vitals.third_party?.origin_count ?? null,
     loaf_dominant_cause: event.vitals.loaf?.dominant_cause ?? null,
-    context_visibility_hidden_at_load: event.context.visibility_hidden_at_load ?? null
+    context_visibility_hidden_at_load: event.context.visibility_hidden_at_load ?? null,
+    // Navigation Timing breakdown columns. Warehouse-only — these
+    // intentionally do NOT enter `flattenSignalEventForGa4` (which is
+    // pinned at 24 fields). Each column carries `null` when the
+    // underlying subpart was unavailable, `0` when it was exposed and
+    // genuinely zero (cached DNS, reused connection, no redirect).
+    navigation_timing_dns_ms: event.vitals.navigation_timing?.dns_ms ?? null,
+    navigation_timing_tcp_ms: event.vitals.navigation_timing?.tcp_ms ?? null,
+    navigation_timing_tls_ms: event.vitals.navigation_timing?.tls_ms ?? null,
+    navigation_timing_redirect_ms: event.vitals.navigation_timing?.redirect_ms ?? null,
+    navigation_timing_service_worker_ms: event.vitals.navigation_timing?.service_worker_ms ?? null,
+    navigation_timing_request_to_first_byte_ms: event.vitals.navigation_timing?.request_to_first_byte_ms ?? null,
+    navigation_timing_request_to_final_headers_ms: event.vitals.navigation_timing?.request_to_final_headers_ms ?? null,
+    navigation_timing_response_download_ms: event.vitals.navigation_timing?.response_download_ms ?? null,
+    navigation_timing_interim_to_final_response_ms:
+      event.vitals.navigation_timing?.interim_to_final_response_ms ?? null,
+    navigation_timing_nav_ttfb_ms: event.vitals.navigation_timing?.nav_ttfb_ms ?? null,
+    navigation_timing_connection_ttfb_ms: event.vitals.navigation_timing?.connection_ttfb_ms ?? null,
+    navigation_timing_activation_adjusted_ttfb_ms: event.vitals.navigation_timing?.activation_adjusted_ttfb_ms ?? null,
+    navigation_timing_first_interim_response_start_ms:
+      event.vitals.navigation_timing?.first_interim_response_start_ms ?? null,
+    navigation_timing_final_response_headers_start_ms:
+      event.vitals.navigation_timing?.final_response_headers_start_ms ?? null,
+    navigation_timing_next_hop_protocol: event.vitals.navigation_timing?.next_hop_protocol ?? null,
+    navigation_timing_transfer_size: event.vitals.navigation_timing?.transfer_size ?? null,
+    navigation_timing_encoded_body_size: event.vitals.navigation_timing?.encoded_body_size ?? null,
+    navigation_timing_decoded_body_size: event.vitals.navigation_timing?.decoded_body_size ?? null,
+    navigation_timing_content_encoding: event.vitals.navigation_timing?.content_encoding ?? null,
+    navigation_timing_provenance_early_hints_present:
+      event.vitals.navigation_timing?.provenance.early_hints_present ?? null,
+    navigation_timing_provenance_activation_adjusted:
+      event.vitals.navigation_timing?.provenance.activation_adjusted ?? null,
+    navigation_timing_provenance_timing_redacted_suspected:
+      event.vitals.navigation_timing?.provenance.timing_redacted_suspected ?? null,
+    navigation_timing_provenance_delivery_type: event.vitals.navigation_timing?.provenance.delivery_type ?? null,
+    navigation_timing_provenance_response_status: event.vitals.navigation_timing?.provenance.response_status ?? null
   };
 }

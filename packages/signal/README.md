@@ -77,9 +77,10 @@ init({
 
 One event per page load with everything we measured:
 
-- **Network tier** — `urban`, `moderate`, `constrained_moderate`, or `constrained` based on the actual TCP handshake time, not a coarse browser label
+- **Network tier** — `urban`, `moderate`, `constrained_moderate`, or `constrained` from the TCP-handshake span exposed by Navigation Timing, when isolatable. Useful as a diagnostic slice; not a complete network-speed cohort — the richer per-subpart picture lives in `vitals.navigation_timing`.
 - **Device tier** — `low`, `mid`, or `high` from real hardware signals (CPU cores, memory, screen)
 - **Web Vitals** — LCP, INP, CLS, FCP, TTFB, plus rich attribution (which element was slow, which interaction phase dominated, which third-party scripts loaded before paint)
+- **Navigation Timing breakdown** (`vitals.navigation_timing`) — DNS, TCP, TLS, request-to-first-byte, request-to-final-headers, response-download, redirect, service-worker subparts; three named TTFB definitions (`nav_ttfb_ms`, `connection_ttfb_ms`, `activation_adjusted_ttfb_ms` clamped ≥ 0 for prerender); `next_hop_protocol` + transfer/body sizes; plus a `provenance` sub-block flagging Early Hints, prerender activation, and suspected TAO redaction. Warehouse-only — does NOT enter the GA4 lane.
 - **Long Animation Frame** story on Chromium 123+ — worst frame and dominant cause (script, layout, style, paint)
 - **Background-tab filter** — events captured while the tab was hidden are tagged so they don't poison your percentiles
 

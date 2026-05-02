@@ -23,7 +23,7 @@ Each page load produces a single JSON event with the following structure.
 
 | Field | Type | Description |
 |---|---|---|
-| `net_tier` | `'urban' \| 'moderate' \| 'constrained_moderate' \| 'constrained' \| null` | TCP-based network quality tier. Null when measurement is unavailable. |
+| `net_tier` | `'urban' \| 'moderate' \| 'constrained_moderate' \| 'constrained' \| null` | Connection-setup tier derived from the TCP-handshake span exposed by Navigation Timing, when isolatable. Null when measurement is unavailable (reused / coalesced / SW-cached / missing). It is a useful diagnostic slice; it is not a complete user-network cohort axis — see [Navigation Timing breakdown](#navigation-timing-breakdown) for the richer picture. |
 | `net_tcp_ms` | `number \| null` | Measured TCP handshake time in milliseconds. |
 | `net_tcp_source` | `string` | How TCP time was derived. See [TCP source values](#tcp-source-values). |
 
@@ -101,6 +101,65 @@ The breakdown is all-or-nothing: if any of the three inputs is missing (opaque c
 | `vitals.loaf.dominant_cause` | `'script' \| 'layout' \| 'style' \| 'paint' \| null` | Substage (argmax) most responsible for the worst frame. Null when every substage input is missing. |
 | `vitals.loaf.script_origin_count` | `number \| null` | Distinct hosts with script activity during the worst frame. Null when no parseable `sourceURL` is present. |
 
+#### Navigation Timing breakdown
+
+Optional decomposition of the full PerformanceNavigationTiming entry into named subparts plus three TTFB definitions plus protocol/payload metadata plus a provenance sub-block. Captured for every event with a Navigation Timing entry; preserved across prerender / bfcache restore so backend timing visibility survives.
+
+**Field discipline:**
+- `null` = unavailable / not exposed / not applicable
+- `0` = exposed and genuinely zero-duration (cached DNS, reused connection, no redirect — meaningful zeros)
+
+The block is null only when no Navigation Timing entry exists. Within the block, each subpart is independently null/0 per its own input availability — this differs from `vitals.lcp_breakdown` (strict all-or-nothing) because navigation subparts have legitimate independent absence (a reused connection has `dns_ms: null` but `request_to_first_byte_ms` can still be measured).
+
+**Subparts:**
+
+| Field | Type | Description |
+|---|---|---|
+| `vitals.navigation_timing.dns_ms` | `number \| null` | DNS lookup duration. Null on reused connections. |
+| `vitals.navigation_timing.tcp_ms` | `number \| null` | TCP handshake duration. Null on reused / coalesced connections. |
+| `vitals.navigation_timing.tls_ms` | `number \| null` | TLS handshake isolated from TCP. Null on TLS-coalesced or non-HTTPS. |
+| `vitals.navigation_timing.redirect_ms` | `number \| null` | Redirect duration. `0` is meaningful (no redirect). |
+| `vitals.navigation_timing.service_worker_ms` | `number \| null` | Service-worker time when SW intercepted; null otherwise. |
+| `vitals.navigation_timing.request_to_first_byte_ms` | `number \| null` | `responseStart − requestStart`. **In 2026 ResourceTiming, `responseStart` may resolve to `firstInterimResponseStart` when a 1xx interim response exists** — so this can be "time to 103 Early Hints" rather than "time to final HTML." Use `request_to_final_headers_ms` for the clean anchor. |
+| `vitals.navigation_timing.request_to_final_headers_ms` | `number \| null` | `finalResponseHeadersStart − requestStart`. Time to actual HTML response headers, post-103. Null when `finalResponseHeadersStart` is not exposed. |
+| `vitals.navigation_timing.response_download_ms` | `number \| null` | Response body transfer duration. |
+| `vitals.navigation_timing.interim_to_final_response_ms` | `number \| null` | Gap between 103 Early Hints and final HTML, when both anchors are exposed. |
+
+**Three TTFB definitions:**
+
+| Field | Type | Description |
+|---|---|---|
+| `vitals.navigation_timing.nav_ttfb_ms` | `number \| null` | Raw nav TTFB (`responseStart − startTime`). Includes redirects + connect + request-response. |
+| `vitals.navigation_timing.connection_ttfb_ms` | `number \| null` | `responseStart − domainLookupStart`. Excludes redirect; isolates connect-through-response. |
+| `vitals.navigation_timing.activation_adjusted_ttfb_ms` | `number \| null` | User-visible TTFB on prerendered pages (`Math.max(0, responseStart − activationStart)`). Clamped to ≥ 0 because response can precede activation. |
+
+**Raw anchor timestamps** (for downstream verification + future TTFB recalculation, ms relative to nav startTime):
+
+| Field | Type | Description |
+|---|---|---|
+| `vitals.navigation_timing.first_interim_response_start_ms` | `number \| null` | Raw `firstInterimResponseStart`. Null when no 1xx response or API not exposed. |
+| `vitals.navigation_timing.final_response_headers_start_ms` | `number \| null` | Raw `finalResponseHeadersStart`. Null when API not exposed. |
+
+**Protocol + payload:**
+
+| Field | Type | Description |
+|---|---|---|
+| `vitals.navigation_timing.next_hop_protocol` | `'h2' \| 'h3' \| 'http/1.1' \| string \| null` | Protocol negotiated by the browser. |
+| `vitals.navigation_timing.transfer_size` | `number \| null` | Total bytes transferred including headers. |
+| `vitals.navigation_timing.encoded_body_size` | `number \| null` | Body size as transmitted (post-encoding). |
+| `vitals.navigation_timing.decoded_body_size` | `number \| null` | Body size after decoding. 2026 ResourceTiming editor's draft. |
+| `vitals.navigation_timing.content_encoding` | `string \| null` | Content-Encoding header (e.g. `gzip`, `br`). Editor's draft; experimental. |
+
+**Provenance sub-block** (`vitals.navigation_timing.provenance.*`):
+
+| Field | Type | Description |
+|---|---|---|
+| `early_hints_present` | `boolean \| null` | `true` when 1xx interim response observed; `false` when final headers seen with no interim; `null` when neither anchor exposed. |
+| `activation_adjusted` | `boolean \| null` | `true` on prerender (activationStart > 0); `false` on regular nav; `null` when API unavailable. |
+| `timing_redacted_suspected` | `boolean \| null` | `true` only on multi-field zero patterns consistent with TAO masking; `false` when timing populated normally; `null` when underlying signals unavailable. |
+| `delivery_type` | `string \| null` | ResourceTiming editor's draft (e.g. `cache`, `navigational-prefetch`). |
+| `response_status` | `number \| null` | HTTP status code if exposed. |
+
 ### Connection context (supplementary, non-classifying)
 
 These signals are collected for cross-reference but do not feed tier classification.
@@ -147,7 +206,7 @@ Signal uses the TCP handshake time from the Navigation Timing API (`PerformanceN
 tcp_connect_ms = secureConnectionStart - connectStart
 ```
 
-This measures the actual round-trip time between the user's device and the server or CDN edge node.
+This measures the connection-setup span exposed by Navigation Timing, when the browser exposes it as an isolatable measurement. It is a useful diagnostic slice; it is not a complete user-network cohort axis — connection reuse (HTTP/2 multiplexing, preconnect), service-worker interception, TLS 1.3 0-RTT coalescing, and prerender all collapse or remove this signal. Sessions where it is unavailable are tracked as `net_tcp_source: 'unavailable_*'` and excluded from the tier; the [Navigation Timing breakdown](#navigation-timing-breakdown) carries the richer per-subpart decomposition.
 
 ### Thresholds
 

@@ -30,7 +30,7 @@ Additive optional fields (omitted entirely when upstream data is insufficient):
 - `experience_funnel` — Act 3 stage summaries
 - `device_hardware`, `network_signals`, `environment` — actionable signal blocks
 - `form_factor_distribution` — mobile / tablet / desktop shares, derived from `device_screen_w`
-- `lcp_story`, `inp_story`, `third_party_story`, `loaf_story`, `context_story` — narrative blocks for the report's act surfaces
+- `lcp_story`, `inp_story`, `third_party_story`, `loaf_story`, `context_story`, `navigation_timing_story` — narrative blocks for the report's act surfaces
 
 ## Actionable Signal Blocks
 
@@ -197,6 +197,20 @@ Act 1 audience-reality block. Reuses the same per-session signals that feed `net
 - `cellular_share_pct` — narrated only when `>= SIGNAL_CELLULAR_NARRATE_THRESHOLD_PCT = 10` (Chromium-only `connection_type`; Safari / Firefox systematically null).
 - `median_rtt_ms` — surfaced when present.
 - `effective_type_dominant` — most-frequent `effective_type` bucket from `4g`, `3g`, `2g`, `slow-2g`, `unknown`. Null when no events contribute.
+
+## Navigation Timing Story
+
+Per-cohort decomposition of the `vitals.navigation_timing` blocks captured at the SDK. Aggregation gates the `navigation_timing_story` block on `SIGNAL_MIN_RACE_OBSERVATIONS = 25` events carrying any navigation_timing block at all. Below that the block is `undefined`.
+
+The block carries:
+
+- `subparts.*` — for each of 11 subparts (DNS / TCP / TLS / redirect / SW / request-to-first-byte / request-to-final-headers / response-download / nav-TTFB / connection-TTFB / activation-adjusted-TTFB) a `SignalNavigationTimingSubpartSummary` with `observations` count + `p25` / `p50` / `p75` quartiles. **Per-subpart observation counts surface alongside quartiles** because quartiles without coverage will overclaim — DNS/TCP/TLS especially, since reused connections systematically remove those subparts from the sample.
+- `dominant_ttfb_subpart` — `'dns' | 'tcp' | 'tls' | 'redirect' | 'request' | 'response' | null`. Argmax over substages that contribute to nav_ttfb. Computed under **strict denominator**: only events where ALL of {dns, tcp, tls, redirect, request_to_first_byte, response_download} are non-null contribute. Otherwise DNS-with-20-samples gets unfairly compared to request-with-200-samples.
+- `dominant_ttfb_subpart_strict_observations` — number of events that contributed to the dominance calculation. Surfaced for honesty: a dominance verdict over 18 events is not the same as one over 1,800 events.
+- `next_hop_protocol_histogram` — counts per `'h2'` / `'h3'` / `'http/1.1'` / `'other'` bucket.
+- `provenance_roll_up.{early_hints, activation_adjusted, timing_redacted_suspected}_share_pct` — share of sessions where each provenance flag was true. Each share has its own observed-denominator (events where the flag was non-null at all), so absent signals don't dilute present ones.
+
+Per-event nav-timing is NOT URL-encoded (would explode the budget). The story-level aggregate IS URL-encoded as a compact subset: `nts75` (per-subpart p75 tuple), `ntso` (per-subpart observation tuple), `ntd` + `ntdo` (dominant subpart + strict observations), `ntp` (protocol histogram tuple), `ntpr` (provenance share tuple). After URL round-trip, `subparts.*.p25` and `subparts.*.p50` are `null` per the codec contract; observations + p75 + dominant + protocol + provenance survive byte-identical.
 
 ## Top Page Path
 

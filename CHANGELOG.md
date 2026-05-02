@@ -40,6 +40,9 @@ Bump the exact pin example whenever a new `-rc.N` is cut so onboarders default t
 
 ### Added
 
+- `vitals.navigation_timing` block on `SignalEventV1` — decomposes the full PerformanceNavigationTiming entry into named subparts (DNS / TCP / TLS / redirect / SW / request-to-first-byte / request-to-final-headers / response-download / interim-to-final-response), three named TTFB definitions (`nav_ttfb_ms`, `connection_ttfb_ms`, `activation_adjusted_ttfb_ms` clamped ≥ 0 for prerender), raw anchor timestamps for 103 Early Hints awareness (`first_interim_response_start_ms`, `final_response_headers_start_ms`), protocol + payload metadata (`next_hop_protocol`, `transfer_size`, `encoded_body_size`, `decoded_body_size`, `content_encoding`), and a `provenance` sub-block (`early_hints_present`, `activation_adjusted`, `timing_redacted_suspected`, `delivery_type`, `response_status`). Per-subpart `null` vs `0` discipline preserved (cached DNS, reused connection, no redirect = meaningful zeros). The block is preserved across prerender so backend timing visibility survives.
+- `SignalNavigationTimingStory` aggregate block — per-subpart quartile summary with observation counts (so quartile honesty survives reused-connection bias on DNS/TCP/TLS), strict-denominator dominant TTFB subpart (only events where every comparable subpart is non-null contribute), `next_hop_protocol_histogram`, and `provenance_roll_up` (each share with its own observed-denominator).
+- 24 new warehouse columns mirroring the breakdown — warehouse-only; the GA4 lane is unchanged at 24 fields.
 - `apps/signal-report/src/glossary.ts` — typed glossary (14 keys: lcp / fcp / inp / ttfb / p75 / cohort / qs / roas / cac / cpc / cpa / poor / classified / renderdelay) used by `renderTerm()` for KPI-translation tooltips.
 - `apps/signal-report/src/render-helpers.ts` — vanilla-TS Reveal / HeroValue / Term builders + boot helpers (`bootRevealObserver`, `bootCounterTweens`, `bootGlossaryPopovers`, `bootScrollSpy`, `bootReadingProgress`, `bootSmoothAnchors`).
 - `apps/signal-report/src/sections/render-{cover,audience,distance,funnel,business}.ts` + `render-shell.ts` — one file per section + the outer scroll-narrative shell.
@@ -53,6 +56,7 @@ Bump the exact pin example whenever a new `-rc.N` is cut so onboarders default t
 
 ### Removed
 
+- Documentation framing of `net_tier` softened to acknowledge it as "connection-setup tier when isolatable" rather than overclaiming as "network speed cohort." `net_tier` field name + behavior unchanged; consumers see no breaking change. The richer subpart picture lives in the new `vitals.navigation_timing` block.
 - Canvas particle system (`apps/signal-report/src/report-motion.ts`, ~1400 lines) and its phase-orchestration scaffolding. Particles deferred indefinitely from RC3.
 - Legacy markup builder (`apps/signal-report/src/report-markup.ts`, ~1450 lines) and the immersive CSS layer (`report-immersive.css`, ~4300 lines). Replaced by per-section render functions + lean tokens-v2 / scroll CSS.
 - Mood-, accent-, and density-driven CSS variation system. The view-model still computes `mood_tier` to inform editorial copy template selection, but no longer drives visuals.
@@ -60,6 +64,10 @@ Bump the exact pin example whenever a new `-rc.N` is cut so onboarders default t
 ### Fixed
 
 - `destroy()` on the sealed (sampled-out) runtime controller now releases the global singleton, so a subsequent `init()` spins up a fresh runtime. Previously a no-op that left the sampled-out shape pinned in `globalThis` for the page lifetime.
+
+### Note (Navigation Timing)
+
+- `SignalNetTcpSource` union UNCHANGED. The new navigation-timing provenance flags live on `vitals.navigation_timing.provenance.*` because they are independent telemetry-quality flags, not TCP-classifier source values.
 
 ### Added (RC3 — Brand surfaces, palette anchor, persona-card paid-media qualifiers)
 
