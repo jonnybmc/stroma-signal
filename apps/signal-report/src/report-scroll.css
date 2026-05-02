@@ -59,7 +59,7 @@ body { overflow-y: auto; overflow-x: hidden; }
   gap: var(--stack-xl);
 }
 .section-inner > .act-intro + * {
-  margin-top: calc(var(--stack-xl) * -0.5);
+  margin-top: calc(var(--stack-xl) * -0.85);
 }
 .section[data-tone="paper"] { background: var(--bg-0); }
 .section[data-tone="cream"] { background: var(--bg-1); }
