@@ -3,47 +3,66 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light" />
     <title>Signal Spike Lab</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT,WONK@9..144,300..700,30..100,0..1&family=Schibsted+Grotesk:wght@400..900&family=JetBrains+Mono:wght@300..600&display=swap"
+      rel="stylesheet"
+    />
     <script type="module" src="/src/main.ts"></script>
   </head>
   <body data-page-title="Landing">
     <main class="page-shell">
+      <header class="lab-chrome" aria-label="Spike lab context">
+        <div class="brand-mark"><span class="brand-dot"></span><span>Signal spike lab</span></div>
+        <div class="chrome-meta">QA harness · data collection path</div>
+      </header>
+
       <section class="hero">
-        <p class="eyebrow">Signal</p>
-        <h1>Spike lab: one page load to one report shell</h1>
-        <p class="lede">
-          This harness wires the canonical runtime into a local collector, a preview collector,
-          the public dataLayer path, and a spike-lab-only live dev-stream gtag transport so we can
-          verify the production-truth chain quickly.
-        </p>
-        <div class="hero-actions">
-          <a class="primary" href="/offers/">Visit second route</a>
-          <button id="flush-now" type="button">Flush this page load now</button>
-          <button id="reset-events" type="button">Reset collector</button>
+        <div class="hero-copy">
+          <p class="eyebrow">Data collection harness</p>
+          <h1>One page load to one report shell</h1>
+          <p class="lede">
+            A compact developer view for validating the runtime, local collector, preview collector,
+            dataLayer export, and spike-lab-only GA4 dev stream before any warehouse plumbing gets involved.
+          </p>
+          <div class="hero-actions">
+            <a class="primary" href="/offers/">Visit second route</a>
+            <button id="flush-now" type="button">Flush this page load now</button>
+            <button id="reset-events" type="button">Reset collector</button>
+          </div>
         </div>
+        <aside class="status-panel" aria-label="Validation surfaces">
+          <div class="status-pill"><span>Runtime</span><span>SDK init</span></div>
+          <div class="status-pill"><span>Collector</span><span>/api/events</span></div>
+          <div class="status-pill"><span>Preview</span><span>/r URL</span></div>
+          <div class="status-pill"><span>GA4</span><span>DebugView</span></div>
+        </aside>
       </section>
 
-      <section class="card-grid">
-        <article class="card">
+      <section class="card-grid" aria-label="Harness state">
+        <article class="card" data-accent="cyan">
           <p class="card-label">Preview URL</p>
           <a id="preview-link" class="link-block" href="#" target="_blank" rel="noreferrer">Waiting for flush...</a>
           <p id="preview-meta" class="muted">No preview aggregate yet.</p>
         </article>
 
-        <article class="card">
+        <article class="card" data-accent="accent">
           <p class="card-label">GA4 Dev Stream</p>
           <p class="mono" id="measurement-id">Not configured</p>
           <p id="ga4-meta" class="muted">Live GA4 transport is booting.</p>
           <p id="datalayer-meta" class="muted">dataLayer events will appear after flush.</p>
         </article>
 
-        <article class="card">
+        <article class="card" data-accent="green">
           <p class="card-label">Collector</p>
           <p id="collector-meta" class="muted">No collector payload received yet.</p>
         </article>
       </section>
 
-      <section class="two-up">
+      <section class="two-up" aria-label="Latest payloads">
         <article class="card">
           <p class="card-label">Latest Collector Event</p>
           <pre id="collector-json">No events captured yet.</pre>

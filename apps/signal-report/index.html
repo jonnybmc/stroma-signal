@@ -3,13 +3,35 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light" />
     <title>Signal Report Routes</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT,WONK@9..144,300..700,30..100,0..1&family=Schibsted+Grotesk:wght@400..900&family=JetBrains+Mono:wght@300..600&display=swap"
+      rel="stylesheet"
+    />
     <style>
       :root {
         color-scheme: light;
-        font-family: "Avenir Next", "Segoe UI", sans-serif;
-        background: #f5efe2;
-        color: #171c22;
+        --bg-0: #f1ede4;
+        --bg-1: #fdfaf3;
+        --bg-2: #f7f2e8;
+        --line: rgba(20, 17, 13, 0.08);
+        --line-strong: rgba(20, 17, 13, 0.18);
+        --ink: #14110d;
+        --ink-soft: #2a2820;
+        --ink-mute: #6a6558;
+        --accent: #b8541b;
+        --accent-soft: rgba(184, 84, 27, 0.1);
+        --accent-strong: #8e3f12;
+        --font-sans: "Schibsted Grotesk", system-ui, -apple-system, sans-serif;
+        --font-display: "Fraunces", "Iowan Old Style", Georgia, serif;
+        --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+      }
+
+      * {
+        box-sizing: border-box;
       }
 
       body {
@@ -17,61 +39,94 @@
         min-height: 100vh;
         display: grid;
         place-items: center;
+        padding: 24px;
         background:
-          radial-gradient(circle at top left, rgba(55, 138, 221, 0.14), transparent 28%),
-          radial-gradient(circle at bottom right, rgba(213, 152, 49, 0.16), transparent 28%),
-          #f5efe2;
+          linear-gradient(180deg, color-mix(in oklab, var(--bg-1) 76%, transparent), transparent 340px),
+          linear-gradient(90deg, rgba(20, 17, 13, 0.035) 1px, transparent 1px),
+          linear-gradient(rgba(20, 17, 13, 0.035) 1px, transparent 1px),
+          var(--bg-0);
+        background-size: auto, 44px 44px, 44px 44px, auto;
+        color: var(--ink);
+        font-family: var(--font-sans);
+        letter-spacing: 0;
+        -webkit-font-smoothing: antialiased;
+        text-rendering: optimizeLegibility;
       }
 
       main {
-        width: min(680px, calc(100vw - 32px));
-        padding: 28px;
-        border: 1px solid rgba(23, 28, 34, 0.12);
-        border-radius: 28px;
-        background: rgba(255, 255, 255, 0.82);
-        box-shadow: 0 14px 44px rgba(23, 28, 34, 0.08);
-      }
-
-      p {
-        line-height: 1.6;
+        width: min(720px, 100%);
+        padding: clamp(24px, 4vw, 42px);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--bg-1);
+        box-shadow: 0 1px 2px rgba(20, 17, 13, 0.04), 0 8px 20px rgba(20, 17, 13, 0.05);
       }
 
       .eyebrow {
+        margin: 0;
+        font-family: var(--font-mono);
+        font-size: 11px;
         text-transform: uppercase;
-        letter-spacing: 0.08em;
-        font-size: 0.78rem;
-        font-weight: 700;
-        color: #6d706c;
+        color: var(--ink-mute);
+      }
+
+      h1 {
+        margin: 12px 0 14px;
+        font-family: var(--font-display);
+        font-variation-settings: "opsz" 96, "SOFT" 30, "WONK" 0;
+        font-size: clamp(38px, 5vw + 10px, 72px);
+        line-height: 1;
+        font-weight: 400;
+        text-wrap: balance;
+      }
+
+      p {
+        margin: 0;
+        color: var(--ink-soft);
+        line-height: 1.6;
+        text-wrap: pretty;
+      }
+
+      code {
+        font-family: var(--font-mono);
+        font-size: 0.9em;
       }
 
       .actions {
         display: flex;
-        gap: 12px;
+        gap: 10px;
         flex-wrap: wrap;
-        margin-top: 20px;
+        margin-top: 22px;
       }
 
       a {
-        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        min-height: 38px;
+        border: 1px solid var(--line-strong);
         border-radius: 999px;
-        padding: 12px 18px;
+        padding: 8px 14px;
+        color: var(--ink-soft);
+        font-family: var(--font-mono);
+        font-size: 12px;
+        text-decoration: none;
+      }
+
+      a:hover {
+        border-color: var(--accent);
+        color: var(--accent-strong);
+        background: var(--accent-soft);
       }
 
       .primary {
-        background: #171c22;
-        color: white;
-      }
-
-      .secondary {
-        border: 1px solid rgba(23, 28, 34, 0.12);
-        color: #171c22;
-        background: rgba(255, 255, 255, 0.7);
+        border-color: var(--accent);
+        color: var(--accent-strong);
       }
     </style>
   </head>
   <body>
     <main>
-      <p class="eyebrow">Signal</p>
+      <p class="eyebrow">Signal report routes</p>
       <h1>Local report routes</h1>
       <p>
         The report app exposes the hosted report shell at <code>/r</code> and the zero-code builder

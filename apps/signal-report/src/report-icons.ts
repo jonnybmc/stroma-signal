@@ -1,15 +1,18 @@
 // lucide-static is tree-shakable (sideEffects: false), so these named
-// imports bundle down to just the 10 SVG strings we reference.
+// imports bundle down to just the SVG strings we reference.
 import {
   AlertCircle,
   AlertTriangle,
   ArrowRight,
   CheckCircle,
   Eye,
+  MonitorSmartphone,
   MousePointerClick,
+  Signal,
   Smartphone,
   TrendingUp,
   Users,
+  Wifi,
   Zap
 } from 'lucide-static';
 
@@ -19,10 +22,13 @@ export type IconName =
   | 'arrowRight'
   | 'checkCircle'
   | 'eye'
+  | 'monitorSmartphone'
   | 'mousePointerClick'
+  | 'signal'
   | 'smartphone'
   | 'trendingUp'
   | 'users'
+  | 'wifi'
   | 'zap';
 
 const ICONS: Record<IconName, string> = {
@@ -31,10 +37,13 @@ const ICONS: Record<IconName, string> = {
   arrowRight: ArrowRight,
   checkCircle: CheckCircle,
   eye: Eye,
+  monitorSmartphone: MonitorSmartphone,
   mousePointerClick: MousePointerClick,
+  signal: Signal,
   smartphone: Smartphone,
   trendingUp: TrendingUp,
   users: Users,
+  wifi: Wifi,
   zap: Zap
 };
 

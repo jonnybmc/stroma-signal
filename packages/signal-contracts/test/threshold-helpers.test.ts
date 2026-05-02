@@ -26,25 +26,25 @@ describe('DEFAULT_NETWORK_THRESHOLDS canonical values', () => {
 describe('formatNetworkBand', () => {
   const allTiers: SignalNetworkTier[] = ['urban', 'moderate', 'constrained_moderate', 'constrained'];
 
-  it.each(allTiers)('returns a non-empty string with the "ms TCP" suffix for %s', (tier) => {
+  it.each(allTiers)('returns a non-empty string ending with the "ms TCP" precision tail for %s', (tier) => {
     const band = formatNetworkBand(tier);
     expect(band).toMatch(/ms TCP$/);
     expect(band.length).toBeGreaterThan(0);
   });
 
-  it('uses canonical glyphs (`<`, `≥`, en-dash) so report copy stays typographically consistent', () => {
-    expect(formatNetworkBand('urban')).toBe('< 50 ms TCP');
-    expect(formatNetworkBand('moderate')).toBe('50–150 ms TCP');
-    expect(formatNetworkBand('constrained_moderate')).toBe('150–400 ms TCP');
-    expect(formatNetworkBand('constrained')).toBe('≥ 400 ms TCP');
+  it('leads with a plain-English real-world qualifier and trails with the TCP-handshake threshold', () => {
+    expect(formatNetworkBand('urban')).toBe('fast 4G / fibre · < 50 ms TCP');
+    expect(formatNetworkBand('moderate')).toBe('stable 4G · 50–150 ms TCP');
+    expect(formatNetworkBand('constrained_moderate')).toBe('slow 4G / fast 3G · 150–400 ms TCP');
+    expect(formatNetworkBand('constrained')).toBe('3G / 2G class · ≥ 400 ms TCP');
   });
 
   it('reflects custom thresholds when supplied explicitly', () => {
     const tighter: SignalNetworkTierThresholds = { urban: 30, moderate: 100, constrained_moderate: 300 };
-    expect(formatNetworkBand('urban', tighter)).toBe('< 30 ms TCP');
-    expect(formatNetworkBand('moderate', tighter)).toBe('30–100 ms TCP');
-    expect(formatNetworkBand('constrained_moderate', tighter)).toBe('100–300 ms TCP');
-    expect(formatNetworkBand('constrained', tighter)).toBe('≥ 300 ms TCP');
+    expect(formatNetworkBand('urban', tighter)).toBe('fast 4G / fibre · < 30 ms TCP');
+    expect(formatNetworkBand('moderate', tighter)).toBe('stable 4G · 30–100 ms TCP');
+    expect(formatNetworkBand('constrained_moderate', tighter)).toBe('slow 4G / fast 3G · 100–300 ms TCP');
+    expect(formatNetworkBand('constrained', tighter)).toBe('3G / 2G class · ≥ 300 ms TCP');
   });
 });
 
@@ -92,10 +92,10 @@ describe('canonical-thresholds drift guard for downstream call sites', () => {
   // strings each helper produces so reviewers see the diff in one
   // place rather than chasing it across the codebase.
   it('every classified network tier produces a stable signature string', () => {
-    expect(formatNetworkBand('urban')).toBe('< 50 ms TCP');
-    expect(formatNetworkBand('moderate')).toBe('50–150 ms TCP');
-    expect(formatNetworkBand('constrained_moderate')).toBe('150–400 ms TCP');
-    expect(formatNetworkBand('constrained')).toBe('≥ 400 ms TCP');
+    expect(formatNetworkBand('urban')).toBe('fast 4G / fibre · < 50 ms TCP');
+    expect(formatNetworkBand('moderate')).toBe('stable 4G · 50–150 ms TCP');
+    expect(formatNetworkBand('constrained_moderate')).toBe('slow 4G / fast 3G · 150–400 ms TCP');
+    expect(formatNetworkBand('constrained')).toBe('3G / 2G class · ≥ 400 ms TCP');
   });
 
   it('every device tier produces a stable signature string', () => {

@@ -2,8 +2,33 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Signal Report</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+    <meta name="color-scheme" content="light dark" />
+    <!--
+      Defense-in-depth CSP. Every escapeHtml call site is the primary
+      defense; CSP catches the case where a future change misses one.
+      'unsafe-inline' on style-src is required by the SSR-style template
+      literals that emit per-element style="" attributes (74 sites). Once
+      those move to classes (post-RC3), the directive can tighten to a
+      hash / nonce.
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.stroma.design; form-action 'self' https://www.stroma.design; frame-ancestors 'none'; base-uri 'none'"
+    />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+    <title>Signal · Tier Report</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="preload"
+      as="style"
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT,WONK@9..144,300..700,30..100,0..1&family=Schibsted+Grotesk:wght@400..900&family=JetBrains+Mono:wght@300..600&display=swap"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT,WONK@9..144,300..700,30..100,0..1&family=Schibsted+Grotesk:wght@400..900&family=JetBrains+Mono:wght@300..600&display=swap"
+      rel="stylesheet"
+    />
     <script type="module" src="/src/report-route.ts"></script>
   </head>
   <body>

@@ -11,19 +11,44 @@ npm package.
 
 - `r/index.html` + `src/report-route.ts` → the hosted Tier Report at
   `https://signal.stroma.design/r`. Decodes a `SignalAggregateV1` from the URL
-  params, builds an immersive view model, and renders the four-act artifact.
+  params, builds the view-model, and renders a five-section vertical scroll
+  narrative artifact (cover · audience · distance · funnel · business).
 - `build/index.html` + `src/build-route.ts` → the zero-code builder /
   validator. Round-trips between aggregate JSON and report URL; surfaces
   `explainSignalAggregateIssues` violations inline.
 - `index.html` → the landing page that points visitors at `/r/` or `/build/`.
 
 The Tier Report is a complete, standalone artifact: a team should be able to
-take it into a sprint review and act on it without further engagement.
+take it into a quarterly business review or sprint review and act on it
+without further engagement.
+
+## Architecture (RC3 redesign)
+
+- **Layout**: vertical scroll narrative — five stacked sections with a
+  scroll-spy table of contents, smooth-scroll TOC anchors, and a bottom
+  reading-progress hairline.
+- **Theme**: light default (warm cream paper aesthetic) with full dark
+  parity via `[data-theme="dark"]`. One canonical accent (warm amber).
+- **Typography**: Signifier pairing — Fraunces (display, serif wedge) +
+  Schibsted Grotesk (sans) + JetBrains Mono (mono). Loaded via Google
+  Fonts CSS2 import.
+- **Editorial register**: tailored to the Paid-Media / PPC specialist and
+  CMO. Glossary tooltips translate every Web-Vital into Paid-Media
+  language (CPC / Quality Score / ROAS / CAC / CPA) with a "what this
+  means for your KPIs" line. Body copy stays diagnostic; headlines never
+  prescribe.
+- **Render tech**: vanilla TypeScript producing escaped HTML strings.
+  Boot helpers (`render-helpers.ts`) hydrate IntersectionObserver reveals,
+  RAF counter tweens, glossary popovers, scroll-spy, and reading-progress
+  after `innerHTML` injection. No framework runtime.
+- **Motion**: deferred indefinitely from RC3. Canvas particle effects and
+  the prior mood/accent/density CSS variation system removed; revisit only
+  on explicit product decision.
 
 ## Run it
 
 ```bash
-pnpm --filter signal-report dev
+pnpm --filter @stroma-labs/signal-report-app dev
 ```
 
 Visit the printed URL and navigate to `/r/?...` (with a real `rv=1` URL),
@@ -38,16 +63,18 @@ Visit the printed URL and navigate to `/r/?...` (with a real `rv=1` URL),
   `scripts/check-boundaries.mjs`.
 - ❌ The `/r` and `/build` routes MUST NOT contain references to fields that
   do not exist on `SignalAggregateV1`. The render-honesty test suite
-  (`report-motion.test.ts`) enforces the language boundary against
-  forbidden phrasings.
+  (`report-render-honesty.test.ts`) enforces the language boundary
+  against forbidden phrasings (revenue / monthly exposure / commercial
+  diagnosis tokens + prescription verbs in headlines + bid-down language).
 
 ## Tests
 
 ```bash
-pnpm --filter signal-report test
+pnpm test:unit
 ```
 
-The view-model + markup tests cover the four-act structure, mood states,
-mode transitions (`reduced` / `legacy`), forbidden-words discipline, and
-the optional Act 4 CTA. E2E coverage lives in
-`tests/e2e/proof-of-life.spec.ts` and `tests/e2e/report-visual.spec.ts`.
+The view-model + render-honesty + spec-alignment tests cover the
+five-section structure, mood-driven editorial template selection, mode
+transitions (`reduced` / `legacy`), forbidden-words discipline, glossary
+KPI translation, and the optional Rapid Fix Plan CTA. E2E coverage lives
+in `tests/e2e/proof-of-life.spec.ts` and `tests/e2e/report-visual.spec.ts`.
