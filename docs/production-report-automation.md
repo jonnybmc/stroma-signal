@@ -1,6 +1,6 @@
 # Production Report Automation
 
-<img src="./images/signal-stroma-logo_1.png" alt="Signal" width="320" />
+<img src="./images/signal-stroma-logo.png" alt="Signal" width="270" />
 
 Use this when Signal is already landing rows in BigQuery and your team wants an always-updated hosted `signal_report_url` with as little manual work as possible.
 

@@ -1,4 +1,4 @@
-<img src="./docs/images/signal-stroma-logo_1.png" alt="Signal" width="320" />
+<img src="./docs/images/signal-stroma-logo.png" alt="Signal" width="270" />
 
 [![CI](https://github.com/jonnybmc/stroma-signal/actions/workflows/ci.yml/badge.svg)](https://github.com/jonnybmc/stroma-signal/actions/workflows/ci.yml)
 [![npm @next](https://img.shields.io/npm/v/@stroma-labs/signal/next?label=npm%20%40next)](https://www.npmjs.com/package/@stroma-labs/signal)
