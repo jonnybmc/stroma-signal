@@ -32,6 +32,8 @@ This means:
 
 This is intentional. Soft navigation support is not first-class in v0.1. The performance data collected (Web Vitals, network tier, device tier) reflects the initial page load, which is the most meaningful measurement for tier classification.
 
+A `markRoute()` API for opt-in per-route INP / CLS / LCP capture in SPAs is being considered for v0.2. The shape, tradeoffs, and open questions are tracked in [RFC 0001](./rfcs/0001-soft-navigation-markroute.md) — comments and pushback welcome before it gets implemented.
+
 ## Duplicate init is safe
 
 Signal stores its runtime under a `Symbol.for('stroma.signal.runtime')` global singleton. If `init()` is called more than once — by React Strict Mode, hot module replacement, or multiple entry points — the second call returns the existing controller without creating a new runtime.

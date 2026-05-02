@@ -8,6 +8,8 @@ If you are looking for the production operating model after rows land in BigQuer
 
 The hosted Tier Report is the shareable proof artifact at the end of this flow. It is not a diagnostic, attribution, or commercial modelling artifact.
 
+> 📋 **Before you deploy**, skim [operator-expectations.md](./operator-expectations.md) — it's the one-page honest answer to GA4 quotas, BigQuery costs, SPA capture behavior, browser support, and privacy posture. Five minutes there saves an hour of "wait, why doesn't this fire?" later.
+
 ## Outcome
 
 By the end of this flow you should have:

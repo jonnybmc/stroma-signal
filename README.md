@@ -45,6 +45,8 @@ pnpm add @stroma-labs/signal@next
 
 ESM-only. Works in any modern browser. Zero runtime dependencies.
 
+> 📋 **Before you install**, read [operator-expectations.md](./docs/operator-expectations.md) — capture model (SPA/MPA), GA4 quotas, BigQuery costs, browser support, privacy posture. One page. The honest "what am I signing up for" answer.
+
 ## Quickstart — pick one
 
 ### Already on GTM and GA4 (most common)
@@ -111,6 +113,7 @@ For the production operating model (manual vs scheduled refresh, where to surfac
 ## Where to go next
 
 **Non-technical / launch ops:**
+- [Operator expectations](./docs/operator-expectations.md) — capture model, quotas, costs, privacy. **Read first.**
 - [Marketer quickstart](./docs/marketer-quickstart.md) — GTM-first, plain English, end-to-end
 - [Production report automation](./docs/production-report-automation.md) — keeping the URL fresh
 - [Launch troubleshooting](./docs/launch-troubleshooting.md) — common gotchas
