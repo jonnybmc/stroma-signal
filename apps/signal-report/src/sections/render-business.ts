@@ -99,13 +99,15 @@ function renderClosingCard(card: ReportClosingCard): string {
               ${
                 card.collects_email
                   ? `
-                    <label class="closing-card-email-label">
+                    <label class="closing-card-email-label" for="closing-email-${card.id}">
                       <span>your email</span>
                       <input
+                        id="closing-email-${card.id}"
                         type="email"
                         data-closing-email
                         placeholder="you@company.com"
                         autocomplete="email"
+                        inputmode="email"
                         maxlength="254"
                         required
                       >
