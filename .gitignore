@@ -34,3 +34,7 @@ bootstrapped-sql/
 # Private companion repo (cloned manually into internal/ for paid-product
 # work; intentionally not tracked here). See CONTRIBUTING.md for setup.
 internal/
+
+# pnpm pack / npm pack tarball artifacts (released via the publish workflow,
+# never committed)
+*.tgz

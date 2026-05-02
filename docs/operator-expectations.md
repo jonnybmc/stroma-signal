@@ -178,7 +178,7 @@ Before going live, walk this list:
 - [ ] You've checked browser-support implications against your audience mix — heavily-iOS audiences should expect `lcp_attribution` and `loaf` as `null` (§5)
 - [ ] You've reviewed the SDK's privacy posture against your DPO's requirements (§6)
 - [ ] You have a plan for refreshing the `signal_report_url` (manual via [first-successful-report.md](./first-successful-report.md), scheduled via [production-report-automation.md](./production-report-automation.md))
-- [ ] If you're SPA + soft-nav-heavy, you've decided whether one-event-per-entry is enough or you'll wait for v0.2's `markRoute()` API
+- [ ] If you're SPA + soft-nav-heavy, you've decided whether one-event-per-entry is enough or you'll wait for v0.2's `markRoute()` API ([RFC 0001](./rfcs/0001-soft-navigation-markroute.md) — comment now if the proposed shape doesn't fit your stack)
 
 ---
 
