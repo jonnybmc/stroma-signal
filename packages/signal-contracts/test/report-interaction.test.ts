@@ -4,7 +4,9 @@ import {
   explainReportInteractionIssues,
   isSignalReportInteractionV1,
   SIGNAL_REPORT_INTERACTION_INGEST_PATH,
+  SIGNAL_REPORT_INTERACTION_INGEST_URL_DEFAULT,
   SIGNAL_REPORT_INTERACTION_VERSION,
+  type SignalReportInteractionIntentKind,
   type SignalReportInteractionV1
 } from '../src/index.js';
 
@@ -138,8 +140,135 @@ describe('explainReportInteractionIssues', () => {
   });
 
   describe('constants', () => {
-    it('exposes the dedicated ingest path', () => {
+    it('exposes the dedicated ingest path (legacy)', () => {
       expect(SIGNAL_REPORT_INTERACTION_INGEST_PATH).toBe('/ingest/report-interaction');
+    });
+
+    it('exposes the canonical full ingest URL for cross-origin sendBeacon delivery', () => {
+      expect(SIGNAL_REPORT_INTERACTION_INGEST_URL_DEFAULT).toBe('https://api.stroma.design/api/v1/intent');
+    });
+  });
+
+  describe('intent kinds', () => {
+    function makeValidIntent(
+      kind: SignalReportInteractionIntentKind,
+      overrides: Partial<SignalReportInteractionV1> = {}
+    ): SignalReportInteractionV1 {
+      return {
+        ...makeValidInteraction(),
+        event_kind: kind,
+        intent_capture_id: '01HBQX5N8C2A6WTYZ3KMG7VPQR',
+        intent_stage: 'initial',
+        ...overrides
+      };
+    }
+
+    it('accepts a well-formed intent_pi_early_access initial event', () => {
+      expect(explainReportInteractionIssues(makeValidIntent('intent_pi_early_access'))).toEqual([]);
+    });
+
+    it('accepts a well-formed intent_rapid_fix initial event', () => {
+      expect(explainReportInteractionIssues(makeValidIntent('intent_rapid_fix'))).toEqual([]);
+    });
+
+    it('accepts a well-formed intent_monitoring initial event', () => {
+      expect(explainReportInteractionIssues(makeValidIntent('intent_monitoring'))).toEqual([]);
+    });
+
+    it('accepts an intent_freeform initial event with a pill_id', () => {
+      const ev = makeValidIntent('intent_freeform', { intent_pill_id: 'multi_page' });
+      expect(explainReportInteractionIssues(ev)).toEqual([]);
+    });
+
+    it('accepts an intent_freeform something_else event with freeform_text', () => {
+      const ev = makeValidIntent('intent_freeform', {
+        intent_pill_id: 'something_else',
+        intent_stage: 'followup',
+        intent_freeform_text: 'PDF export with our brand on it would be ideal'
+      });
+      expect(explainReportInteractionIssues(ev)).toEqual([]);
+    });
+
+    it('accepts a followup with email + cadence carrying the same capture id', () => {
+      const initial = makeValidIntent('intent_monitoring');
+      const followup: SignalReportInteractionV1 = {
+        ...initial,
+        intent_stage: 'followup',
+        intent_email: 'cmo@example.co.za',
+        intent_cadence: 'weekly'
+      };
+      expect(explainReportInteractionIssues(followup)).toEqual([]);
+    });
+
+    it('rejects an intent_pi_early_access event missing intent_capture_id', () => {
+      const { intent_capture_id: _drop, ...rest } = makeValidIntent('intent_pi_early_access');
+      const issues = explainReportInteractionIssues(rest);
+      expect(issues.some((i) => i.includes('intent_capture_id'))).toBe(true);
+    });
+
+    it('rejects an intent_freeform event missing intent_pill_id', () => {
+      const { intent_pill_id: _drop, ...rest } = makeValidIntent('intent_freeform');
+      const issues = explainReportInteractionIssues(rest);
+      expect(issues.some((i) => i.includes('intent_pill_id'))).toBe(true);
+    });
+
+    it('rejects an unknown intent_pill_id value', () => {
+      const ev = makeValidIntent('intent_freeform', {
+        intent_pill_id: 'pdf_export' as unknown as 'multi_page'
+      });
+      const issues = explainReportInteractionIssues(ev);
+      expect(issues.some((i) => i.includes('intent_pill_id'))).toBe(true);
+    });
+
+    it('rejects a followup event with no email / cadence / freeform_text payload', () => {
+      const ev = makeValidIntent('intent_pi_early_access', { intent_stage: 'followup' });
+      const issues = explainReportInteractionIssues(ev);
+      expect(issues.some((i) => i.includes('followup'))).toBe(true);
+    });
+
+    it('rejects an intent_email longer than 254 chars', () => {
+      const ev = makeValidIntent('intent_pi_early_access', {
+        intent_stage: 'followup',
+        intent_email: `${'a'.repeat(245)}@example.com`
+      });
+      const issues = explainReportInteractionIssues(ev);
+      expect(issues.some((i) => i.includes('intent_email'))).toBe(true);
+    });
+
+    it('rejects an intent_email missing the @ symbol', () => {
+      const ev = makeValidIntent('intent_pi_early_access', {
+        intent_stage: 'followup',
+        intent_email: 'not-an-email'
+      });
+      const issues = explainReportInteractionIssues(ev);
+      expect(issues.some((i) => i.includes('intent_email'))).toBe(true);
+    });
+
+    it('rejects an intent_freeform_text longer than 200 chars', () => {
+      const ev = makeValidIntent('intent_freeform', {
+        intent_pill_id: 'something_else',
+        intent_stage: 'followup',
+        intent_freeform_text: 'x'.repeat(201)
+      });
+      const issues = explainReportInteractionIssues(ev);
+      expect(issues.some((i) => i.includes('intent_freeform_text'))).toBe(true);
+    });
+
+    it('rejects an unknown intent_cadence value', () => {
+      const ev = makeValidIntent('intent_monitoring', {
+        intent_stage: 'followup',
+        intent_cadence: 'daily' as unknown as 'weekly'
+      });
+      const issues = explainReportInteractionIssues(ev);
+      expect(issues.some((i) => i.includes('intent_cadence'))).toBe(true);
+    });
+
+    it('rejects an unknown intent_stage value', () => {
+      const ev = makeValidIntent('intent_monitoring', {
+        intent_stage: 'pending' as unknown as 'initial'
+      });
+      const issues = explainReportInteractionIssues(ev);
+      expect(issues.some((i) => i.includes('intent_stage'))).toBe(true);
     });
   });
 });

@@ -1,18 +1,20 @@
 import { decodeSignalReportUrl, type SignalAggregateV1 } from '@stroma-labs/signal-contracts';
 
 import './shared.css';
-import './report-immersive.css';
+import './report-tokens-v2.css';
+import './report-scroll.css';
+import { bootReport } from './render-helpers';
+import { renderReportShell, SECTION_ORDER } from './render-shell';
 import { escapeHtml } from './render-utils';
-import { renderReportMarkup } from './report-markup';
-import { initReportMotion } from './report-motion';
-import { buildReportViewModel, type ReportMotionMode, selectMotionMode } from './report-view-model';
+import { buildReportViewModel } from './report-view-model';
 
 const app = document.querySelector<HTMLDivElement>('#app');
 if (!app) throw new Error('Missing app root');
+const appRoot = app;
 
 function renderInvalidReportState(message: string): void {
-  app.className = 'app-shell';
-  app.innerHTML = `
+  appRoot.className = 'app-shell';
+  appRoot.innerHTML = `
     <section class="builder-card">
       <p class="eyebrow">Signal</p>
       <h1 class="headline">Invalid report URL</h1>
@@ -49,40 +51,9 @@ if (!location.search) {
   }
 
   if (!decodeFailed && aggregate) {
-    const params = new URLSearchParams(location.search);
-    const qaParam = params.get('qa');
-    const qaMode = qaParam === '1' || qaParam === 'deterministic';
-    const qaDeterministic = qaParam === 'deterministic';
-    const forcedMotion = params.get('motion');
-    const motionMode: ReportMotionMode = qaDeterministic
-      ? 'reduced'
-      : forcedMotion === 'full' || forcedMotion === 'reduced'
-        ? forcedMotion
-        : selectMotionMode(window.matchMedia('(prefers-reduced-motion: reduce)').matches);
-    const requestedScene = params.get('scene');
-    const scene =
-      requestedScene === 'act1' || requestedScene === 'act2' || requestedScene === 'act3' || requestedScene === 'act4'
-        ? requestedScene
-        : 'all';
     const viewModel = buildReportViewModel(aggregate);
-
-    app.className = `app-shell motion-${motionMode} mood-${viewModel.mood_tier}${qaMode ? ' qa-mode' : ''}${qaDeterministic ? ' qa-deterministic' : ''} scene-${scene}`;
-    app.innerHTML = renderReportMarkup(viewModel, motionMode);
-    const skipOrchestration = qaMode || motionMode === 'reduced' || scene !== 'all' || forcedMotion === 'reduced';
-    initReportMotion(motionMode, { skipOrchestration });
-
-    const shareBtn = document.querySelector<HTMLButtonElement>('[data-role="share-copy"]');
-    if (shareBtn) {
-      shareBtn.addEventListener('click', () => {
-        navigator.clipboard.writeText(location.href).then(() => {
-          shareBtn.textContent = 'Copied!';
-          shareBtn.setAttribute('data-copied', 'true');
-          setTimeout(() => {
-            shareBtn.textContent = 'Copy report link';
-            shareBtn.removeAttribute('data-copied');
-          }, 2000);
-        });
-      });
-    }
+    app.className = '';
+    app.innerHTML = renderReportShell(viewModel);
+    bootReport(SECTION_ORDER.map((s) => s.id));
   }
 }

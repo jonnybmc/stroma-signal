@@ -3,27 +3,51 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light" />
     <title>Signal Spike Lab - Offers</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT,WONK@9..144,300..700,30..100,0..1&family=Schibsted+Grotesk:wght@400..900&family=JetBrains+Mono:wght@300..600&display=swap"
+      rel="stylesheet"
+    />
     <script type="module" src="/src/main.ts"></script>
   </head>
   <body data-page-title="Offers">
     <main class="page-shell">
+      <header class="lab-chrome" aria-label="Spike lab context">
+        <div class="brand-mark"><span class="brand-dot"></span><span>Signal spike lab</span></div>
+        <div class="chrome-meta">Secondary route · navigation timing</div>
+      </header>
+
       <section class="hero alt">
-        <p class="eyebrow">Signal</p>
-        <h1>Offers route</h1>
-        <p class="lede">
-          This second route exists so we can exercise navigation timing on another real page and
-          verify the collector path separately from the landing view.
-        </p>
-        <div class="hero-actions">
-          <a class="primary" href="/">Back to landing</a>
-          <button id="flush-now" type="button">Flush this page load now</button>
+        <div class="hero-copy">
+          <p class="eyebrow">Route validation</p>
+          <h1>Offers route</h1>
+          <p class="lede">
+            The second route exercises navigation timing on another real page and verifies the same
+            collector path separately from the landing view.
+          </p>
+          <div class="hero-actions">
+            <a class="primary" href="/">Back to landing</a>
+            <button id="flush-now" type="button">Flush this page load now</button>
+          </div>
         </div>
       </section>
 
-      <section class="card">
-        <p class="card-label">Page state</p>
-        <p class="lede">This page uses the same runtime wiring and local collector endpoints.</p>
+      <section class="card-grid" aria-label="Route state">
+        <article class="card" data-accent="cyan">
+          <p class="card-label">Page state</p>
+          <p class="lede">This page uses the same runtime wiring and local collector endpoints.</p>
+        </article>
+        <article class="card" data-accent="accent">
+          <p class="card-label">Validation role</p>
+          <p class="muted">Confirms route-level URL capture, flush behavior, and preview collector aggregation.</p>
+        </article>
+        <article class="card" data-accent="green">
+          <p class="card-label">Expected signal</p>
+          <p class="mono">url=/offers/ · page=Offers</p>
+        </article>
       </section>
     </main>
   </body>

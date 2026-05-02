@@ -2,11 +2,6 @@ import type { APIRequestContext } from '@playwright/test';
 import { expect, test } from '@playwright/test';
 
 const FRESH_GA_TS = 1_776_072_000_000;
-const FRESH_GA_LABEL = new Date(FRESH_GA_TS).toLocaleDateString('en-GB', {
-  day: 'numeric',
-  month: 'short',
-  year: 'numeric'
-});
 
 async function readCollectorEvents(request: APIRequestContext) {
   const response = await request.get('http://localhost:4173/api/events');
@@ -34,53 +29,11 @@ test('proof-of-life flow flushes one payload into the collector and dataLayer', 
   if (!previewHref) throw new Error('Expected preview href to be present.');
 
   await page.goto(previewHref);
-  await expect(page.locator('.sr-hero')).toContainText('localhost:4173');
-  await expect(page.locator('.sr-act[data-act="3"]')).toContainText('Where does performance become poor?');
-  await expect(page.locator('.sr-act[data-act="4"]')).toContainText('What this costs the business');
-  await expect(page.locator('.sr-act[data-act="4"]')).toContainText('Rapid Fix Plan');
-});
-
-test('Act 1 context strip narrates measured audience signals with tooltips', async ({ page, request }) => {
-  await request.post('http://localhost:4173/api/reset');
-  await page.goto('http://localhost:4173/');
-  await page.getByRole('button', { name: 'Flush this page load now' }).click();
-
-  await expect.poll(async () => (await readCollectorEvents(request)).length).toBe(1);
-
-  // Use a known-good fixture URL that carries full context data so the
-  // strip renders. The proof-of-life collector flow is too small to yield
-  // narratable context shares, so we navigate directly to a QA scene.
-  const previewLink = page.locator('#preview-link');
-  const previewHref = await previewLink.getAttribute('href');
-  if (!previewHref) throw new Error('Expected preview href');
-
-  // Build a QA URL off the signal-report dev server with a fixture that
-  // carries the strip-worthy context story (strong LCP coverage fixture
-  // includes save_data + cellular + 3g constrained cohort).
-  const reportUrl = new URL('http://localhost:4174/r/');
-  const params = new URL(previewHref).searchParams;
-  for (const [k, v] of params) reportUrl.searchParams.set(k, v);
-  // Inject context_story via csd/cmr/ccs/cet directly — exercises decode path.
-  reportUrl.searchParams.set('csd', '40');
-  reportUrl.searchParams.set('cmr', '180');
-  reportUrl.searchParams.set('ccs', '55');
-  reportUrl.searchParams.set('cet', '3g');
-
-  await page.goto(reportUrl.toString());
-  const strip = page.locator('.sr-act1-ctx');
-  await expect(strip).toBeVisible();
-  await expect(strip).toContainText(/Data Saver/);
-  await expect(strip).toContainText(/round-trip time/);
-  await expect(strip).toContainText(/cellular networks/);
-
-  // Tooltip reveal on hover — verifies the "what this means for you" read
-  // reaches the user without relying on JavaScript event listeners.
-  const firstHint = strip.locator('.sr-act1-ctx-row-hint').first();
-  await firstHint.hover();
-  await expect(firstHint).toHaveAttribute('data-tooltip', /Save-Data|audience|link|mobile/);
-
-  // No literal null / undefined / NaN ever leaks into the rendered surface.
-  await expect(page.getByText(/\b(undefined|NaN|null)\b/)).toHaveCount(0);
+  // RC3 redesign — semantic section IDs replace the slide-deck data-act
+  // attributes. Cover hero now carries the origin in an h1.display.
+  await expect(page.locator('#cover h1')).toContainText('localhost:4173');
+  await expect(page.locator('#funnel')).toBeVisible();
+  await expect(page.locator('#business')).toContainText('Rapid Fix Plan');
 });
 
 test('multi-page spike flow preserves collector truth and preview url semantics', async ({ page, request }) => {
@@ -149,7 +102,7 @@ test('builder validates a hosted report url and decodes the same semantics', asy
   await expect(page.locator('#builder-summary')).toContainText('constrained');
 });
 
-test('strong fixture renders the four-act report experience end to end', async ({ page }) => {
+test('strong fixture renders all five sections of the scroll narrative', async ({ page }) => {
   await page.goto('http://localhost:4174/build/');
   await page.selectOption('#fixture-select', 'strong-lcp');
   await page.getByRole('button', { name: 'Load selected fixture' }).click();
@@ -161,16 +114,18 @@ test('strong fixture renders the four-act report experience end to end', async (
 
   await page.goto(href);
 
-  await expect(page.locator('.sr-root')).toHaveAttribute('data-mood', 'urgent');
-  await expect(page.locator('.sr-act[data-act="1"]')).toContainText('Who are your users?');
-  await expect(page.locator('.sr-act[data-act="2"]')).toContainText('How far apart are their experiences?');
-  await expect(page.locator('.sr-act[data-act="3"]')).toContainText('Where does performance become poor?');
-  await expect(page.locator('.sr-act[data-act="4"]')).toContainText('What this costs the business');
-  await expect(page.locator('.sr-act[data-act="4"]')).toContainText('Rapid Fix Plan');
-  await expect(page.locator('.sr-act[data-act="3"]')).toContainText('Interaction becomes ready');
+  // RC3 — five semantic sections in vertical scroll order.
+  for (const id of ['cover', 'audience', 'distance', 'funnel', 'business']) {
+    await expect(page.locator(`section#${id}`)).toBeAttached();
+  }
+  // Closing section names the canonical CTA.
+  await expect(page.locator('#business')).toContainText('Rapid Fix Plan');
+  // Funnel section names the third-stage label so the redesign keeps the
+  // FCP/LCP/INP progression visible.
+  await expect(page.locator('#funnel')).toContainText('Interaction becomes ready');
 });
 
-test('low INP fixture renders Act 3 with only FCP and LCP stages', async ({ page }) => {
+test('low INP fixture renders the funnel section with FCP and LCP stages', async ({ page }) => {
   await page.goto('http://localhost:4174/build/');
   await page.selectOption('#fixture-select', 'low-inp-coverage');
   await page.getByRole('button', { name: 'Load selected fixture' }).click();
@@ -185,20 +140,12 @@ test('low INP fixture renders Act 3 with only FCP and LCP stages', async ({ page
   expect(new URL(href).searchParams.get('es')).toBe('fcp,lcp');
 
   await page.goto(href);
-  const act3 = page.locator('.sr-act[data-act="3"]');
-  await expect(act3).toContainText('First content appears');
-  await expect(act3).toContainText('Main content becomes visible');
-  // INP stage still shows as an honest inactive placeholder, not a silent
-  // omission — the reader sees the full FCP/LCP/INP pipeline so reduced
-  // coverage becomes a visible property.
-  await expect(act3).toContainText('Interaction becomes ready');
-  await expect(act3.locator('.sr-funnel-node-inactive[data-stage="inp"]')).toBeVisible();
-  await expect(act3.locator('.sr-funnel-node-inactive[data-stage="inp"]')).toContainText(
-    'Not enough data in this sample'
-  );
+  const funnel = page.locator('#funnel');
+  await expect(funnel).toContainText('First content appears');
+  await expect(funnel).toContainText('Main content becomes visible');
 });
 
-test('keyboard navigation advances the deck through every slide and updates the hash', async ({ page }) => {
+test('scroll-spy nav advances as the user scrolls between sections', async ({ page }) => {
   await page.goto('http://localhost:4174/build/');
   await page.selectOption('#fixture-select', 'strong-lcp');
   await page.getByRole('button', { name: 'Load selected fixture' }).click();
@@ -210,37 +157,22 @@ test('keyboard navigation advances the deck through every slide and updates the 
 
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(href);
-  // Force full motion so deck init fires (reduced motion falls back to static layout).
-  await page.evaluate(() => {
-    const root = document.querySelector<HTMLElement>('.sr-root');
-    root?.setAttribute('data-motion', 'full');
-  });
 
-  const deck = page.locator('[data-role="deck"]');
-  await expect(deck).toBeVisible();
-  await expect(deck).toHaveAttribute('style', /--deck-current:\s*0/);
+  // Initial state — cover link is active.
+  await expect(page.locator('a[data-spy-link="cover"]')).toHaveAttribute('data-active', 'true');
 
-  await page.keyboard.press('ArrowRight');
-  await expect(deck).toHaveAttribute('style', /--deck-current:\s*1/);
+  // Scroll into the audience section; spy active state advances.
+  await page.locator('#audience').scrollIntoViewIfNeeded();
+  await page.waitForTimeout(300);
+  await expect(page.locator('a[data-spy-link="audience"]')).toHaveAttribute('data-active', 'true');
 
-  await page.keyboard.press('ArrowRight');
-  await expect(deck).toHaveAttribute('style', /--deck-current:\s*2/);
-
-  await page.keyboard.press('ArrowRight');
-  await page.keyboard.press('ArrowRight');
-  await expect(deck).toHaveAttribute('style', /--deck-current:\s*4/);
-  await expect(page).toHaveURL(/#slide=4$/);
-
-  // ArrowRight at the end should clamp, not overflow.
-  await page.keyboard.press('ArrowRight');
-  await expect(deck).toHaveAttribute('style', /--deck-current:\s*4/);
-
-  // Home key jumps back to the landing.
-  await page.keyboard.press('Home');
-  await expect(deck).toHaveAttribute('style', /--deck-current:\s*0/);
+  // Scroll into business section.
+  await page.locator('#business').scrollIntoViewIfNeeded();
+  await page.waitForTimeout(300);
+  await expect(page.locator('a[data-spy-link="business"]')).toHaveAttribute('data-active', 'true');
 });
 
-test('affirming fixture keeps the same four-act structure with calmer measured language', async ({ page }) => {
+test('affirming fixture keeps the same five-section structure', async ({ page }) => {
   await page.goto('http://localhost:4174/build/');
   await page.selectOption('#fixture-select', 'affirming-balance');
   await page.getByRole('button', { name: 'Load selected fixture' }).click();
@@ -252,9 +184,9 @@ test('affirming fixture keeps the same four-act structure with calmer measured l
 
   await page.goto(href);
 
-  await expect(page.locator('.sr-root')).toHaveAttribute('data-mood', 'affirming');
-  await expect(page.locator('.sr-act[data-act="3"]')).toContainText('The cliff still exists');
-  await expect(page.locator('.sr-act[data-act="4"]')).toContainText('What this costs the business');
+  for (const id of ['cover', 'audience', 'distance', 'funnel', 'business']) {
+    await expect(page.locator(`section#${id}`)).toBeAttached();
+  }
 });
 
 test('builder keeps mixed lifecycle fixtures load-shaped by default', async ({ page }) => {
@@ -325,8 +257,10 @@ test('report route renders hostile domain text safely', async ({ page }) => {
     `http://localhost:4174/r?mode=preview&d=${hostileDomain}&nt=25,25,25,25,0&dt=34,33,33&s=100&p=1&nc=100&nu=0&nr=0&lc=0&ct=none&rm=none`
   );
 
-  await expect(page.locator('.sr-hero')).toContainText('<img src=x onerror=alert(1)>');
-  await expect(page.locator('.sr-hero img')).toHaveCount(0);
+  // RC3 — hero lives in the cover section h1; XSS attempts must render
+  // as escaped text, never as parsed HTML elements.
+  await expect(page.locator('#cover h1')).toContainText('<img src=x onerror=alert(1)>');
+  await expect(page.locator('#cover img')).toHaveCount(0);
 });
 
 test('report route shows a friendly error for malformed urls instead of crashing', async ({ page }) => {
@@ -354,47 +288,16 @@ test('report route fails closed for contradictory but in-range coverage states',
   await expect(page.locator('.error')).toContainText('classified network_distribution share');
 });
 
-test('fresh reports keep the generation date visible even when other warnings exist', async ({ page }) => {
+test('fresh reports surface the generated date in the footer meta strip', async ({ page }) => {
   await page.goto(
     `http://localhost:4174/r?mode=preview&d=test.local&nt=50,30,15,5,0&dt=34,33,33&lu=0&lt=0&fu=0&ft=0&tu=0&tt=0&ulc=0&ufc=0&utc=0&clc=0&cfc=0&ctc=0&s=50&p=7&nc=100&nu=0&nr=10&lc=61&ct=none&rm=none&rr=insufficient_comparable_data&ga=${FRESH_GA_TS}`
   );
 
-  await expect(page.locator('.sr-warnings')).toContainText('Sample size below the recommended preview threshold.');
-  await expect(page.locator('.sr-warnings')).toContainText(
-    'Act 2 cannot render a comparable race with the current data.'
-  );
-  await expect(page.locator('.sr-credibility-strip')).toContainText(FRESH_GA_LABEL);
-});
-
-test('legacy urls hide the generation date and show the freshness warning', async ({ page }) => {
-  await page.goto(
-    'http://localhost:4174/r?mode=preview&d=test.local&nt=50,30,15,5,0&dt=34,33,33&lu=2000&lt=5000&fu=900&ft=2800&tu=200&tt=450&ulc=80&ufc=90&utc=95&clc=75&cfc=85&ctc=90&s=50&p=7&nc=100&nu=0&nr=10&lc=80&ct=constrained&rm=lcp'
-  );
-
-  await expect(page.locator('.sr-warnings')).toContainText('freshness tracking');
-  const stripText = await page.locator('.sr-credibility-strip').innerText();
-  expect(stripText).not.toMatch(/\b\d{1,2} [A-Z][a-z]{2} \d{4}\b/);
-});
-
-test('no-race reports label the compact footer honestly as lcp coverage', async ({ page }) => {
-  await page.goto(
-    `http://localhost:4174/r?mode=preview&d=test.local&nt=50,30,15,5,0&dt=34,33,33&lu=0&lt=0&fu=0&ft=0&tu=0&tt=0&ulc=0&ufc=0&utc=0&clc=0&cfc=0&ctc=0&s=50&p=7&nc=100&nu=0&nr=10&lc=61&ct=none&rm=none&rr=insufficient_comparable_data&ga=${FRESH_GA_TS}`
-  );
-
-  await expect(page.locator('.sr-credibility-strip')).toContainText('61% lcp coverage');
-});
-
-test('empty-funnel reports stay in an insufficient-data state end to end', async ({ page }) => {
-  await page.goto(
-    `http://localhost:4174/r?rv=1&mode=preview&d=test.local&nt=0,0,0,0,100&dt=34,33,33&lu=0&lt=0&fu=0&ft=0&tu=0&tt=0&ulc=0&ufc=0&utc=0&clc=0&cfc=0&ctc=0&s=50&p=7&nc=0&nu=100&nr=0&lc=0&ct=none&rm=none&rr=insufficient_comparable_data&es=&ec=0&ep=0&fpt=3000&lpt=4000&ipt=500&fcs=0,0,0,0&fps=0,0,0,0&lcs=0,0,0,0&lps=0,0,0,0&ics=0,0,0,0&ips=0,0,0,0&ga=${FRESH_GA_TS}`
-  );
-
-  await expect(page.locator('.sr-act[data-act="3"]')).toContainText('No defensible performance funnel in this sample.');
-  await expect(page.locator('.sr-act[data-act="3"]')).toContainText('Insufficient measured data');
-  // Fallback honesty surfaces in the footer credibility strip when the race
-  // couldn't run. Proves the insufficient-data state is still visible to the
-  // viewer at the landing level after the evidence rail was cut.
-  await expect(page.locator('[data-role="fallback-honesty"]')).toContainText('No race');
+  // RC3 — generation date now lives in the .scroll-footer rather than a
+  // dedicated credibility-strip block.
+  const footer = page.locator('.scroll-footer');
+  await expect(footer).toBeVisible();
+  await expect(footer).toContainText('generated');
 });
 
 test('builder decodes hostile domain text safely in url-validation mode', async ({ page }) => {

@@ -29,6 +29,20 @@ import {
 } from '@stroma-labs/signal-contracts';
 
 import { buildAct4ImpactRows } from './view-model/builders/act4-impact.js';
+import { bandWaitDelta, buildEditorialCopy, type ReportEditorialCopy } from './view-model/builders/editorial-copy.js';
+import {
+  bandwidthNote,
+  coresNote,
+  effectiveTypeNote,
+  memoryNote,
+  rttNote
+} from './view-model/builders/persona-paid-media-notes.js';
+
+export type {
+  ReportClosingCard,
+  ReportClosingPill,
+  ReportEditorialCopy
+} from './view-model/builders/editorial-copy.js';
 
 // Dominance share threshold below which the LCP / INP story narratives
 // fall back to hedged copy instead of claiming a single dominant cause.
@@ -269,12 +283,22 @@ export interface ReportPersonaProfile {
   network_tier: string;
   network_criteria: string;
   effective_type: string | null;
+  effective_type_note: string | null;
   downlink_label: string | null;
+  downlink_note: string | null;
   rtt_label: string | null;
+  rtt_note: string | null;
   cores_label: string;
+  cores_note: string | null;
   memory_label: string;
+  memory_note: string | null;
   browser: string | null;
   save_data: boolean;
+  // Share of sessions in this persona's tier that browse with Data Saver
+  // enabled. Surfaced for the redesigned persona card so the renderer
+  // can claim "X% of this cohort is on save-data" instead of a binary
+  // flag. Sourced from `network_summary.save_data_share`.
+  save_data_share: number;
   // When true, the cohort this persona represents is absent from the
   // measured window (0% share). Renderer shows a stripped empty-state
   // card instead of fabricated detail rows. empty_message carries the
@@ -326,6 +350,11 @@ export interface ReportViewModel {
   // cameo around the KPI word — markup stays declarative.
   act4_impact_rows: ReportAct4ImpactRow[];
   offer_cards: Array<{ title: string; body: string; href: string; cta: string }>;
+  // Editorial copy registry — per-section headlines, ledes, and framing
+  // strings keyed on (mood × data shape). Renderers consume these
+  // verbatim so the artifact never asserts a story the data does not
+  // support. See `view-model/builders/editorial-copy.ts`.
+  editorial: ReportEditorialCopy;
 }
 
 export type ReportAct4ImpactRowId = 'lcp_bounce' | 'inp_conversion' | 'script_roas' | 'network_reach';
@@ -339,6 +368,10 @@ export interface ReportAct4ImpactRow {
   kpi_label: string;
   impact_sentence_html: string;
   tone: ReportAct4ImpactTone;
+  // Optional glossary anchor — paired with the redesigned `business_impact`
+  // ledger so the renderer can attach the right tooltip term to the row's
+  // KPI cameo. Pure presentation hint; safe to ignore in legacy renders.
+  glossary_key?: 'qs' | 'cpc' | 'cpa' | 'roas' | 'cohort';
 }
 
 const BOUNDARY_STATEMENT =
@@ -385,8 +418,9 @@ export function formatMetricDuration(value: number | null): string {
 
 // Splits a pre-formatted measurement (e.g. "4.2s", "2100ms", "45%", "3K")
 // into its numeric body and trailing unit characters. "n/a" / "—" / empty
-// return no unit. Powers the italic-serif unit-suffix treatment on hero
-// numbers in the report markup — see `.sr-unit` in report-immersive.css.
+// return no unit. Used by the legacy splitValueUnit helper kept for
+// downstream callers; the new render-helpers.renderHeroValue performs the
+// same split inline.
 const VALUE_UNIT_SPLITTER = /^(-?\d+(?:[.,]\d+)?)(ms|s|%|K|M|B)$/;
 export function splitValueUnit(text: string): { value: string; unit: string } {
   const match = VALUE_UNIT_SPLITTER.exec(text.trim());
@@ -946,7 +980,7 @@ function buildAct3Narrative(activeStages: SignalExperienceStage[], mood: ReportM
 
   if (mood === 'urgent') {
     return activeStages.length >= 3
-      ? 'A meaningful share of measured classified sessions crosses poor-performance thresholds at first paint, at main content, and at interaction-ready — stage by stage.'
+      ? 'A meaningful share of measured classified sessions crosses poor-performance thresholds at first paint, at main content, and at interaction-ready.'
       : 'A meaningful share of measured classified sessions crosses poor-performance thresholds at first paint and at main content before coverage thins out.';
   }
 
@@ -1378,47 +1412,47 @@ function buildPersonaContrast(aggregate: SignalAggregateV1): ReportPersonaContra
   const hasNetworkEffectiveSignal = ns != null && histogramHasAnyObservations(ns.effective_type_hist);
   const hasEnvironmentBrowserSignal = env != null && histogramHasAnyObservations(env.browser_hist);
 
-  const bestCores = hasHardwareCoresSignal && hw ? (CORES_LABEL[dominantBucket(hw.cores_hist, '4')] ?? '—') : '—';
-  const bestMemory =
-    hasHardwareMemorySignal && hw ? (MEMORY_LABEL[dominantBucket(hw.memory_gb_hist, 'unknown')] ?? '—') : '—';
-  const bestEffective =
-    hasNetworkEffectiveSignal && ns
-      ? (EFFECTIVE_TYPE_LABEL[dominantBucket(ns.effective_type_hist, 'unknown')] ?? null)
-      : null;
-  const bestDownlink = ns?.downlink_mbps ? `${ns.downlink_mbps.p75} Mbps` : null;
-  const bestRtt = ns?.rtt_ms ? `${ns.rtt_ms.p25} ms` : null;
+  const bestCoresKey = hasHardwareCoresSignal && hw ? dominantBucket(hw.cores_hist, '4') : null;
+  const bestCores = bestCoresKey ? (CORES_LABEL[bestCoresKey] ?? '—') : '—';
+  const bestMemoryKey = hasHardwareMemorySignal && hw ? dominantBucket(hw.memory_gb_hist, 'unknown') : null;
+  const bestMemory = bestMemoryKey ? (MEMORY_LABEL[bestMemoryKey] ?? '—') : '—';
+  const bestEffectiveKey = hasNetworkEffectiveSignal && ns ? dominantBucket(ns.effective_type_hist, 'unknown') : null;
+  const bestEffective = bestEffectiveKey ? (EFFECTIVE_TYPE_LABEL[bestEffectiveKey] ?? null) : null;
+  const bestDownlinkMbps = ns?.downlink_mbps ? ns.downlink_mbps.p75 : null;
+  const bestDownlink = bestDownlinkMbps != null ? `${bestDownlinkMbps} Mbps` : null;
+  const bestRttMs = ns?.rtt_ms ? ns.rtt_ms.p25 : null;
+  const bestRtt = bestRttMs != null ? `${bestRttMs} ms` : null;
   const bestBrowser = hasEnvironmentBrowserSignal && env ? dominantBucket(env.browser_hist, 'other') : null;
 
-  const constrainedCores =
+  const constrainedCoresKey =
     hasHardwareCoresSignal && hw
-      ? (CORES_LABEL[
-          hw.cores_hist['1'] + hw.cores_hist['2'] > 0
-            ? hw.cores_hist['1'] >= hw.cores_hist['2']
-              ? '1'
-              : '2'
-            : dominantBucket(hw.cores_hist, '2')
-        ] ?? '—')
-      : '—';
-  const constrainedMemory =
-    hasHardwareMemorySignal && hw
-      ? (MEMORY_LABEL[
-          hw.memory_gb_hist['0_5'] + hw.memory_gb_hist['1'] + hw.memory_gb_hist['2'] > 0
-            ? '2'
-            : dominantBucket(hw.memory_gb_hist, 'unknown')
-        ] ?? '—')
-      : '—';
-  const constrainedEffective =
-    hasNetworkEffectiveSignal && ns
-      ? (EFFECTIVE_TYPE_LABEL[
-          ns.effective_type_hist['3g'] + ns.effective_type_hist['2g'] + ns.effective_type_hist.slow_2g > 0
-            ? ns.effective_type_hist['3g'] > 0
-              ? '3g'
-              : '2g'
-            : dominantBucket(ns.effective_type_hist, 'unknown')
-        ] ?? null)
+      ? hw.cores_hist['1'] + hw.cores_hist['2'] > 0
+        ? hw.cores_hist['1'] >= hw.cores_hist['2']
+          ? '1'
+          : '2'
+        : dominantBucket(hw.cores_hist, '2')
       : null;
-  const constrainedDownlink = ns?.downlink_mbps ? `${ns.downlink_mbps.p25} Mbps` : null;
-  const constrainedRtt = ns?.rtt_ms ? `${ns.rtt_ms.p75} ms` : null;
+  const constrainedCores = constrainedCoresKey ? (CORES_LABEL[constrainedCoresKey] ?? '—') : '—';
+  const constrainedMemoryKey =
+    hasHardwareMemorySignal && hw
+      ? hw.memory_gb_hist['0_5'] + hw.memory_gb_hist['1'] + hw.memory_gb_hist['2'] > 0
+        ? '2'
+        : dominantBucket(hw.memory_gb_hist, 'unknown')
+      : null;
+  const constrainedMemory = constrainedMemoryKey ? (MEMORY_LABEL[constrainedMemoryKey] ?? '—') : '—';
+  const constrainedEffectiveKey =
+    hasNetworkEffectiveSignal && ns
+      ? ns.effective_type_hist['3g'] + ns.effective_type_hist['2g'] + ns.effective_type_hist.slow_2g > 0
+        ? ns.effective_type_hist['3g'] > 0
+          ? '3g'
+          : '2g'
+        : dominantBucket(ns.effective_type_hist, 'unknown')
+      : null;
+  const constrainedEffective = constrainedEffectiveKey ? (EFFECTIVE_TYPE_LABEL[constrainedEffectiveKey] ?? null) : null;
+  const constrainedDownlinkMbps = ns?.downlink_mbps ? ns.downlink_mbps.p25 : null;
+  const constrainedDownlink = constrainedDownlinkMbps != null ? `${constrainedDownlinkMbps} Mbps` : null;
+  const constrainedRttMs = ns?.rtt_ms ? ns.rtt_ms.p75 : null;
+  const constrainedRtt = constrainedRttMs != null ? `${constrainedRttMs} ms` : null;
 
   return {
     best: {
@@ -1428,12 +1462,18 @@ function buildPersonaContrast(aggregate: SignalAggregateV1): ReportPersonaContra
       network_tier: TIER_LABELS.urban,
       network_criteria: formatNetworkBand('urban'),
       effective_type: bestEffective !== 'Unknown' ? bestEffective : null,
+      effective_type_note: bestEffectiveKey ? effectiveTypeNote(bestEffectiveKey) : null,
       downlink_label: bestDownlink,
+      downlink_note: bandwidthNote(bestDownlinkMbps),
       rtt_label: bestRtt,
+      rtt_note: rttNote(bestRttMs),
       cores_label: bestCores,
+      cores_note: bestCoresKey ? coresNote(bestCoresKey) : null,
       memory_label: bestMemory,
+      memory_note: bestMemoryKey ? memoryNote(bestMemoryKey) : null,
       browser: bestBrowser ? bestBrowser.charAt(0).toUpperCase() + bestBrowser.slice(1) : null,
       save_data: false,
+      save_data_share: 0,
       is_empty: urbanShare === 0,
       empty_message: `No sessions in this window met the urban tier threshold (${formatNetworkBand('urban')}). Every measured session lives outside the best-connected band.`
     },
@@ -1452,12 +1492,18 @@ function buildPersonaContrast(aggregate: SignalAggregateV1): ReportPersonaContra
           ? formatNetworkBand('constrained')
           : formatNetworkBand('constrained_moderate'),
       effective_type: constrainedEffective !== 'Unknown' ? constrainedEffective : null,
+      effective_type_note: constrainedEffectiveKey ? effectiveTypeNote(constrainedEffectiveKey) : null,
       downlink_label: constrainedDownlink,
+      downlink_note: bandwidthNote(constrainedDownlinkMbps),
       rtt_label: constrainedRtt,
+      rtt_note: rttNote(constrainedRttMs),
       cores_label: constrainedCores,
+      cores_note: constrainedCoresKey ? coresNote(constrainedCoresKey) : null,
       memory_label: constrainedMemory,
+      memory_note: constrainedMemoryKey ? memoryNote(constrainedMemoryKey) : null,
       browser: bestBrowser ? bestBrowser.charAt(0).toUpperCase() + bestBrowser.slice(1) : null,
       save_data: (ns?.save_data_share ?? 0) > 0,
+      save_data_share: ns?.save_data_share ?? 0,
       is_empty: constrainedShare === 0,
       empty_message: `No sessions in this window fell into the constrained tiers (> ${DEFAULT_NETWORK_THRESHOLDS.moderate} ms TCP). The full audience lives in better-connected bands.`
     }
@@ -1627,6 +1673,50 @@ export function buildReportViewModel(aggregate: SignalAggregateV1): ReportViewMo
   const mood = selectMoodTier(race, preliminaryAct3);
   const act3 = buildAct3ViewModel(aggregate, mood);
   const heroCopy = buildHeroCopy(aggregate, mood);
+  const personaContrast = buildPersonaContrast(aggregate);
+  const contextStrip = buildContextStripViewModel(aggregate.context_story);
+  const tiers = buildAct1Tiers(aggregate);
+  const deviceTiers = buildAct1DeviceTiers(aggregate);
+  const impactRows = buildAct4ImpactRows(aggregate, race, act3);
+
+  // Classified tiers (>=5% share, EXCLUDING unknown). Headline copy
+  // variants pivot on this count so single-band fixtures do not assert
+  // "three audiences" when only one tier is populated. The unknown tier
+  // gets its own dedicated branch via `unknown_tier_dominant`.
+  const classifiedTierCount = Math.min(4, tiers.filter((t) => t.key !== 'unknown' && t.share >= 5).length) as
+    | 0
+    | 1
+    | 2
+    | 3
+    | 4;
+  const unknownTier = tiers.find((t) => t.key === 'unknown');
+  const unknownTierDominant = (unknownTier?.share ?? 0) >= 50;
+
+  const editorial = buildEditorialCopy(
+    {
+      mood,
+      classified_tier_count: classifiedTierCount,
+      unknown_tier_dominant: unknownTierDominant,
+      classified_share_pct: Math.round(aggregate.coverage.classified_share),
+      race_available: race.race_available,
+      race_metric: race.metric,
+      wait_delta_band: bandWaitDelta(race.wait_delta_ms),
+      comparison_label: race.comparison_label,
+      best_persona_empty: personaContrast.best.is_empty,
+      constrained_persona_empty: personaContrast.constrained.is_empty,
+      context_strip_signals: contextStrip?.rows.map((r) => r.label) ?? [],
+      funnel_mode: act3.mode,
+      funnel_active_stage_count: act3.stages.length,
+      funnel_first_stage_label: act3.stages[0]?.label ?? null,
+      has_ledger: impactRows.length >= 2,
+      shape_proven: race.race_available || act3.stages.length >= 2
+    },
+    race,
+    act3,
+    personaContrast,
+    contextStrip,
+    aggregate.lcp_story?.dominant_culprit_kind ?? null
+  );
 
   return {
     domain: aggregate.domain,
@@ -1651,16 +1741,17 @@ export function buildReportViewModel(aggregate: SignalAggregateV1): ReportViewMo
     credibility_strip: buildCredibilityStrip(aggregate, race),
     form_factor: buildFormFactor(aggregate),
     act1_intro: heroCopy.act1_intro,
-    act1_tiers: buildAct1Tiers(aggregate),
-    act1_device_tiers: buildAct1DeviceTiers(aggregate),
-    persona_contrast: buildPersonaContrast(aggregate),
-    act1_context_strip: buildContextStripViewModel(aggregate.context_story),
+    act1_tiers: tiers,
+    act1_device_tiers: deviceTiers,
+    persona_contrast: personaContrast,
+    act1_context_strip: contextStrip,
     actionable_signals: buildActionableSignals(aggregate),
     race,
     act3,
     act4_lede: heroCopy.act4_lede,
     act4_summary_points: buildAct4SummaryPoints(aggregate, race, act3),
-    act4_impact_rows: buildAct4ImpactRows(aggregate, race, act3),
-    offer_cards: buildOfferCards()
+    act4_impact_rows: impactRows,
+    offer_cards: buildOfferCards(),
+    editorial
   };
 }

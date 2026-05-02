@@ -13,7 +13,34 @@
 
 export const SIGNAL_REPORT_INTERACTION_VERSION = 1 as const;
 
-export type SignalReportInteractionKind = 'report_opened' | 'report_slide_advanced';
+export type SignalReportInteractionKind =
+  | 'report_opened'
+  | 'report_slide_advanced'
+  // Intent-capture kinds — emitted from the /r closing section's
+  // three-card router + 5-pill freeform demand-signal row. Each click
+  // is a fire-and-forget signal of latent demand for one of the four
+  // wedges. Free at the click; pricing decisions get made on the next
+  // surface, never inline.
+  | 'intent_pi_early_access'
+  | 'intent_rapid_fix'
+  | 'intent_monitoring'
+  | 'intent_freeform';
+
+export type SignalReportInteractionIntentKind = Extract<SignalReportInteractionKind, `intent_${string}`>;
+
+/** Two-stage capture pattern. Initial click logs an anonymous demand
+ * signal; the optional follow-up (email + cadence) lands as a `followup`
+ * carrying the same `intent_capture_id`. Server upserts so one CTA click
+ * == one demand-signal row, not one event-per-interaction. */
+export type SignalReportInteractionIntentStage = 'initial' | 'followup';
+
+export type SignalReportInteractionIntentCadence = 'weekly' | 'monthly';
+
+export type SignalReportInteractionIntentPillId =
+  | 'multi_page'
+  | 'multi_client_portfolio'
+  | 'competitor_context'
+  | 'something_else';
 
 export type SignalReportInteractionRoute = 'r';
 
@@ -43,12 +70,46 @@ export interface SignalReportInteractionV1 {
   dwell_ms?: number;
   ua_browser?: string;
   ua_tier?: SignalReportInteractionUaTier;
+  // ─── Intent-capture payload (only set on intent_* kinds) ─────────────
+  /** Stable client-side UUID generated at the moment of the first click
+   * for a given CTA. Sent on the initial event AND on any follow-up
+   * event for the same intent (e.g. email-submit follow-up after a PI
+   * early-access click). The snapshot-engine repository UPSERTs by this
+   * id so the row count == demand-signal count, not click count. */
+  intent_capture_id?: string;
+  /** Marks whether this event is the initial CTA click or a follow-up
+   * carrying additional payload (email, cadence, freeform_text). */
+  intent_stage?: SignalReportInteractionIntentStage;
+  intent_email?: string;
+  /** Monitoring-card only. */
+  intent_cadence?: SignalReportInteractionIntentCadence;
+  /** Freeform pill row only. Identifies which of the 5 pills was
+   * clicked. `something_else` is paired with `intent_freeform_text`. */
+  intent_pill_id?: SignalReportInteractionIntentPillId;
+  /** Capped 200 chars server-side. Emitted only when
+   * `intent_pill_id === 'something_else'`. */
+  intent_freeform_text?: string;
 }
 
 export const SIGNAL_REPORT_INTERACTION_VALID_KINDS: ReadonlySet<SignalReportInteractionKind> = new Set([
   'report_opened',
-  'report_slide_advanced'
+  'report_slide_advanced',
+  'intent_pi_early_access',
+  'intent_rapid_fix',
+  'intent_monitoring',
+  'intent_freeform'
 ]);
+
+export const SIGNAL_REPORT_INTERACTION_VALID_INTENT_STAGES: ReadonlySet<SignalReportInteractionIntentStage> = new Set([
+  'initial',
+  'followup'
+]);
+
+export const SIGNAL_REPORT_INTERACTION_VALID_INTENT_CADENCES: ReadonlySet<SignalReportInteractionIntentCadence> =
+  new Set(['weekly', 'monthly']);
+
+export const SIGNAL_REPORT_INTERACTION_VALID_INTENT_PILL_IDS: ReadonlySet<SignalReportInteractionIntentPillId> =
+  new Set(['multi_page', 'multi_client_portfolio', 'competitor_context', 'something_else']);
 
 export const SIGNAL_REPORT_INTERACTION_VALID_ROUTES: ReadonlySet<SignalReportInteractionRoute> = new Set(['r']);
 
@@ -67,8 +128,23 @@ export const SIGNAL_REPORT_INTERACTION_VALID_UA_TIERS: ReadonlySet<SignalReportI
 // the base.
 const KIND_REQUIRED_FIELDS: Record<SignalReportInteractionKind, readonly string[]> = {
   report_opened: ['rv'],
-  report_slide_advanced: ['rv', 'section_id']
+  report_slide_advanced: ['rv', 'section_id'],
+  intent_pi_early_access: ['intent_capture_id', 'intent_stage'],
+  intent_rapid_fix: ['intent_capture_id', 'intent_stage'],
+  intent_monitoring: ['intent_capture_id', 'intent_stage'],
+  intent_freeform: ['intent_capture_id', 'intent_stage', 'intent_pill_id']
 };
+
+/** Intent kinds where a `followup` event MUST carry at least one of
+ * email / cadence / freeform_text — otherwise the followup carries no
+ * new information and is a wire-format error. */
+const INTENT_FOLLOWUP_PAYLOAD_FIELDS: readonly (keyof Pick<
+  SignalReportInteractionV1,
+  'intent_email' | 'intent_cadence' | 'intent_freeform_text'
+>)[] = ['intent_email', 'intent_cadence', 'intent_freeform_text'];
+
+const MAX_INTENT_FREEFORM_TEXT_LENGTH = 200;
+const MAX_INTENT_EMAIL_LENGTH = 254;
 
 // Lightweight guard — the ingest endpoint and the client emitters
 // share a single source of truth for validity. Returns an array of
@@ -96,7 +172,13 @@ export function explainReportInteractionIssues(value: unknown): string[] {
   if (typeof v.ts !== 'number' || !Number.isFinite(v.ts)) {
     issues.push('Expected "ts" to be a finite number.');
   }
-  if (typeof v.st !== 'string' || v.st.length === 0) {
+  // Share token: intent_* kinds may carry an empty string (the /r URL
+  // may not have an `st` param when loaded directly without a share
+  // link). The legacy report_opened / report_slide_advanced kinds keep
+  // the non-empty requirement.
+  if (typeof v.st !== 'string') {
+    issues.push('Expected "st" (share token) to be a string.');
+  } else if (v.st.length === 0 && typeof v.event_kind === 'string' && !v.event_kind.startsWith('intent_')) {
     issues.push('Expected "st" (share token) to be a non-empty string.');
   }
   if (
@@ -130,6 +212,62 @@ export function explainReportInteractionIssues(value: unknown): string[] {
     issues.push('Expected "dwell_ms" to be a non-negative number when present.');
   }
 
+  // Intent-payload validity (when present + when required by kind).
+  if (v.intent_capture_id != null) {
+    if (typeof v.intent_capture_id !== 'string' || v.intent_capture_id.length === 0) {
+      issues.push('Expected "intent_capture_id" to be a non-empty string when present.');
+    }
+  }
+  if (
+    v.intent_stage != null &&
+    !SIGNAL_REPORT_INTERACTION_VALID_INTENT_STAGES.has(v.intent_stage as SignalReportInteractionIntentStage)
+  ) {
+    issues.push('Expected "intent_stage" to be "initial" | "followup" when present.');
+  }
+  if (v.intent_email != null) {
+    if (typeof v.intent_email !== 'string') {
+      issues.push('Expected "intent_email" to be a string when present.');
+    } else if (v.intent_email.length === 0 || v.intent_email.length > MAX_INTENT_EMAIL_LENGTH) {
+      issues.push(`Expected "intent_email" length to be 1–${MAX_INTENT_EMAIL_LENGTH} when present.`);
+    } else if (!v.intent_email.includes('@')) {
+      issues.push('Expected "intent_email" to contain "@" when present (RFC-5322 lite).');
+    }
+  }
+  if (
+    v.intent_cadence != null &&
+    !SIGNAL_REPORT_INTERACTION_VALID_INTENT_CADENCES.has(v.intent_cadence as SignalReportInteractionIntentCadence)
+  ) {
+    issues.push('Expected "intent_cadence" to be "weekly" | "monthly" when present.');
+  }
+  if (
+    v.intent_pill_id != null &&
+    !SIGNAL_REPORT_INTERACTION_VALID_INTENT_PILL_IDS.has(v.intent_pill_id as SignalReportInteractionIntentPillId)
+  ) {
+    issues.push(
+      'Expected "intent_pill_id" to be one of: multi_page, multi_client_portfolio, competitor_context, something_else when present.'
+    );
+  }
+  if (v.intent_freeform_text != null) {
+    if (typeof v.intent_freeform_text !== 'string') {
+      issues.push('Expected "intent_freeform_text" to be a string when present.');
+    } else if (v.intent_freeform_text.length > MAX_INTENT_FREEFORM_TEXT_LENGTH) {
+      issues.push(`Expected "intent_freeform_text" length to be ≤ ${MAX_INTENT_FREEFORM_TEXT_LENGTH} when present.`);
+    }
+  }
+  if (
+    kindValid &&
+    typeof v.event_kind === 'string' &&
+    v.event_kind.startsWith('intent_') &&
+    v.intent_stage === 'followup'
+  ) {
+    const hasPayload = INTENT_FOLLOWUP_PAYLOAD_FIELDS.some((field) => v[field] != null);
+    if (!hasPayload) {
+      issues.push(
+        'Expected "followup" intent event to carry at least one of intent_email / intent_cadence / intent_freeform_text.'
+      );
+    }
+  }
+
   return issues;
 }
 
@@ -137,7 +275,23 @@ export function isSignalReportInteractionV1(value: unknown): value is SignalRepo
   return explainReportInteractionIssues(value).length === 0;
 }
 
-// Default ingest endpoint. Separate from Signal's `/collect`. Clients
-// override via env or inline configuration tag if hosting their own
-// ingest template.
+/**
+ * Default ingest endpoint path (legacy). Held for backwards compatibility
+ * with any consumer constructing a same-origin URL; the canonical default
+ * for the new intent-capture emitter is the full URL constant below.
+ *
+ * @deprecated Prefer `SIGNAL_REPORT_INTERACTION_INGEST_URL_DEFAULT` for
+ *  cross-origin sendBeacon delivery. Will be removed in a future major.
+ */
 export const SIGNAL_REPORT_INTERACTION_INGEST_PATH = '/ingest/report-interaction';
+
+/**
+ * Canonical ingest URL for the report-interaction telemetry endpoint.
+ * Hosted by the stroma-snapshot-engine workspace at
+ * `https://api.stroma.design/api/v1/intent`.
+ *
+ * The new intent-capture client emitter (in apps/signal-report) defaults
+ * to this URL. Consumers can override via init config when self-hosting
+ * the ingest endpoint.
+ */
+export const SIGNAL_REPORT_INTERACTION_INGEST_URL_DEFAULT = 'https://api.stroma.design/api/v1/intent';

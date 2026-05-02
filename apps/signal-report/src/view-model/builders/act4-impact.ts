@@ -83,24 +83,55 @@ function toneFromConstrainedShare(share: number): ReportAct4ImpactTone {
 // function instead of scrolling through a 100-line imperative push
 // loop.
 
+// Tone-aware impact-sentence variants. The metric_value already conveys
+// magnitude; the prose should scale with it instead of asserting one
+// alarm-toned headline at every severity. Discipline: never prescribe;
+// only describe the consequence the measured delta lands on.
+const LCP_BOUNCE_SENTENCES: Record<ReportAct4ImpactTone, string> = {
+  alert:
+    'Google and Meta raise CPC on slow landing pages. At this delta, you are paying more for clicks that never become sessions.',
+  watch:
+    'Google and Meta lift CPC on slower landing pages. The delta here is enough to start showing up in auction prices.',
+  steady:
+    'The wait delta here is small. CPC pressure from landing-page experience is present but not the dominant cost driver in this window.'
+};
+
 function buildLcpBounceRow(race: ReportRaceViewModel): ReportAct4ImpactRow | null {
   if (!race.race_available || race.wait_delta_ms == null || !race.wait_delta_seconds) return null;
+  const tone = toneFromWaitDeltaMs(race.wait_delta_ms);
   return {
     id: 'lcp_bounce',
     metric_value: race.wait_delta_seconds,
     metric_label: `LCP wait delta · ${race.comparison_label} vs urban`,
     kpi_label: 'Bounce Rate · Ad Quality Score',
-    impact_sentence_html: wrapKpiCameo(
-      'Google and Meta raise CPC on slow landing pages. You pay more for clicks that never become sessions.',
-      'CPC'
-    ),
-    tone: toneFromWaitDeltaMs(race.wait_delta_ms)
+    impact_sentence_html: wrapKpiCameo(LCP_BOUNCE_SENTENCES[tone], 'CPC'),
+    tone,
+    glossary_key: 'cpc'
   };
+}
+
+// Per-phase INP-conversion sentences. Mushy-buttons framing only fits
+// `input_delay`; `processing` is heavy click-handlers; `presentation_delay`
+// is render-commit lag (the page accepts the click but the next paint is
+// late). Picking the wrong sentence misattributes mechanism.
+function pickInpConversionSentence(phase: 'input_delay' | 'processing' | 'presentation_delay' | null): string {
+  if (phase === 'processing') {
+    return 'Heavy click handlers at the point of intent stall conversion. Same ad spend, fewer leads, inflated CPA.';
+  }
+  if (phase === 'presentation_delay') {
+    return 'The page accepts the click, but takes too long to commit the next paint. Users assume nothing happened and leave. Same ad spend, fewer leads, inflated CPA.';
+  }
+  if (phase === 'input_delay') {
+    return 'Mushy buttons at the point of intent drop conversion. Same ad spend, fewer leads, inflated CPA.';
+  }
+  // No dominant phase confidently named — fall back to a non-mechanism
+  // framing that still earns the row's space.
+  return 'A measurable share of sessions cross the interaction-poor threshold. The mechanism is not single-cause here, but it shows up at the bottom of the funnel as inflated CPA.';
 }
 
 function buildInpConversionRow(act3: ReportAct3ViewModel): ReportAct4ImpactRow | null {
   if (act3.poor_session_share == null || act3.poor_session_share < ACT4_INP_GATE_POOR_SHARE_PCT) return null;
-  const phase = act3.inp_story?.dominant_phase;
+  const phase = act3.inp_story?.dominant_phase ?? null;
   return {
     id: 'inp_conversion',
     metric_value: `${act3.poor_session_share}%`,
@@ -108,11 +139,9 @@ function buildInpConversionRow(act3: ReportAct3ViewModel): ReportAct4ImpactRow |
       ? `Sessions past the poor-performance threshold · dominant phase ${phase.replace('_', ' ')}`
       : 'Sessions past the poor-performance threshold',
     kpi_label: 'Conversion Rate · Cost Per Acquisition',
-    impact_sentence_html: wrapKpiCameo(
-      'Mushy buttons at the point of intent drop conversion. Same ad spend, fewer leads, inflated CPA.',
-      'CPA'
-    ),
-    tone: toneFromPoorShare(act3.poor_session_share)
+    impact_sentence_html: wrapKpiCameo(pickInpConversionSentence(phase), 'CPA'),
+    tone: toneFromPoorShare(act3.poor_session_share),
+    glossary_key: 'cpa'
   };
 }
 
@@ -145,16 +174,22 @@ function buildScriptRoasRow(race: ReportRaceViewModel, act3: ReportAct3ViewModel
     tone = thirdParty?.dominant_tier === 'heavy' ? 'alert' : 'watch';
   }
 
+  // "Cannot interact" is correct only at heavy / loaf-alert. At watch tier
+  // (moderate third-party share, sub-150ms LoAF) it's hyperbole — users
+  // can interact, just slowly.
+  const sentence =
+    tone === 'alert'
+      ? 'Mobile-first audiences cannot reliably interact with a script-heavy page. Top-of-funnel reach without bottom-of-funnel ROAS.'
+      : 'Mobile-first audiences struggle to interact with a script-heavy page. Top-of-funnel reach with leaky bottom-of-funnel ROAS.';
+
   return {
     id: 'script_roas',
     metric_value: metricValue,
     metric_label: metricLabel,
     kpi_label: 'Mobile ROAS · Audience Reach',
-    impact_sentence_html: wrapKpiCameo(
-      'Mobile-first audiences cannot interact with a script-heavy page. Top-of-funnel reach without bottom-of-funnel ROAS.',
-      'ROAS'
-    ),
-    tone
+    impact_sentence_html: wrapKpiCameo(sentence, 'ROAS'),
+    tone,
+    glossary_key: 'roas'
   };
 }
 
@@ -162,16 +197,21 @@ function buildNetworkReachRow(aggregate: SignalAggregateV1): ReportAct4ImpactRow
   const constrainedShare =
     aggregate.network_distribution.constrained_moderate + aggregate.network_distribution.constrained;
   if (constrainedShare < ACT4_NETWORK_GATE_CONSTRAINED_PCT) return null;
+  const tone = toneFromConstrainedShare(constrainedShare);
+  // At alert tier (>=50%) the framing earns "majority"; at watch tier
+  // (>=30%) "real share" stays accurate.
+  const sentence =
+    tone === 'alert'
+      ? 'A majority of your audience lives on constrained networks. Campaigns calibrated for urban speed leak Campaign Efficiency at scale here.'
+      : 'A real share of your audience lives on constrained networks. Campaigns calibrated for urban speed leak Campaign Efficiency here.';
   return {
     id: 'network_reach',
     metric_value: `${constrainedShare}%`,
     metric_label: 'Audience on constrained or worse networks',
     kpi_label: 'Audience Reach · Campaign Efficiency',
-    impact_sentence_html: wrapKpiCameo(
-      'A real share of your audience lives on constrained networks. Campaigns calibrated for urban speed leak Campaign Efficiency here.',
-      'Campaign Efficiency'
-    ),
-    tone: toneFromConstrainedShare(constrainedShare)
+    impact_sentence_html: wrapKpiCameo(sentence, 'Campaign Efficiency'),
+    tone,
+    glossary_key: 'cohort'
   };
 }
 

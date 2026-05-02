@@ -1,0 +1,218 @@
+// Forbidden-words discipline for the redesigned scroll-narrative report.
+// Replaces the prior motion-payload guard. Two surfaces:
+//
+//   1. WHOLE-DOC tokens — must never appear anywhere in the rendered shell:
+//      revenue / exposure / monthly / asv / mts / zar (pre-existing
+//      commercial-modelling guard) + bid-down / exclusion phrasings.
+//
+//   2. HEADLINE+LEDE tokens — prescription verbs that violate the
+//      "educational only, body never prescribes" boundary in headlines
+//      and ledes specifically. Body copy may use educational language
+//      (glossary tooltips translate KPI consequence) but headlines stay
+//      diagnostic.
+//
+// The test renders every shipped fixture so any regression that smuggles
+// a forbidden token through fixture-driven copy fails CI.
+
+import { signalReportScenarioFixtures } from '@stroma-labs/signal-contracts';
+import { describe, expect, it } from 'vitest';
+import { renderReportShell } from './render-shell';
+import { buildReportViewModel } from './report-view-model';
+
+// Whole-doc forbidden tokens — case-insensitive; must not appear ANYWHERE
+// in the rendered HTML across any fixture. Tightened from the prior
+// motion-payload single-word list (which collided with legitimate uses
+// like "Business exposure") to precise phrases that name the actual
+// truth-boundary violation: revenue estimates, monthly exposure figures,
+// asv/mts/zar commercial-modelling tokens, and bid-down vocabulary.
+const FORBIDDEN_WHOLEDOC: string[] = [
+  'revenue estimate',
+  'revenue impact',
+  'monthly exposure',
+  'monthly revenue',
+  'commercial exposure',
+  'commercial diagnosis',
+  ' asv ',
+  ' mts ',
+  ' zar ',
+  'bid down',
+  'lower CPC ceilings',
+  'lower bids',
+  'bid lower'
+];
+
+// Headline + lede forbidden tokens — prescription verbs that read as
+// directives instead of diagnostic observation. The renderer extracts
+// every <h1> + .act-intro-lede + .section-title + .section-lede slot and
+// asserts none of these appear inside.
+const FORBIDDEN_IN_HEADLINES_AND_LEDES: string[] = [
+  'recommend',
+  'you should',
+  'optimize',
+  'we suggest',
+  'the fix is',
+  'exclude',
+  'avoid'
+];
+
+function extractHeadlineSlots(html: string): string[] {
+  const slots: string[] = [];
+  const patterns = [
+    /<h1\b[^>]*>([\s\S]*?)<\/h1>/gi,
+    /<p\b[^>]*class="[^"]*\bact-intro-lede\b[^"]*"[^>]*>([\s\S]*?)<\/p>/gi,
+    /<h2\b[^>]*class="[^"]*\bsection-title\b[^"]*"[^>]*>([\s\S]*?)<\/h2>/gi,
+    /<p\b[^>]*class="[^"]*\bsection-lede\b[^"]*"[^>]*>([\s\S]*?)<\/p>/gi
+  ];
+  for (const pattern of patterns) {
+    let match: RegExpExecArray | null = pattern.exec(html);
+    while (match !== null) {
+      slots.push(match[1] ?? '');
+      match = pattern.exec(html);
+    }
+  }
+  return slots;
+}
+
+// ─── Closing-section discipline ──────────────────────────────────────
+//
+// The closing section (Act 04 / Business) handles the conversion CTAs.
+// It must read as a continuation of the editorial body, NOT as a sales
+// footer. Two scoped guards (case-insensitive, business-section scope):
+//
+//   - Sales-register tokens: paywall verbs, premium/pro tier language,
+//     hype verbs, R-currency overclaims
+//   - Celebration tokens: transactional / packaging / "thanks!" register
+//     that breaks the observation tone established by the rest of the
+//     report
+
+const FORBIDDEN_BUSINESS_SECTION_SALES_TOKENS: string[] = [
+  'unlock',
+  'upgrade to',
+  ' pro ',
+  ' premium ',
+  'get more',
+  'discover more',
+  'fix your',
+  'costing you r',
+  'costing you $',
+  'transform',
+  'revolutionize',
+  'limited time',
+  'limited offer',
+  'special offer',
+  'exclusive access'
+];
+
+const FORBIDDEN_BUSINESS_SECTION_CELEBRATION_TOKENS: string[] = [
+  'thanks!',
+  "you're in!",
+  'welcome!',
+  'joined!',
+  'congrats',
+  'choose your',
+  'pick your',
+  'select your plan',
+  'three paths',
+  'three packages',
+  'three options to choose'
+];
+
+function extractBusinessSection(html: string): string {
+  const start = html.indexOf('id="business"');
+  if (start === -1) return '';
+  // Walk forward to find the matching </section> close. The shell only
+  // emits one section per id, so the next </section> after the id
+  // attribute is the right closer.
+  const end = html.indexOf('</section>', start);
+  if (end === -1) return html.slice(start);
+  return html.slice(start, end + '</section>'.length);
+}
+
+// Strip inline style + script attributes before scanning prose. The
+// forbidden-words guards target editorial copy (text content + plain
+// attribute values), NOT CSS property names like `transform:` that
+// appear inside `style="..."` blocks. Without this, "transform" would
+// fire on every reveal-animation transform CSS property.
+function stripPresentationAttrs(html: string): string {
+  return (
+    html
+      .replaceAll(/style="[^"]*"/g, '')
+      .replaceAll(/style='[^']*'/g, '')
+      // Also strip class= attribute values — class names like
+      // `closing-pill` etc. are not editorial copy.
+      .replaceAll(/class="[^"]*"/g, '')
+      .replaceAll(/class='[^']*'/g, '')
+  );
+}
+
+describe('render-honesty: forbidden-words discipline across rendered shell', () => {
+  describe('whole-doc forbidden tokens never appear anywhere in the rendered shell', () => {
+    for (const fixture of signalReportScenarioFixtures) {
+      const vm = buildReportViewModel(fixture.aggregate);
+      const html = renderReportShell(vm).toLowerCase();
+
+      for (const forbidden of FORBIDDEN_WHOLEDOC) {
+        it(`${fixture.name}: does not contain "${forbidden}"`, () => {
+          expect(html).not.toContain(forbidden.toLowerCase());
+        });
+      }
+    }
+  });
+
+  describe('business-section sales-register tokens are mechanically blocked', () => {
+    for (const fixture of signalReportScenarioFixtures) {
+      const vm = buildReportViewModel(fixture.aggregate);
+      const businessProse = stripPresentationAttrs(extractBusinessSection(renderReportShell(vm))).toLowerCase();
+
+      for (const forbidden of FORBIDDEN_BUSINESS_SECTION_SALES_TOKENS) {
+        it(`${fixture.name}: business section does not contain "${forbidden.trim()}"`, () => {
+          expect(businessProse).not.toContain(forbidden.toLowerCase());
+        });
+      }
+    }
+  });
+
+  describe('business-section celebration / packaging tokens are mechanically blocked', () => {
+    for (const fixture of signalReportScenarioFixtures) {
+      const vm = buildReportViewModel(fixture.aggregate);
+      const businessProse = stripPresentationAttrs(extractBusinessSection(renderReportShell(vm))).toLowerCase();
+
+      for (const forbidden of FORBIDDEN_BUSINESS_SECTION_CELEBRATION_TOKENS) {
+        it(`${fixture.name}: business section does not contain "${forbidden}"`, () => {
+          expect(businessProse).not.toContain(forbidden.toLowerCase());
+        });
+      }
+    }
+  });
+
+  describe('headline + lede slots never carry prescription verbs', () => {
+    for (const fixture of signalReportScenarioFixtures) {
+      const vm = buildReportViewModel(fixture.aggregate);
+      const html = renderReportShell(vm);
+      const slots = extractHeadlineSlots(html);
+
+      for (const forbidden of FORBIDDEN_IN_HEADLINES_AND_LEDES) {
+        it(`${fixture.name}: no headline/lede slot contains "${forbidden}"`, () => {
+          for (const slot of slots) {
+            expect(slot.toLowerCase()).not.toContain(forbidden.toLowerCase());
+          }
+        });
+      }
+    }
+  });
+
+  describe('shell renders all 5 sections + boundary statement on every fixture', () => {
+    for (const fixture of signalReportScenarioFixtures) {
+      it(`${fixture.name}: renders cover/audience/distance/funnel/business + boundary footer`, () => {
+        const vm = buildReportViewModel(fixture.aggregate);
+        const html = renderReportShell(vm);
+
+        for (const id of ['cover', 'audience', 'distance', 'funnel', 'business']) {
+          expect(html).toContain(`id="${id}"`);
+        }
+        // Boundary statement (truth-frame) lives in the closing section.
+        expect(html).toContain(vm.boundary_statement);
+      });
+    }
+  });
+});
