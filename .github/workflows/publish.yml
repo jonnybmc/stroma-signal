@@ -34,13 +34,16 @@ jobs:
           version: 10.28.2
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          # Node 24 ships with npm 11.x bundled, which has the OIDC
+          # publish-auth flow needed for npm Trusted Publishing. Node
+          # 22 ships with npm 10.x (no OIDC publish auth) — upgrading
+          # via `npm i -g npm@latest` mid-job corrupts npm's own
+          # dependencies on hosted runners (MODULE_NOT_FOUND on
+          # promise-retry), so we just use a Node version that has
+          # the right npm bundled.
+          node-version: 24
           cache: pnpm
           registry-url: https://registry.npmjs.org
-      # Node 22 LTS ships with npm 10.x. npm Trusted Publishing (OIDC
-      # publish auth) requires npm 11.5+. Upgrade explicitly so the
-      # `npm publish` step below has the OIDC code path available.
-      - run: npm install -g npm@latest
       - run: pnpm install --frozen-lockfile
       - run: pnpm run ci
       - run: pnpm exec playwright install --with-deps chromium
