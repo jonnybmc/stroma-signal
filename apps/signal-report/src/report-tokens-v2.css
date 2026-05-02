@@ -19,7 +19,7 @@
   --ink: #14110d;             /* primary */
   --ink-soft: #2a2820;        /* secondary */
   --ink-mute: #6a6558;        /* tertiary / metadata */
-  --ink-faint: #b3ad9e;       /* hairline / disabled */
+  --ink-faint: #b3ad9e;       /* decorative only — fails WCAG AA as text on cream (~2:1). Use --ink-mute for any visible text. */
 
   /* — accent (single canonical: warm amber, Signifier-tuned) — */
   --accent: #b8541b;          /* burnt sienna for cream */

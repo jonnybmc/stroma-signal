@@ -176,7 +176,7 @@ body { overflow-y: auto; overflow-x: hidden; }
 }
 .scroll-nav-toc a .toc-num {
   font-family: var(--font-mono);
-  color: var(--ink-faint);
+  color: var(--ink-mute);
 }
 .scroll-nav-toc a:hover { color: var(--ink); }
 .scroll-nav-toc a[data-active="true"] { color: var(--ink); }
@@ -837,7 +837,7 @@ body { overflow-y: auto; overflow-x: hidden; }
   margin: 0;
   font-family: var(--font-mono);
   font-size: 10px;
-  color: var(--ink-faint);
+  color: var(--ink-mute);
   letter-spacing: 0.04em;
 }
 

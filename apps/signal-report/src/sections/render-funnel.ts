@@ -17,7 +17,7 @@ function renderStageRow(stage: ReportExperienceStageViewModel, index: number): s
   const widthPct = Math.max(0, Math.min(100, stage.weighted_poor_share));
   return `
     <div class="block stack-sm" style="display:grid;grid-template-columns:auto 1fr auto;gap:var(--stack-md);align-items:center;">
-      <div class="mono" style="font-size:13px;color:var(--ink-faint);">${num}</div>
+      <div class="mono" style="font-size:13px;color:var(--ink-mute);">${num}</div>
       <div>
         <div class="row-between" style="margin-bottom:6px;">
           <span style="font-size:14px;color:var(--ink);">${renderTerm(STAGE_TERM[stage.key] ?? 'lcp', stage.label)}</span>
