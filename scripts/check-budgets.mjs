@@ -29,8 +29,14 @@ const baseSource = await readFile(baseBundle);
 // `@stroma-labs/signal` base bundle. Treat as a regression tripwire: if a
 // change blows the budget, either the change is over-weight or the budget
 // needs a deliberate, reviewed bump.
-assertUnderBudget('@stroma-labs/signal gzip', gzipSync(baseSource).byteLength, 5632);
-assertUnderBudget('@stroma-labs/signal brotli', brotliCompressSync(baseSource).byteLength, 5632);
+//
+// Bumped 5632 → 6656 in the navigation-timing-breakdown merge: the new
+// vitals.navigation_timing block (per-subpart fidelity, three TTFB
+// definitions, 103 Early-Hints provenance) added ~550 bytes gzipped to
+// the base bundle. The new ceiling gives ~7% gzip headroom; brotli
+// remains comfortably under (~5.5 KB measured at the bump).
+assertUnderBudget('@stroma-labs/signal gzip', gzipSync(baseSource).byteLength, 6656);
+assertUnderBudget('@stroma-labs/signal brotli', brotliCompressSync(baseSource).byteLength, 6656);
 
 const reportFiles = await walk(reportDist);
 let reportWeight = 0;
