@@ -460,7 +460,7 @@ function pickPiCard(shape: EditorialDataShape): ReportClosingCard {
     cta_href: null,
     collects_email: true,
     collects_cadence: false,
-    small_note: 'Currently a small cohort. No availability promised.'
+    small_note: null
   };
 }
 
@@ -482,7 +482,7 @@ function pickRapidFixCard(shape: EditorialDataShape): ReportClosingCard {
     cta_href: 'https://www.stroma.design/book?service=rapid-fix',
     collects_email: false,
     collects_cadence: false,
-    small_note: 'Project-scoped. Booked, not bought.'
+    small_note: null
   };
 }
 
@@ -497,7 +497,7 @@ function pickMonitoringCard(): ReportClosingCard {
     cta_href: null,
     collects_email: true,
     collects_cadence: true,
-    small_note: 'Not yet shipped — collecting demand first.'
+    small_note: null
   };
 }
 
