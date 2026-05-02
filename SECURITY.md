@@ -12,7 +12,7 @@ If you discover a security vulnerability in Signal, please report it responsibly
 
 **Do not open a public issue.**
 
-Instead, email **security@stroma.design** with:
+Instead, email **admin@stroma.design** with:
 
 - A description of the vulnerability
 - Steps to reproduce
