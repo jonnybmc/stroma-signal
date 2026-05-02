@@ -321,21 +321,29 @@ body { overflow-y: auto; overflow-x: hidden; }
   .grid-3 { grid-template-columns: 1fr; gap: var(--stack-sm); }
 }
 
-/* — table-like data row — */
+/* — table-like data row — semantic <table> with grid layout via display:contents
+   on table parts. Native tabular semantics for screen readers + grid layout
+   for visual control. */
 .data-table {
   display: grid;
   grid-template-columns: 1.4fr 1.6fr 1fr 0.6fr;
   gap: 0;
-  /* Heavier top border anchors the whole table on the cream surface. */
+  border-collapse: collapse;
   border-top: 2px solid var(--line-table-header);
 }
-.data-table .th,
-.data-table .td {
+.data-table thead,
+.data-table tbody,
+.data-table tr {
+  display: contents;
+}
+.data-table th,
+.data-table td {
   padding: 14px 0;
   border-bottom: 1px solid var(--line-table);
   font-size: 13.5px;
+  text-align: left;
 }
-.data-table .th {
+.data-table th {
   font-family: var(--font-mono);
   font-size: 10.5px;
   letter-spacing: 0.16em;
@@ -343,47 +351,45 @@ body { overflow-y: auto; overflow-x: hidden; }
   color: var(--ink-soft);
   padding: 10px 0;
   font-weight: 600;
-  /* Stronger bottom border on the header row so the table reads as a
-   * proper tabular structure, not free-floating rows. */
   border-bottom: 1.5px solid var(--line-table-header);
 }
-.data-table .td.mono {
+.data-table th.th-share { text-align: right; }
+.data-table td.mono {
   font-family: var(--font-mono);
   font-size: 12.5px;
   color: var(--ink-soft);
 }
-.data-table .td-share {
+.data-table td.td-share {
   text-align: right;
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
   color: var(--ink);
   font-weight: 500;
 }
-.data-table .td-sessions {
+.data-table td.td-sessions {
   font-family: var(--font-mono);
   color: var(--ink);
   font-variant-numeric: tabular-nums;
   font-weight: 500;
 }
-.data-table .td-name {
+.data-table td.td-name {
   display: flex;
   align-items: stretch;
   gap: 12px;
 }
-.data-table .td-name .rule {
+.data-table td.td-name .rule {
   width: 4px;
   border-radius: 2px;
   flex-shrink: 0;
 }
-.data-table .td-name .label {
+.data-table td.td-name .label {
   align-self: center;
   color: var(--ink);
   font-weight: 500;
 }
-
-/* Last-row treatment — drop the bottom border on the final cell row so
- * the table reads as a clean self-contained block, not as a fragment. */
-.data-table > .td:nth-last-child(-n+4) {
+/* Drop the bottom border on the final row so the table reads as a clean
+ * self-contained block, not as a fragment. */
+.data-table tbody tr:last-child td {
   border-bottom-width: 2px;
   border-bottom-color: var(--line-table-header);
 }
@@ -392,12 +398,6 @@ body { overflow-y: auto; overflow-x: hidden; }
   .data-table { grid-template-columns: 1fr 1fr; }
   .data-table .th-criteria,
   .data-table .td-criteria { display: none; }
-  /* On mobile, the 4-column grid collapses to 2 columns, so the
-   * "last row" selector needs to count 2 children, not 4. */
-  .data-table > .td:nth-last-child(-n+2) {
-    border-bottom-width: 2px;
-    border-bottom-color: var(--line-table-header);
-  }
 }
 
 /* — section eyebrow with prefixed icon — */

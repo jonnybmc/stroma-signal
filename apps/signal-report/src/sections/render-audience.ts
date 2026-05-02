@@ -30,24 +30,32 @@ function renderTierTable(vm: ReportViewModel): string {
     .map((t) => {
       const color = TIER_COLOR_VAR[t.key] ?? 'var(--tier-unknown)';
       return `
-        <div class="td td-name"><span class="rule" style="background:${color};"></span><span class="label">${escapeHtml(
-          t.label
-        )}</span></div>
-        <div class="td td-criteria mono">${escapeHtml(criteriaForTier(t.key))}</div>
-        <div class="td td-sessions">${Math.round((t.share / 100) * vm.sample_size)}</div>
-        <div class="td td-share">${Math.round(t.share)}%</div>
+        <tr>
+          <td class="td-name"><span class="rule" style="background:${color};"></span><span class="label">${escapeHtml(
+            t.label
+          )}</span></td>
+          <td class="td-criteria mono">${escapeHtml(criteriaForTier(t.key))}</td>
+          <td class="td-sessions">${Math.round((t.share / 100) * vm.sample_size)}</td>
+          <td class="td-share">${Math.round(t.share)}%</td>
+        </tr>
       `;
     })
     .join('');
 
   return `
-    <div class="data-table">
-      <div class="th">Tier</div>
-      <div class="th th-criteria">Criteria</div>
-      <div class="th">Sessions</div>
-      <div class="th" style="text-align:right;">Share</div>
-      ${rows}
-    </div>
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th scope="col">Tier</th>
+          <th scope="col" class="th-criteria">Criteria</th>
+          <th scope="col">Sessions</th>
+          <th scope="col" class="th-share">Share</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows}
+      </tbody>
+    </table>
   `;
 }
 
@@ -60,24 +68,32 @@ function renderDeviceTable(vm: ReportViewModel): string {
   const rows = vm.act1_device_tiers
     .map((d) => {
       return `
-        <div class="td td-name"><span class="rule" style="background:var(--ink-faint);"></span><span class="label">${escapeHtml(
-          d.label
-        )}</span></div>
-        <div class="td td-criteria mono">${escapeHtml(deviceCriteriaFor(d.key))}</div>
-        <div class="td td-sessions">${Math.round((d.share / 100) * vm.sample_size)}</div>
-        <div class="td td-share">${Math.round(d.share)}%</div>
+        <tr>
+          <td class="td-name"><span class="rule" style="background:var(--ink-faint);"></span><span class="label">${escapeHtml(
+            d.label
+          )}</span></td>
+          <td class="td-criteria mono">${escapeHtml(deviceCriteriaFor(d.key))}</td>
+          <td class="td-sessions">${Math.round((d.share / 100) * vm.sample_size)}</td>
+          <td class="td-share">${Math.round(d.share)}%</td>
+        </tr>
       `;
     })
     .join('');
 
   return `
-    <div class="data-table">
-      <div class="th">Device</div>
-      <div class="th th-criteria">Criteria</div>
-      <div class="th">Sessions</div>
-      <div class="th" style="text-align:right;">Share</div>
-      ${rows}
-    </div>
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th scope="col">Device</th>
+          <th scope="col" class="th-criteria">Criteria</th>
+          <th scope="col">Sessions</th>
+          <th scope="col" class="th-share">Share</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows}
+      </tbody>
+    </table>
   `;
 }
 
