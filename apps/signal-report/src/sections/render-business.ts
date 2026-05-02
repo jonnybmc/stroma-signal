@@ -120,7 +120,7 @@ function renderClosingCard(card: ReportClosingCard): string {
       }
       <!-- Confirmation slot — replaces the form + note when state flips to "logged" -->
       <div class="closing-card-confirmation" hidden>
-        <p class="closing-card-confirmation-text" data-closing-confirmation-text>✓ thanks — we will let you know when it ships</p>
+        <p class="closing-card-confirmation-text" data-closing-confirmation-text>✓ noted — we will be in touch</p>
       </div>
     </div>
   `;

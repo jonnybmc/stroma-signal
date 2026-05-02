@@ -200,7 +200,7 @@ function attachFormSubmitHandler(card: HTMLElement, state: CardState, ctx: Resol
     if (intent_cadence) payload.intent_cadence = intent_cadence;
 
     sendIntent(payload);
-    flipCardToConfirmation(card, '✓ thanks — we will let you know when it ships');
+    flipCardToConfirmation(card, '✓ noted — we will be in touch');
   });
 }
 

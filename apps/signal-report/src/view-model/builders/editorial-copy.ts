@@ -447,8 +447,8 @@ function pickPiCard(shape: EditorialDataShape): ReportClosingCard {
   // give themselves. Imperative declarative, no questions.
   const body =
     shape.mood === 'affirming'
-      ? 'If you ever want to see which campaigns are exposed to this gap, the campaign-attribution layer will join substrate to spend and conversions. We will let you know when early access opens.'
-      : 'Substrate × spend × conversions joins are coming as a paid layer — early access opens to a small cohort first. We will let you know when you can connect this report to your campaign data.';
+      ? 'Signal stops at substrate. If you want to see which campaigns, audiences, or creatives are exposed to this gap, that join is a separate piece we are exploring.'
+      : 'Signal stops at substrate. The campaign-side question — which spend, audiences, or creatives are exposed to this gap — is a separate join we are exploring.';
 
   return {
     id: 'pi_early_access',
@@ -456,7 +456,7 @@ function pickPiCard(shape: EditorialDataShape): ReportClosingCard {
     eyebrow: 'Campaign-attribution layer',
     title: 'See which campaigns this affects.',
     body,
-    cta_label: 'Tell me when it ships',
+    cta_label: 'Keep me posted',
     cta_href: null,
     collects_email: true,
     collects_cadence: false,
@@ -493,7 +493,7 @@ function pickMonitoringCard(): ReportClosingCard {
     eyebrow: 'Scheduled monitoring',
     title: 'Run this report on a schedule.',
     body: 'Re-running the BigQuery query and regenerating the URL by hand is fine for a one-off — less fine as a regular read. Scheduled monitoring would deliver this same report weekly or monthly as the data refreshes. We are collecting interest before we build it.',
-    cta_label: 'Tell me when it ships',
+    cta_label: 'Keep me posted',
     cta_href: null,
     collects_email: true,
     collects_cadence: true,
