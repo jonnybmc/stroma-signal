@@ -22,6 +22,21 @@ A small browser library that classifies every page load by the user's real netwo
 
 Signal sits one layer beneath every option above: it produces the per-session evidence the others can't or won't capture, and you wire it into whatever you already use.
 
+## What Signal adds beyond GA4
+
+GA4 is comprehensive on conversions, sessions, and attribution. It's deliberately thin on **what your users were experiencing when they got there** — and that's the gap Signal fills. You install Signal alongside GA4 (they don't conflict); each does what it's good at.
+
+| The question your operator is asking | **GA4 alone** | **GA4 + Signal** |
+|---|---|---|
+| Which network were users actually on? | `effective_type` — a browser hint that bins both fibre and a congested 4G tower as `4g` | TCP-handshake substrate tier (urban / moderate / constrained moderate / constrained) — measured per session, not guessed |
+| Why was the page slow? | LCP / INP scores | LCP element + render-delay phase, INP interaction-phase breakdown, third-party scripts that loaded before paint |
+| Per-session detail? | Free tier samples after 10M events / month | Every event, joined to your existing warehouse, no sampling |
+| Long Animation Frame story? | Not captured | Chromium 123+ worst-frame duration + dominant cause (script / layout / style / paint) |
+| Navigation Timing decomposition? | Not captured | Per-subpart DNS / TCP / TLS / request / response / SW timings, three TTFB definitions (raw, connection, activation-adjusted), Early-Hints provenance |
+| Where does the raw data live? | Google's warehouse, GA4 schema | Your warehouse, your schema — joinable to spend, conversions, anything else you already have |
+
+Signal is the substrate evidence layer underneath whatever you already use. GA4 keeps doing what it does; Signal answers the questions GA4 was never designed to.
+
 ## Install
 
 ```bash
