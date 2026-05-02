@@ -101,7 +101,7 @@ function renderPersonaCard(persona: ReportPersonaProfile, accentVar: string): st
   }
 
   const rows: Array<[string, string]> = [
-    ['Network', `${escapeHtml(persona.network_tier)} · ${escapeHtml(persona.network_criteria)}`],
+    ['Network', escapeHtml(persona.network_criteria)],
     persona.effective_type
       ? ['Connection class', composeRowValue(persona.effective_type, persona.effective_type_note)]
       : null,
