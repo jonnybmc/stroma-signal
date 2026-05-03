@@ -26,6 +26,7 @@
     "check:boundaries": "node scripts/check-boundaries.mjs",
     "check:exports": "node scripts/check-package-exports.mjs",
     "check:release": "node scripts/check-release-readiness.mjs",
+    "test:cli:pack": "node scripts/pack-and-test-cli.mjs",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "format": "biome format --write .",
