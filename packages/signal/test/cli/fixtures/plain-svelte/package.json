@@ -1,0 +1,11 @@
+{
+  "name": "fixture-plain-svelte",
+  "version": "0.0.0",
+  "private": true,
+  "dependencies": {
+    "svelte": "^5.0.0"
+  },
+  "devDependencies": {
+    "vite": "^6.0.0"
+  }
+}
