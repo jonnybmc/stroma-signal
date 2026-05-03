@@ -69,7 +69,8 @@
     "dist/**/*.mjs"
   ],
   "scripts": {
-    "build": "rollup -c rollup.config.mjs && chmod +x dist/cli.mjs",
+    "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
+    "build": "pnpm clean && rollup -c rollup.config.mjs && chmod +x dist/cli.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.cli.json --noEmit",
     "prepublishOnly": "pnpm -C ../.. build && pnpm -C ../.. check:release"
   },

@@ -1,9 +1,29 @@
+// Bundle budgets — gzip ceilings on what consumers actually download.
+//
+// The previous version of this script measured `dist/index.mjs` in
+// isolation, missing the chunks the entry transitively imports. That
+// understated the real cost for unbundled ESM consumers (esm.sh, native
+// import maps) and gave bundler users a misleading floor.
+//
+// This version walks the static `from "..."` import graph for each
+// entry and sums the gzip cost of the entry + every reachable chunk.
+// Static imports only — the runtime SDK has no dynamic `import()` and
+// the CLI rolls up with `inlineDynamicImports: true`, so the static
+// graph is the full payload.
+//
+// Four ceilings — set deliberately above current measured weights so
+// they catch regressions without forcing a fight every release. Bumping
+// a ceiling requires the same review discipline as bumping the runtime
+// budget always has: identify what added the weight, confirm it's
+// justified, raise the ceiling explicitly with a why-line.
+
+import { existsSync } from 'node:fs';
 import { readdir, readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { brotliCompressSync, gzipSync } from 'node:zlib';
 
 const root = process.cwd();
-const baseBundle = path.join(root, 'packages/signal/dist/index.mjs');
+const distRoot = path.join(root, 'packages/signal/dist');
 const reportDist = path.join(root, 'apps/signal-report/dist');
 
 function assertUnderBudget(label, size, budget) {
@@ -12,6 +32,104 @@ function assertUnderBudget(label, size, budget) {
   }
 }
 
+/**
+ * Walk the static import graph from `entryPath`. Returns the set of
+ * absolute file paths the entry transitively pulls in via relative
+ * imports (`./` or `../`). Bare specifiers and `node:` builtins are
+ * not part of the runtime payload — the consumer's bundler resolves
+ * them — and are skipped.
+ *
+ * The CLI bundle embeds rendered framework snippets as string
+ * literals (`import { SignalClient } from './SignalClient'`); these
+ * match the regex but resolve to non-existent paths inside dist.
+ * Skip resolved paths that don't exist on disk — rollup would have
+ * failed at build time if they were real imports.
+ */
+async function resolveClosure(entryPath) {
+  const visited = new Set();
+  const queue = [entryPath];
+  while (queue.length > 0) {
+    const file = queue.shift();
+    if (visited.has(file)) continue;
+    visited.add(file);
+    const source = await readFile(file, 'utf8');
+    for (const match of source.matchAll(/from\s*["']([./][^"']+)["']/g)) {
+      const resolved = path.resolve(path.dirname(file), match[1]);
+      if (visited.has(resolved)) continue;
+      if (!existsSync(resolved)) continue; // string-literal false positive
+      queue.push(resolved);
+    }
+  }
+  return [...visited];
+}
+
+async function compressClosure(files) {
+  let raw = 0;
+  let gzip = 0;
+  let brotli = 0;
+  for (const file of files) {
+    const buf = await readFile(file);
+    raw += buf.byteLength;
+    gzip += gzipSync(buf).byteLength;
+    brotli += brotliCompressSync(buf).byteLength;
+  }
+  return { raw, gzip, brotli };
+}
+
+const budgets = [
+  {
+    label: 'runtime root (every browser user pays for this)',
+    entry: 'index.mjs',
+    extras: [],
+    ceilingGzip: 7 * 1024
+  },
+  {
+    label: 'runtime + GA4 (sum of both closures, deduped)',
+    entry: 'index.mjs',
+    extras: ['ga4/index.mjs'],
+    ceilingGzip: 9 * 1024
+  },
+  {
+    label: 'report subpath (self-hosted preview renderer)',
+    entry: 'report/index.mjs',
+    extras: [],
+    ceilingGzip: 15 * 1024
+  },
+  {
+    label: 'CLI (install-time only, runs in node — not browser)',
+    entry: 'cli.mjs',
+    extras: [],
+    ceilingGzip: 20 * 1024
+  }
+];
+
+console.log('Bundle budgets — closure-based gzip ceilings\n');
+
+for (const budget of budgets) {
+  const entryAbs = path.join(distRoot, budget.entry);
+  const extraAbs = budget.extras.map((extra) => path.join(distRoot, extra));
+  const allEntries = [entryAbs, ...extraAbs];
+  const closures = await Promise.all(allEntries.map(resolveClosure));
+  const closure = [...new Set(closures.flat())];
+  const { raw, gzip, brotli } = await compressClosure(closure);
+  const ceilingDisplay = `${(budget.ceilingGzip / 1024).toFixed(0)} KB`;
+  const status = gzip <= budget.ceilingGzip ? '✓' : '✗';
+  console.log(
+    `  ${status} ${budget.label.padEnd(56)}` +
+      `  raw=${raw.toString().padStart(6)}` +
+      `  gzip=${gzip.toString().padStart(5)}` +
+      `  brotli=${brotli.toString().padStart(5)}` +
+      `  files=${closure.length}` +
+      `  ceiling=${ceilingDisplay}`
+  );
+  assertUnderBudget(budget.label, gzip, budget.ceilingGzip);
+}
+
+// Hosted /r + /build static-assets budget. Covers the vertical-scroll
+// report deck, credibility footer, Lucide icons, particle canvas, the
+// self-hosted Geist-Variable display font (~24 KB), and the /build
+// companion route with its fixture registry. Same regression-tripwire
+// posture as the runtime budgets above.
 async function walk(dir) {
   const entries = await readdir(dir, { withFileTypes: true });
   const files = await Promise.all(
@@ -24,32 +142,15 @@ async function walk(dir) {
   return files.flat();
 }
 
-const baseSource = await readFile(baseBundle);
-// SDK runtime budget — gzip and brotli upper bounds on the published
-// `@stroma-labs/signal` base bundle. Treat as a regression tripwire: if a
-// change blows the budget, either the change is over-weight or the budget
-// needs a deliberate, reviewed bump.
-//
-// Bumped 5632 → 6656 in the navigation-timing-breakdown merge: the new
-// vitals.navigation_timing block (per-subpart fidelity, three TTFB
-// definitions, 103 Early-Hints provenance) added ~550 bytes gzipped to
-// the base bundle. The new ceiling gives ~7% gzip headroom; brotli
-// remains comfortably under (~5.5 KB measured at the bump).
-assertUnderBudget('@stroma-labs/signal gzip', gzipSync(baseSource).byteLength, 6656);
-assertUnderBudget('@stroma-labs/signal brotli', brotliCompressSync(baseSource).byteLength, 6656);
-
 const reportFiles = await walk(reportDist);
 let reportWeight = 0;
 for (const file of reportFiles) {
   const fileStat = await stat(file);
   reportWeight += fileStat.size;
 }
-
-// Hosted /r + /build static-assets budget. Covers the four-act report deck,
-// the credibility footer, Lucide icons, the canvas particle system, the
-// self-hosted Geist-Variable display font (~24 KB), and the /build companion
-// route with its fixture registry. Same regression-tripwire posture as the
-// runtime budget above.
 assertUnderBudget('signal-report static weight', reportWeight, 296 * 1024);
+console.log(
+  `\n  ✓ signal-report static assets                                raw=${reportWeight}  ceiling=${296 * 1024}\n`
+);
 
 console.log('Bundle budgets passed.');
