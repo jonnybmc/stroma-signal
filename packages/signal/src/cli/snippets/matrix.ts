@@ -103,17 +103,26 @@ function nextAppRouterFiles(sink: SinkChoice): SnippetFile[] {
     {
       path: 'app/SignalClient.tsx',
       action: 'create',
-      body: `'use client';
+      body: `// Stroma Signal — browser-only SDK boot. Lives in its own Client
+// Component because Next App Router defaults to Server Components,
+// and Signal touches window/document/performance APIs that only
+// exist in the browser.
+'use client';
 
 import { useEffect } from 'react';
 
 export function SignalClient() {
+  // useEffect runs once on mount (post-hydration). init() is internally
+  // idempotent, so React Strict Mode's double-invoke in dev is safe.
   useEffect(() => {
+    // Dynamic import keeps Signal out of the server bundle entirely —
+    // Next would otherwise pull it in for code-splitting analysis.
     (async () => {
 ${sinkDynamicImportLines(sink)}
 ${initCallBody(sink, '      ')}
     })();
   }, []);
+  // Renders nothing — pure side-effect anchor. Existence triggers init().
   return null;
 }
 `
@@ -122,12 +131,16 @@ ${initCallBody(sink, '      ')}
       path: 'app/layout.tsx',
       action: 'modify',
       position: 'inside-body',
-      body: `// Add this import + render <SignalClient /> as a child of <body>:
+      body: `// Add this import alongside your existing layout imports:
 import { SignalClient } from './SignalClient';
 
-// Inside your RootLayout's <body>:
-//   <SignalClient />
-//   {children}
+// And render <SignalClient /> as a child of <body> in your RootLayout.
+// Position is irrelevant visually (it returns null) — but it MUST be
+// inside <body> so it lands inside the Client boundary at hydration:
+//   <body>
+//     <SignalClient />
+//     {children}
+//   </body>
 `
     }
   ];
@@ -161,12 +174,20 @@ function reactRouterV7Files(sink: SinkChoice): SnippetFile[] {
     {
       path: 'app/entry.client.tsx',
       action: 'create',
-      body: `import { startTransition, StrictMode } from 'react';
+      body: `// React Router v7's canonical browser entry. This file runs ONLY
+// in the browser — server bundles never reach it — so it's the
+// natural place for browser-only SDK boot like Signal.
+//
+// If your project doesn't have entry.client.tsx, expose it with:
+//   npx react-router reveal entry.client
+import { startTransition, StrictMode } from 'react';
 import { hydrateRoot } from 'react-dom/client';
 import { HydratedRouter } from 'react-router/dom';
 
 ${sinkImportLines(sink)}
 
+// Initialise Signal BEFORE hydration so the lifecycle listeners are
+// in place by the time the first user interaction happens.
 ${initCallBody(sink, '')}
 
 startTransition(() => {
@@ -187,12 +208,19 @@ function remixV2Files(sink: SinkChoice): SnippetFile[] {
     {
       path: 'app/entry.client.tsx',
       action: 'create',
-      body: `import { RemixBrowser } from '@remix-run/react';
+      body: `// Remix v2's canonical browser entry. Runs ONLY in the browser, so
+// it's the natural place for browser-only SDK boot like Signal.
+//
+// If your project doesn't have entry.client.tsx, expose it with:
+//   npx remix reveal entry.client
+import { RemixBrowser } from '@remix-run/react';
 import { startTransition, StrictMode } from 'react';
 import { hydrateRoot } from 'react-dom/client';
 
 ${sinkImportLines(sink)}
 
+// Initialise Signal BEFORE hydration so the lifecycle listeners are
+// in place by the time the first user interaction happens.
 ${initCallBody(sink, '')}
 
 startTransition(() => {
@@ -229,10 +257,15 @@ function svelteKitFiles(sink: SinkChoice): SnippetFile[] {
       path: 'src/routes/+layout.svelte',
       action: 'create',
       body: `<script lang="ts">
+  // Svelte 5 runes — \`$props\` destructures incoming layout props,
+  // \`$effect\` runs ONLY in the browser (NOT during SSR), making it
+  // the canonical place for browser-only SDK boot like Signal.
+  // (For Svelte 4 codebases, the older \`onMount\` hook works the same.)
   import type { LayoutProps } from './$types';
   let { children }: LayoutProps = $props();
 
   $effect(() => {
+    // Dynamic import keeps Signal out of the SSR bundle entirely.
     (async () => {
 ${sinkDynamicImportLines(sink)}
 ${initCallBody(sink, '      ')}

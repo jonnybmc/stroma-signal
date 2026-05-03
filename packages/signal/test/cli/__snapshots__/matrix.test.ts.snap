@@ -226,12 +226,20 @@ exports[`rendered snippets per (framework × sink) — snapshot stability > rend
   "files": [
     {
       "action": "create",
-      "body": "'use client';
+      "body": "// Stroma Signal — browser-only SDK boot. Lives in its own Client
+// Component because Next App Router defaults to Server Components,
+// and Signal touches window/document/performance APIs that only
+// exist in the browser.
+'use client';
 
 import { useEffect } from 'react';
 
 export function SignalClient() {
+  // useEffect runs once on mount (post-hydration). init() is internally
+  // idempotent, so React Strict Mode's double-invoke in dev is safe.
   useEffect(() => {
+    // Dynamic import keeps Signal out of the server bundle entirely —
+    // Next would otherwise pull it in for code-splitting analysis.
     (async () => {
       const { init, createBeaconSink } = await import('@stroma-labs/signal');
       init({
@@ -240,6 +248,7 @@ export function SignalClient() {
       });
     })();
   }, []);
+  // Renders nothing — pure side-effect anchor. Existence triggers init().
   return null;
 }
 ",
@@ -247,12 +256,16 @@ export function SignalClient() {
     },
     {
       "action": "modify",
-      "body": "// Add this import + render <SignalClient /> as a child of <body>:
+      "body": "// Add this import alongside your existing layout imports:
 import { SignalClient } from './SignalClient';
 
-// Inside your RootLayout's <body>:
-//   <SignalClient />
-//   {children}
+// And render <SignalClient /> as a child of <body> in your RootLayout.
+// Position is irrelevant visually (it returns null) — but it MUST be
+// inside <body> so it lands inside the Client boundary at hydration:
+//   <body>
+//     <SignalClient />
+//     {children}
+//   </body>
 ",
       "path": "app/layout.tsx",
       "position": "inside-body",
@@ -277,12 +290,20 @@ exports[`rendered snippets per (framework × sink) — snapshot stability > rend
   "files": [
     {
       "action": "create",
-      "body": "'use client';
+      "body": "// Stroma Signal — browser-only SDK boot. Lives in its own Client
+// Component because Next App Router defaults to Server Components,
+// and Signal touches window/document/performance APIs that only
+// exist in the browser.
+'use client';
 
 import { useEffect } from 'react';
 
 export function SignalClient() {
+  // useEffect runs once on mount (post-hydration). init() is internally
+  // idempotent, so React Strict Mode's double-invoke in dev is safe.
   useEffect(() => {
+    // Dynamic import keeps Signal out of the server bundle entirely —
+    // Next would otherwise pull it in for code-splitting analysis.
     (async () => {
       const { init, createCallbackSink } = await import('@stroma-labs/signal');
       init({
@@ -294,6 +315,7 @@ export function SignalClient() {
       });
     })();
   }, []);
+  // Renders nothing — pure side-effect anchor. Existence triggers init().
   return null;
 }
 ",
@@ -301,12 +323,16 @@ export function SignalClient() {
     },
     {
       "action": "modify",
-      "body": "// Add this import + render <SignalClient /> as a child of <body>:
+      "body": "// Add this import alongside your existing layout imports:
 import { SignalClient } from './SignalClient';
 
-// Inside your RootLayout's <body>:
-//   <SignalClient />
-//   {children}
+// And render <SignalClient /> as a child of <body> in your RootLayout.
+// Position is irrelevant visually (it returns null) — but it MUST be
+// inside <body> so it lands inside the Client boundary at hydration:
+//   <body>
+//     <SignalClient />
+//     {children}
+//   </body>
 ",
       "path": "app/layout.tsx",
       "position": "inside-body",
@@ -330,12 +356,20 @@ exports[`rendered snippets per (framework × sink) — snapshot stability > rend
   "files": [
     {
       "action": "create",
-      "body": "'use client';
+      "body": "// Stroma Signal — browser-only SDK boot. Lives in its own Client
+// Component because Next App Router defaults to Server Components,
+// and Signal touches window/document/performance APIs that only
+// exist in the browser.
+'use client';
 
 import { useEffect } from 'react';
 
 export function SignalClient() {
+  // useEffect runs once on mount (post-hydration). init() is internally
+  // idempotent, so React Strict Mode's double-invoke in dev is safe.
   useEffect(() => {
+    // Dynamic import keeps Signal out of the server bundle entirely —
+    // Next would otherwise pull it in for code-splitting analysis.
     (async () => {
       const { init } = await import('@stroma-labs/signal');
       const { createDataLayerSink } = await import('@stroma-labs/signal/ga4');
@@ -345,6 +379,7 @@ export function SignalClient() {
       });
     })();
   }, []);
+  // Renders nothing — pure side-effect anchor. Existence triggers init().
   return null;
 }
 ",
@@ -352,12 +387,16 @@ export function SignalClient() {
     },
     {
       "action": "modify",
-      "body": "// Add this import + render <SignalClient /> as a child of <body>:
+      "body": "// Add this import alongside your existing layout imports:
 import { SignalClient } from './SignalClient';
 
-// Inside your RootLayout's <body>:
-//   <SignalClient />
-//   {children}
+// And render <SignalClient /> as a child of <body> in your RootLayout.
+// Position is irrelevant visually (it returns null) — but it MUST be
+// inside <body> so it lands inside the Client boundary at hydration:
+//   <body>
+//     <SignalClient />
+//     {children}
+//   </body>
 ",
       "path": "app/layout.tsx",
       "position": "inside-body",
@@ -920,12 +959,20 @@ exports[`rendered snippets per (framework × sink) — snapshot stability > rend
   "files": [
     {
       "action": "create",
-      "body": "import { startTransition, StrictMode } from 'react';
+      "body": "// React Router v7's canonical browser entry. This file runs ONLY
+// in the browser — server bundles never reach it — so it's the
+// natural place for browser-only SDK boot like Signal.
+//
+// If your project doesn't have entry.client.tsx, expose it with:
+//   npx react-router reveal entry.client
+import { startTransition, StrictMode } from 'react';
 import { hydrateRoot } from 'react-dom/client';
 import { HydratedRouter } from 'react-router/dom';
 
 import { init, createBeaconSink } from '@stroma-labs/signal';
 
+// Initialise Signal BEFORE hydration so the lifecycle listeners are
+// in place by the time the first user interaction happens.
 init({
   sinks: [createBeaconSink({ endpoint: '/rum/signal' })],
   sampleRate: 1
@@ -962,12 +1009,20 @@ exports[`rendered snippets per (framework × sink) — snapshot stability > rend
   "files": [
     {
       "action": "create",
-      "body": "import { startTransition, StrictMode } from 'react';
+      "body": "// React Router v7's canonical browser entry. This file runs ONLY
+// in the browser — server bundles never reach it — so it's the
+// natural place for browser-only SDK boot like Signal.
+//
+// If your project doesn't have entry.client.tsx, expose it with:
+//   npx react-router reveal entry.client
+import { startTransition, StrictMode } from 'react';
 import { hydrateRoot } from 'react-dom/client';
 import { HydratedRouter } from 'react-router/dom';
 
 import { init, createCallbackSink } from '@stroma-labs/signal';
 
+// Initialise Signal BEFORE hydration so the lifecycle listeners are
+// in place by the time the first user interaction happens.
 init({
   sinks: [createCallbackSink({ onReport: (event) => {
     // Receive every SignalEventV1. Send to your collector / log / etc.
@@ -1006,13 +1061,21 @@ exports[`rendered snippets per (framework × sink) — snapshot stability > rend
   "files": [
     {
       "action": "create",
-      "body": "import { startTransition, StrictMode } from 'react';
+      "body": "// React Router v7's canonical browser entry. This file runs ONLY
+// in the browser — server bundles never reach it — so it's the
+// natural place for browser-only SDK boot like Signal.
+//
+// If your project doesn't have entry.client.tsx, expose it with:
+//   npx react-router reveal entry.client
+import { startTransition, StrictMode } from 'react';
 import { hydrateRoot } from 'react-dom/client';
 import { HydratedRouter } from 'react-router/dom';
 
 import { init } from '@stroma-labs/signal';
 import { createDataLayerSink } from '@stroma-labs/signal/ga4';
 
+// Initialise Signal BEFORE hydration so the lifecycle listeners are
+// in place by the time the first user interaction happens.
 init({
   sinks: [createDataLayerSink()],
   sampleRate: 1
@@ -1048,12 +1111,19 @@ exports[`rendered snippets per (framework × sink) — snapshot stability > rend
   "files": [
     {
       "action": "create",
-      "body": "import { RemixBrowser } from '@remix-run/react';
+      "body": "// Remix v2's canonical browser entry. Runs ONLY in the browser, so
+// it's the natural place for browser-only SDK boot like Signal.
+//
+// If your project doesn't have entry.client.tsx, expose it with:
+//   npx remix reveal entry.client
+import { RemixBrowser } from '@remix-run/react';
 import { startTransition, StrictMode } from 'react';
 import { hydrateRoot } from 'react-dom/client';
 
 import { init, createBeaconSink } from '@stroma-labs/signal';
 
+// Initialise Signal BEFORE hydration so the lifecycle listeners are
+// in place by the time the first user interaction happens.
 init({
   sinks: [createBeaconSink({ endpoint: '/rum/signal' })],
   sampleRate: 1
@@ -1090,12 +1160,19 @@ exports[`rendered snippets per (framework × sink) — snapshot stability > rend
   "files": [
     {
       "action": "create",
-      "body": "import { RemixBrowser } from '@remix-run/react';
+      "body": "// Remix v2's canonical browser entry. Runs ONLY in the browser, so
+// it's the natural place for browser-only SDK boot like Signal.
+//
+// If your project doesn't have entry.client.tsx, expose it with:
+//   npx remix reveal entry.client
+import { RemixBrowser } from '@remix-run/react';
 import { startTransition, StrictMode } from 'react';
 import { hydrateRoot } from 'react-dom/client';
 
 import { init, createCallbackSink } from '@stroma-labs/signal';
 
+// Initialise Signal BEFORE hydration so the lifecycle listeners are
+// in place by the time the first user interaction happens.
 init({
   sinks: [createCallbackSink({ onReport: (event) => {
     // Receive every SignalEventV1. Send to your collector / log / etc.
@@ -1134,13 +1211,20 @@ exports[`rendered snippets per (framework × sink) — snapshot stability > rend
   "files": [
     {
       "action": "create",
-      "body": "import { RemixBrowser } from '@remix-run/react';
+      "body": "// Remix v2's canonical browser entry. Runs ONLY in the browser, so
+// it's the natural place for browser-only SDK boot like Signal.
+//
+// If your project doesn't have entry.client.tsx, expose it with:
+//   npx remix reveal entry.client
+import { RemixBrowser } from '@remix-run/react';
 import { startTransition, StrictMode } from 'react';
 import { hydrateRoot } from 'react-dom/client';
 
 import { init } from '@stroma-labs/signal';
 import { createDataLayerSink } from '@stroma-labs/signal/ga4';
 
+// Initialise Signal BEFORE hydration so the lifecycle listeners are
+// in place by the time the first user interaction happens.
 init({
   sinks: [createDataLayerSink()],
   sampleRate: 1
@@ -1177,10 +1261,15 @@ exports[`rendered snippets per (framework × sink) — snapshot stability > rend
     {
       "action": "create",
       "body": "<script lang="ts">
+  // Svelte 5 runes — \`$props\` destructures incoming layout props,
+  // \`$effect\` runs ONLY in the browser (NOT during SSR), making it
+  // the canonical place for browser-only SDK boot like Signal.
+  // (For Svelte 4 codebases, the older \`onMount\` hook works the same.)
   import type { LayoutProps } from './$types';
   let { children }: LayoutProps = $props();
 
   $effect(() => {
+    // Dynamic import keeps Signal out of the SSR bundle entirely.
     (async () => {
       const { init, createBeaconSink } = await import('@stroma-labs/signal');
       init({
@@ -1216,10 +1305,15 @@ exports[`rendered snippets per (framework × sink) — snapshot stability > rend
     {
       "action": "create",
       "body": "<script lang="ts">
+  // Svelte 5 runes — \`$props\` destructures incoming layout props,
+  // \`$effect\` runs ONLY in the browser (NOT during SSR), making it
+  // the canonical place for browser-only SDK boot like Signal.
+  // (For Svelte 4 codebases, the older \`onMount\` hook works the same.)
   import type { LayoutProps } from './$types';
   let { children }: LayoutProps = $props();
 
   $effect(() => {
+    // Dynamic import keeps Signal out of the SSR bundle entirely.
     (async () => {
       const { init, createCallbackSink } = await import('@stroma-labs/signal');
       init({
@@ -1257,10 +1351,15 @@ exports[`rendered snippets per (framework × sink) — snapshot stability > rend
     {
       "action": "create",
       "body": "<script lang="ts">
+  // Svelte 5 runes — \`$props\` destructures incoming layout props,
+  // \`$effect\` runs ONLY in the browser (NOT during SSR), making it
+  // the canonical place for browser-only SDK boot like Signal.
+  // (For Svelte 4 codebases, the older \`onMount\` hook works the same.)
   import type { LayoutProps } from './$types';
   let { children }: LayoutProps = $props();
 
   $effect(() => {
+    // Dynamic import keeps Signal out of the SSR bundle entirely.
     (async () => {
       const { init } = await import('@stroma-labs/signal');
       const { createDataLayerSink } = await import('@stroma-labs/signal/ga4');
