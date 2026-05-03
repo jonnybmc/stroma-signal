@@ -1,3 +1,4 @@
+import json from '@rollup/plugin-json';
 import { nodeResolve } from '@rollup/plugin-node-resolve';
 import terser from '@rollup/plugin-terser';
 import typescript from '@rollup/plugin-typescript';
@@ -77,6 +78,7 @@ export default [
       /^@stroma-labs\/signal($|\/)/
     ],
     plugins: [
+      json(),
       nodeResolve({ preferBuiltins: true }),
       typescript({
         tsconfig: './tsconfig.cli.json',

@@ -1,50 +1,61 @@
 // Stroma Signal `signal init` CLI — entry point.
 //
-// At Phase C.1 this is a minimal stub that proves the build pipeline
-// works end-to-end (Rollup CLI target → dist/cli.mjs with shebang →
-// chmod +x → invokable as `node dist/cli.mjs`). The real wizard flow
-// lands in Phase C.2 onward (UI primitives, framework detection,
-// snippet matrix, telemetry queue).
+// Routes argv to the init command. Single subcommand for v1; future
+// commands (e.g. `signal upgrade`, `signal doctor`) plug in here.
 
-import { argv, exit } from 'node:process';
+import { argv, exit, stderr, stdout } from 'node:process';
+
+import { CliUsageError, parseInitArgs, printUsage, run } from './commands/init.js';
 
 const VERSION = '0.1.0-rc.4';
 
-function printUsage(): void {
-  // eslint-disable-next-line no-console
-  console.log(`Stroma Signal CLI · v${VERSION}
+async function main(rawArgs: readonly string[]): Promise<number> {
+  // Top-level arg routing: every flag goes to the init command. We
+  // accept `signal init <flags>`, `signal <flags>`, `signal --help`,
+  // and `signal --version` as equivalent — a single-command CLI
+  // doesn't need a strict subcommand grammar.
+  let args = rawArgs;
+  if (args[0] === 'init') args = args.slice(1);
 
-Usage:
-  npx @stroma-labs/signal init       Add Signal to your project (interactive wizard)
-  npx @stroma-labs/signal --help     Print this usage
-  npx @stroma-labs/signal --version  Print the CLI version
-
-The interactive wizard flow ships in Phase C.2+ of the install-wizard plan.
-This is the Phase C.1 build-pipeline scaffold.
-`);
-}
-
-function main(args: readonly string[]): number {
+  // Top-level fast paths.
   if (args.includes('--version') || args.includes('-V')) {
-    // eslint-disable-next-line no-console
-    console.log(VERSION);
+    stdout.write(`${VERSION}\n`);
     return 0;
   }
   if (args.includes('--help') || args.includes('-h') || args.length === 0) {
-    printUsage();
+    printUsage((s) => stdout.write(s));
     return 0;
   }
-  const command = args[0];
-  if (command === 'init') {
-    // eslint-disable-next-line no-console
-    console.log('signal init: wizard flow lands in Phase C.2+ of the install-wizard plan.');
-    return 0;
+
+  let parsed: ReturnType<typeof parseInitArgs>;
+  try {
+    parsed = parseInitArgs(args);
+  } catch (err) {
+    if (err instanceof CliUsageError) {
+      stderr.write(`Error: ${err.message}\n\n`);
+      printUsage((s) => stderr.write(s));
+      return 2;
+    }
+    throw err;
   }
-  // eslint-disable-next-line no-console
-  console.error(`Unknown command: ${command}\n`);
-  printUsage();
-  return 1;
+
+  try {
+    const result = await run(parsed, { cliVersion: VERSION });
+    return result.exitCode;
+  } catch (err) {
+    if (err instanceof CliUsageError) {
+      stderr.write(`Error: ${err.message}\n`);
+      return 2;
+    }
+    const message = err instanceof Error ? err.message : String(err);
+    stderr.write(`Error: ${message}\n`);
+    return 1;
+  }
 }
 
-const exitCode = main(argv.slice(2));
-exit(exitCode);
+main(argv.slice(2))
+  .then((code) => exit(code))
+  .catch((err) => {
+    stderr.write(`Fatal: ${err instanceof Error ? err.message : String(err)}\n`);
+    exit(1);
+  });
