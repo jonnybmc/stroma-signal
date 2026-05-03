@@ -320,6 +320,12 @@ export interface ReportViewModel {
   freshness_known: boolean;
   warnings: string[];
   mode: SignalAggregateV1['mode'];
+  /** Sample-confidence band sourced from `aggregate.band` (deterministic
+   *  function of sample_size; see deriveSampleBand in
+   *  signal-contracts/aggregation.ts). Drives the cover's preliminary-
+   *  read banner — 'preliminary'/'provisional' surfaces a banner;
+   *  'stable' suppresses it. */
+  band: SignalAggregateV1['band'];
   mood_tier: ReportMoodTier;
   mood_label: string;
   hero_kicker: string;
@@ -1726,6 +1732,7 @@ export function buildReportViewModel(aggregate: SignalAggregateV1): ReportViewMo
     freshness_known: !aggregate.warnings.includes(SIGNAL_FRESHNESS_UNKNOWN_WARNING),
     warnings: aggregate.warnings,
     mode: aggregate.mode,
+    band: aggregate.band,
     mood_tier: mood,
     mood_label:
       mood === 'urgent'

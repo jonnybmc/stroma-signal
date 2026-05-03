@@ -238,6 +238,15 @@ function buildNextSteps(sink: SinkChoice): string[] {
   steps.push(
     'Verify in your destination (~60 seconds after first page load):\n  https://github.com/jonnybmc/stroma-signal/blob/main/docs/launch-troubleshooting.md'
   );
+  // Premature-pull guard: stop a fresh installer from running the
+  // BigQuery URL-builder at N=12 events, generating a thin report,
+  // and sharing the URL — first impression of a misleading report
+  // burns more trust than waiting a week. The /r cover surfaces a
+  // "preliminary" banner when sample_size < 100, but the cheaper
+  // gate is to set the expectation here, at the moment of install.
+  steps.push(
+    'Wait ~5–7 days of real traffic before running the BigQuery URL-builder for a representative report:\n  https://github.com/jonnybmc/stroma-signal/blob/main/docs/first-successful-report.md#8-first-week-reality-check'
+  );
   steps.push('Questions / problems:\n  https://github.com/jonnybmc/stroma-signal/issues');
   return steps;
 }

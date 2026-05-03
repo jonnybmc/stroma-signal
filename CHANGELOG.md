@@ -38,6 +38,16 @@ Bump the exact pin example whenever a new `-rc.N` is cut so onboarders default t
 - Snapshot-engine companion: new `src/features/install/` encapsulated module mirrors the existing intent module (deletion-test discipline preserved), `POST /api/v1/install` + `GET /api/v1/install/stats`, dedicated `install_events` Turso table with per-phase timestamps + idempotent retry via `last_event_id`, zod `.strict()` mode, 4 KB body cap, NO User-Agent header capture.
 - Existing intent module: removed dead `weekly_inbox` value from the `pill_id` CHECK constraint (pre-existing drift between migration text and validator/contract enums); added migration-validator alignment test that catches future drift in either direction.
 
+### Added — Sample-confidence band on `/r` cover (premature-pull guard)
+
+A first-time installer who runs the BigQuery URL-builder query at N=12 events generates a thin report and, if shared externally, burns trust before the data is meaningful. Three additions close the gap without ever blocking the operator from querying their warehouse:
+
+- **Wizard outro (Task A):** the `signal init` next-steps panel now includes a "Wait ~5–7 days of real traffic before running the BigQuery URL-builder for a representative report" bullet, linking to `first-successful-report.md §8` for the rubric. Sets the right expectation at the moment of install — the cheapest gate.
+- **Contract + SQL + codec (Task C):** new `SignalAggregateV1.band` field — `'preliminary'` (sample < 100), `'provisional'` (100–499), `'stable'` (≥ 500). Threshold lives in ONE place: `SIGNAL_SAMPLE_BAND_PROVISIONAL_THRESHOLD` + `SIGNAL_SAMPLE_BAND_STABLE_THRESHOLD` in `signal-contracts/src/types.ts`, with the SQL `URL_builder` templates computing the same value via inline CASE so warehouse-only paths agree without round-tripping through TS. New `b=<band>` URL parameter; codec back-fills from `s=` (sample_size) for older URLs.
+- **`/r` cover banner (Task B):** when `vm.band !== 'stable'`, the cover renders a brand-olive note above the masthead — "Preliminary read — sample of N sessions. Ranges and percentiles stabilise around 100+ events..." (or the provisional variant). Suppressed entirely when stable. Banner is a self-honesty signal in the artifact recipients see — not a gate on the operator's BigQuery query.
+
+Test coverage: `deriveSampleBand` boundary tests at 0/99/100/499/500/10k; codec round-trip + back-fill paths; per-fixture banner-render assertion in `report-fixture-coverage.test.ts` (every fixture gets the right banner rendered or suppressed based on its sample size). Total tests: 2552 (was 2529; +23 new).
+
 ### Notes
 
 - Wizard adds zero runtime dependencies to the published `@stroma-labs/signal` package — both `check-release-readiness.mjs` invariants stay intact (no `dependencies` block, no bundled deps in the packed artifact).

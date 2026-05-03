@@ -40,6 +40,21 @@ describe('fixture coverage — every scenario renders without null/undefined/NaN
         expect(html, `${fx.id} missing boundary statement`).toContain(vm.boundary_statement);
       });
 
+      // Sample-band banner (P2-credibility): the cover surfaces a
+      // brand-olive note above the masthead when band !== 'stable'.
+      // Fixture-driven sanity check: render contains the headline iff
+      // band is preliminary/provisional, suppressed entirely when stable.
+      it('renders the sample-band banner only when band !== stable', () => {
+        if (vm.band === 'preliminary') {
+          expect(html, `${fx.id} (band=preliminary) missing banner headline`).toContain('Preliminary read');
+        } else if (vm.band === 'provisional') {
+          expect(html, `${fx.id} (band=provisional) missing banner headline`).toContain('Provisional read');
+        } else {
+          expect(html, `${fx.id} (band=stable) leaks banner headline`).not.toContain('Preliminary read');
+          expect(html, `${fx.id} (band=stable) leaks banner headline`).not.toContain('Provisional read');
+        }
+      });
+
       it('does not leak null / undefined / NaN as visible content', () => {
         expect(lowered, `${fx.id} leaks >null<`).not.toContain('>null<');
         expect(lowered, `${fx.id} leaks >undefined<`).not.toContain('>undefined<');

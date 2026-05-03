@@ -102,6 +102,8 @@ If you are preparing the package for live release rather than just proving the p
 
 Once events have flowed for 5–7 days, walk this list. The point is to feel confident the data is healthy *before* you share the URL with stakeholders.
 
+> **Sample-confidence band.** Every generated `signal_report_url` carries a `b=<band>` URL parameter — `preliminary` (sample < 100), `provisional` (100–499), or `stable` (≥ 500). The hosted `/r` cover renders a brand-olive note above the masthead when the band is **preliminary** or **provisional**, so a thin report can't masquerade as a stable read when shared externally. The thresholds live in `packages/signal-contracts/src/types.ts` (`SIGNAL_SAMPLE_BAND_PROVISIONAL_THRESHOLD` / `SIGNAL_SAMPLE_BAND_STABLE_THRESHOLD`) and the SQL URL-builders compute them inline. There is no gate stopping you from running the URL-builder query whenever you want — the band is purely an honesty signal.
+
 | What to check | What "healthy" looks like | What to investigate if you see it |
 |---|---|---|
 | **Event volume** | Roughly **20–80% of your GA4 sessions count** for the same window. The exact ratio depends on your hard-nav vs soft-nav mix (see §1 of [operator-expectations.md](./operator-expectations.md)) | Below 10% → check the SDK is loaded on every entry route, not just the homepage |

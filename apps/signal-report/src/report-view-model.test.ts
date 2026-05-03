@@ -414,6 +414,21 @@ describe('report view model', () => {
     expect(viewModel.warnings).toContain('Act 2 cannot render a comparable race with the current data.');
   });
 
+  it('surfaces sample-confidence band on the view model derived from sample_size', () => {
+    // Above-stable URL → band: 'stable'
+    const stableUrl =
+      'https://signal.stroma.design/r?rv=1&mode=production&d=test.local&nt=50,30,15,5,0&dt=34,33,33&lu=0&lt=0&fu=0&ft=0&tu=0&tt=0&ulc=0&ufc=0&utc=0&clc=0&cfc=0&ctc=0&s=750&p=7&nc=100&nu=0&nr=10&lc=80&ct=none&rm=none&rr=insufficient_comparable_data&ga=1776072000000';
+    expect(buildReportViewModel(decodeSignalReportUrl(stableUrl)).band).toBe('stable');
+
+    // Provisional URL → band: 'provisional' (back-filled from sample_size)
+    const provisionalUrl = stableUrl.replace('&s=750', '&s=200');
+    expect(buildReportViewModel(decodeSignalReportUrl(provisionalUrl)).band).toBe('provisional');
+
+    // Preliminary URL → band: 'preliminary' (back-filled from sample_size)
+    const preliminaryUrl = stableUrl.replace('&s=750', '&s=50');
+    expect(buildReportViewModel(decodeSignalReportUrl(preliminaryUrl)).band).toBe('preliminary');
+  });
+
   it('builds a complete view model from every scenario fixture without crash or NaN', () => {
     for (const fixture of signalReportScenarioFixtures) {
       const viewModel = buildReportViewModel(fixture.aggregate);

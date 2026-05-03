@@ -40,6 +40,49 @@ function tierLegendItem(t: { key: string; label: string }): string {
   `;
 }
 
+/**
+ * Sample-band banner — surfaced ABOVE the masthead when the report's
+ * underlying sample size hasn't crossed the stable threshold (500).
+ * Designed to make a thin report self-honest about its own confidence
+ * without blocking the operator from running their query whenever they
+ * want. Returns '' (no node emitted) when band === 'stable'.
+ *
+ * Visual register: brand-olive accent border, dim copy. Sits inside
+ * the section but BEFORE the cover hero so the recipient sees it
+ * immediately on page load.
+ */
+function renderSampleBandBanner(vm: ReportViewModel): string {
+  if (vm.band === 'stable') return '';
+  const headline = vm.band === 'preliminary' ? 'Preliminary read' : 'Provisional read';
+  const body =
+    vm.band === 'preliminary'
+      ? `Sample of ${vm.sample_size.toLocaleString('en-US')} session${vm.sample_size === 1 ? '' : 's'} measured. Ranges and percentiles stabilise around 100+ events; consider waiting for more traffic before sharing externally.`
+      : `Sample of ${vm.sample_size.toLocaleString('en-US')} sessions measured. Direction is reliable but tier-level percentiles continue to firm up past 500 events.`;
+  return `
+    <div
+      role="note"
+      aria-label="Sample-confidence note"
+      style="
+        display:flex;
+        flex-direction:column;
+        gap:4px;
+        padding:14px 18px;
+        margin-bottom:var(--stack-lg);
+        border-left:3px solid var(--accent);
+        background:color-mix(in oklab, var(--bg-2) 60%, transparent);
+        border-radius:6px;
+      "
+    >
+      <div class="mono" style="font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--accent);">
+        ${escapeHtml(headline)}
+      </div>
+      <div style="font-size:13px;color:var(--ink-mute);line-height:1.5;">
+        ${escapeHtml(body)}
+      </div>
+    </div>
+  `;
+}
+
 export function renderCoverSection(vm: ReportViewModel): string {
   const tiers = vm.act1_tiers.map((t) => ({
     key: t.key,
@@ -51,6 +94,7 @@ export function renderCoverSection(vm: ReportViewModel): string {
   return `
     <section id="cover" class="section" data-tone="paper" aria-labelledby="cover-heading" style="padding-block:0;">
       <div class="section-inner" style="gap:var(--stack-2xl);">
+        ${renderSampleBandBanner(vm)}
         <div class="act-intro">
           <div class="act-intro-stack">
             ${renderReveal(

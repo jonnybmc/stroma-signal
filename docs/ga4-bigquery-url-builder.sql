@@ -69,6 +69,17 @@ counts AS (
   SELECT
     ANY_VALUE(host) AS host, -- single domain after WHERE host filter
     COUNT(*) AS sample_size,
+    -- Sample-confidence band — drives the /r cover's preliminary banner.
+    -- Thresholds mirror packages/signal-contracts/src/types.ts
+    -- (SIGNAL_SAMPLE_BAND_PROVISIONAL_THRESHOLD = 100,
+    --  SIGNAL_SAMPLE_BAND_STABLE_THRESHOLD       = 500). If those
+    -- constants change, update this CASE in lockstep — the
+    -- sql-templates.test.ts assertion catches drift on either side.
+    CASE
+      WHEN COUNT(*) < 100 THEN 'preliminary'
+      WHEN COUNT(*) < 500 THEN 'provisional'
+      ELSE 'stable'
+    END AS report_band,
     IFNULL(ROUND(100 * SAFE_DIVIDE(COUNTIF(net_tier IS NOT NULL), COUNT(*))), 0) AS network_coverage,
     IFNULL(ROUND(100 * SAFE_DIVIDE(COUNTIF(net_tier IS NULL), COUNT(*))), 0) AS unclassified_share,
     IFNULL(ROUND(100 * SAFE_DIVIDE(COUNTIF(net_tcp_source = 'unavailable_reused'), COUNT(*))), 0) AS reuse_share,
@@ -352,6 +363,7 @@ SELECT CONCAT(
   '&cfc=', CAST(comparison_fcp_coverage AS STRING),
   '&ctc=', CAST(comparison_ttfb_coverage AS STRING),
   '&s=', CAST(sample_size AS STRING),
+  '&b=', report_band,
   '&p=7',
   '&nc=', CAST(network_coverage AS STRING),
   '&nu=', CAST(unclassified_share AS STRING),
