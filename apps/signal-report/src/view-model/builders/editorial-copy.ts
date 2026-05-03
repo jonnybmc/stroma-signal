@@ -10,11 +10,7 @@
 //   not make.
 // - Mood (urgent / sober / affirming) shifts tone within an honest frame.
 
-import type {
-  SignalRaceMetric,
-  SignalReportInteractionIntentKind,
-  SignalReportInteractionIntentPillId
-} from '@stroma-labs/signal-contracts';
+import type { SignalRaceMetric, SignalReportInteractionIntentPillId } from '@stroma-labs/signal-contracts';
 
 import type {
   ReportAct3ViewModel,
@@ -49,40 +45,49 @@ export interface EditorialDataShape {
   shape_proven: boolean;
 }
 
-/** One of the three closing-section cards. Each card is a needs-inquiry
- * (question-led title, empathetic body) — never a packaged offer. CTA
- * label reads as a quiet text-link, never a button. Visual restraint
- * lives in the renderer; the editorial register lives here. */
-export interface ReportClosingCard {
-  id: 'pi_early_access' | 'rapid_fix' | 'monitoring';
-  /** SignalReportInteractionKind value emitted to the snapshot-engine
-   * `/api/v1/intent` endpoint when the CTA is clicked. */
-  intent_kind: SignalReportInteractionIntentKind;
-  eyebrow: string;
-  /** Question-led title. e.g. "Wondering which campaigns are exposed?" */
-  title: string;
-  /** 1-2 sentence empathetic body. Mood + shape aware. */
+/** One radio option in the closing modal's "What would help?" question.
+ *  Each maps 1:1 to an existing intent event kind; "something_else"
+ *  expands to a sub-pill multiselect inside the modal. */
+export interface ReportClosingModalChoice {
+  value: 'pi_early_access' | 'rapid_fix' | 'monitoring' | 'something_else';
+  /** Short imperative label rendered alongside the radio. */
+  label: string;
+  /** 1-line explanatory body rendered as muted copy beneath the label. */
   body: string;
-  cta_label: string;
-  /** When set, the card click POSTs the intent then redirects here.
-   *  When null, the click logs intent + transforms in place to ✓ noted. */
-  cta_href: string | null;
-  /** When true, card transforms to reveal an optional inline email
-   *  field after the initial click logs anonymously. */
-  collects_email: boolean;
-  /** Monitoring card only — reveals a Weekly / Daily selector. */
-  collects_cadence: boolean;
-  /** Optional honesty footnote shown beneath the CTA. */
-  small_note: string | null;
 }
 
-/** One pill in the freeform-demand row beneath the cards. Single-line
- *  mono-small text, NOT a button. */
+/** Editorial copy for the closing-section modal. Drives a single
+ *  trigger button + a native <dialog> with progressive-disclosure form.
+ *  Replaces the prior three-card + freeform-multiselect layout. */
+export interface ReportClosingModal {
+  trigger_label: string;
+  title: string;
+  lede: string;
+  choice_legend: string;
+  choices: ReportClosingModalChoice[];
+  cadence_legend: string;
+  cadence_options: { value: 'weekly' | 'monthly'; label: string }[];
+  pills_legend: string;
+  freeform_label: string;
+  freeform_placeholder: string;
+  email_label: string;
+  email_placeholder: string;
+  /** Inline error message shown beside the email field when submit is
+   *  attempted on a path that requires email (PI / Monitoring) but
+   *  the field is empty or malformed. Announced via role="alert". */
+  email_error_text: string;
+  submit_label: string;
+  confirmation_text: string;
+  dismiss_label: string;
+}
+
+/** One pill in the freeform-demand sub-multiselect inside the modal
+ *  (revealed when the user picks "Something else"). */
 export interface ReportClosingPill {
   pill_id: SignalReportInteractionIntentPillId;
   label: string;
-  /** When true, clicking expands the pill into a short freeform text
-   *  field (capped 200 chars). Only true for `something_else`. */
+  /** When true, checking the pill reveals a short freeform text field
+   *  (capped 200 chars). Only true for `something_else`. */
   collects_freeform_text: boolean;
 }
 
@@ -117,15 +122,14 @@ export interface ReportEditorialCopy {
   business_what_this_enables: string[];
 
   /** Boundary-statement-anchored bridge sentence rendered above the
-   *  closing-card row. Question-led ("What would help most from here?"),
-   *  not packaging-led ("Choose your next step"). */
+   *  closing modal trigger. Question-led ("What would help most from
+   *  here?"), not packaging-led. Single source of truth for the
+   *  truth-boundary language; no near-paraphrase elsewhere. */
   business_closing_bridge_html: string;
-  /** Three co-equal cards. Visual primary is conveyed by the editorial
-   *  bridge above, never by card weight. */
-  business_closing_cards: ReportClosingCard[];
-  /** Lead-in label for the freeform pill row. */
-  business_closing_pill_lead_in: string;
-  /** Five inline pills capturing demand we haven't yet productized. */
+  /** Closing-section modal copy — trigger label + dialog interior. */
+  business_closing_modal: ReportClosingModal;
+  /** Sub-pills revealed inside the modal when "Something else" is
+   *  picked. Each carries an `intent_pill_id` for `intent_freeform`. */
   business_closing_pills: ReportClosingPill[];
 }
 
@@ -179,8 +183,7 @@ export function buildEditorialCopy(
     business_what_this_enables: pickWhatThisEnables(shape, dominantCulpritKind),
 
     business_closing_bridge_html: pickClosingBridge(),
-    business_closing_cards: pickClosingCards(shape),
-    business_closing_pill_lead_in: 'Or tell us what would actually help —',
+    business_closing_modal: pickClosingModal(shape),
     business_closing_pills: pickClosingPills()
   };
 }
@@ -430,74 +433,70 @@ function pickWhatThisEnables(shape: EditorialDataShape, dominantCulpritKind: str
 // ─── Closing-section bridge + cards + pills ───────────────────────────
 
 function pickClosingBridge(): string {
-  // The closing bridge is JUST the needs-inquiry question. The renderer
-  // composes it with the canonical `vm.boundary_statement` verbatim so
-  // the artifact has ONE source of truth for the truth-boundary
-  // language (no duplicate near-paraphrase between bridge + footer).
-  return '<strong>What would help most from here?</strong>';
+  // The closing bridge USED to append "What would help most from here?"
+  // to the boundary statement, but the modal's trigger button + dialog
+  // title both ask the same question — three near-identical
+  // restatements in one section. Empty bridge keeps the boundary
+  // statement clean as the truth-frame; the trigger button below it IS
+  // the question.
+  return '';
 }
 
-function pickClosingCards(shape: EditorialDataShape): ReportClosingCard[] {
-  return [pickPiCard(shape), pickRapidFixCard(shape), pickMonitoringCard()];
-}
-
-function pickPiCard(shape: EditorialDataShape): ReportClosingCard {
-  // Card titles tonally extend the bridge question "What would help most
-  // from here?" — read as natural answers a thoughtful operator would
-  // give themselves. Imperative declarative, no questions.
-  const body =
+function pickClosingModal(shape: EditorialDataShape): ReportClosingModal {
+  // Choice bodies tonally extend the bridge question "What would help
+  // most from here?" — read as natural answers a thoughtful operator
+  // would give themselves. Imperative declarative, no questions, no
+  // celebration register, no exclusion / "upgrade to" / "premium" copy
+  // (render-honesty enforced).
+  const piBody =
     shape.mood === 'affirming'
-      ? 'If you ever want to know which specific campaigns or audiences are most exposed to a gap like this, we are working on a separate tool that links this report to your ad-platform data. Not built yet — collecting interest first.'
-      : 'This report shows the gap, but it does not tell you which specific campaigns or audiences are most exposed to it. We are working on a separate tool that links this report to your ad-platform data. Not built yet — collecting interest first.';
+      ? 'A campaign-attribution layer would map specific ad campaigns to the gap surfaced here. Not built yet — collecting interest first.'
+      : 'This report shows the gap; it does not tell you which campaigns or audiences are most exposed to it. We are collecting interest in a campaign-attribution layer that would.';
+  const rapidBody = shape.has_ledger
+    ? 'A short, prioritised fix list for the highest-pressure page surfaced above. Booked through stroma.design.'
+    : 'A short, prioritised fix list for a single high-value page. Booked through stroma.design.';
 
   return {
-    id: 'pi_early_access',
-    intent_kind: 'intent_pi_early_access',
-    eyebrow: 'Campaign-attribution layer',
-    title: 'See which campaigns this affects.',
-    body,
-    cta_label: 'Keep me posted',
-    cta_href: null,
-    collects_email: true,
-    collects_cadence: false,
-    small_note: null
-  };
-}
-
-function pickRapidFixCard(shape: EditorialDataShape): ReportClosingCard {
-  // Body softens when the report shows little measured pressure — the
-  // offer still applies but the framing shouldn't read as if the page
-  // is on fire when it isn't.
-  const body = shape.has_ledger
-    ? 'If a single high-value page is dragging the funnel above and you want a short, prioritised fix list, this traces the cause and returns it. Booked through stroma.design.'
-    : 'If you have a single high-value page that needs a short, prioritised fix list, this traces the cause and returns it. Booked through stroma.design.';
-
-  return {
-    id: 'rapid_fix',
-    intent_kind: 'intent_rapid_fix',
-    eyebrow: 'Rapid Fix Plan',
-    title: 'Get a fix list for this page.',
-    body,
-    cta_label: 'Get a fix plan',
-    cta_href: 'https://www.stroma.design/book?service=rapid-fix',
-    collects_email: false,
-    collects_cadence: false,
-    small_note: null
-  };
-}
-
-function pickMonitoringCard(): ReportClosingCard {
-  return {
-    id: 'monitoring',
-    intent_kind: 'intent_monitoring',
-    eyebrow: 'Scheduled monitoring',
-    title: 'Run this report on a schedule.',
-    body: 'Re-running the BigQuery query and regenerating the URL by hand is fine for a one-off — less fine as a regular read. Scheduled monitoring would deliver this same report weekly or monthly as the data refreshes. We are collecting interest before we build it.',
-    cta_label: 'Keep me posted',
-    cta_href: null,
-    collects_email: true,
-    collects_cadence: true,
-    small_note: null
+    trigger_label: 'What would help next?',
+    title: 'What would help next?',
+    lede: 'Tell us what would actually help — we use this to prioritise what we build next.',
+    choice_legend: 'Pick one:',
+    choices: [
+      {
+        value: 'pi_early_access',
+        label: 'Show me which campaigns this affects',
+        body: piBody
+      },
+      {
+        value: 'rapid_fix',
+        label: 'Get a fix list for this page',
+        body: rapidBody
+      },
+      {
+        value: 'monitoring',
+        label: 'Run this report on a schedule',
+        body: 'Re-running the BigQuery query by hand is fine for a one-off, less fine as a regular read. Scheduled delivery weekly or monthly as the data refreshes.'
+      },
+      {
+        value: 'something_else',
+        label: 'Something else',
+        body: 'Pick any of the options that apply, or describe what would help.'
+      }
+    ],
+    cadence_legend: 'How often?',
+    cadence_options: [
+      { value: 'weekly', label: 'weekly' },
+      { value: 'monthly', label: 'monthly' }
+    ],
+    pills_legend: 'Which kinds?',
+    freeform_label: 'tell us more',
+    freeform_placeholder: 'What would actually help? (200 chars max)',
+    email_label: 'your email',
+    email_placeholder: 'you@company.com',
+    email_error_text: 'add a valid email so we can follow up',
+    submit_label: 'send',
+    confirmation_text: '✓ noted — we will be in touch',
+    dismiss_label: 'close'
   };
 }
 

@@ -6,6 +6,7 @@
      --stack-lg  48px   between major elements within a section
      --stack-xl  64px   between sub-sections
      --stack-2xl 96px   between act sections (chapter break)
+     --act-lede-content-gap 28-40px between Act 01-04 intro containers and first content blocks
 */
 
 :root {
@@ -15,12 +16,25 @@
   --stack-lg: 48px;
   --stack-xl: 64px;
   --stack-2xl: 96px;
+  --act-lede-content-gap: clamp(28px, 3.2vh, 40px);
 
   --section-py: clamp(48px, 7vh, 96px);
   --section-px: clamp(20px, 5vw, 56px);
 
   --report-max: 1100px;
   --column-max: 720px;
+}
+@media (max-width: 720px) {
+  :root {
+    --stack-xs: 6px;
+    --stack-sm: 12px;
+    --stack-md: 20px;
+    --stack-lg: 32px;
+    --stack-xl: 44px;
+    --act-lede-content-gap: clamp(20px, 6vw, 28px);
+    --section-py: clamp(40px, 8vh, 64px);
+    --section-px: clamp(18px, 5vw, 24px);
+  }
 }
 
 /* — global reset — */
@@ -58,8 +72,14 @@ body { overflow-y: auto; overflow-x: hidden; }
   flex-direction: column;
   gap: var(--stack-xl);
 }
-.section-inner > .act-intro + * {
-  margin-top: calc(var(--stack-xl) * -1);
+#cover .section-inner {
+  gap: clamp(40px, 6vh, var(--stack-xl));
+}
+#audience .section-inner,
+#distance .section-inner,
+#funnel .section-inner,
+#business .section-inner {
+  gap: var(--act-lede-content-gap);
 }
 .section[data-tone="paper"] { background: var(--bg-0); }
 .section[data-tone="cream"] { background: var(--bg-1); }
@@ -67,22 +87,55 @@ body { overflow-y: auto; overflow-x: hidden; }
 .section[data-tone="paper"] + .section[data-tone="cream"] {
   border-top: 1px solid var(--line);
 }
+@media (max-width: 720px) {
+  .section + .section {
+    padding-top: clamp(18px, 5vh, 32px);
+  }
+}
 
 /* — act intro — */
 .act-intro {
-  min-height: 78dvh;
+  min-height: auto;
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  padding-block: clamp(40px, 6vh, 72px);
+  justify-content: flex-start;
+  padding-block: clamp(40px, 6vh, 72px) clamp(20px, 3vh, 36px);
   position: relative;
 }
-#cover .act-intro { min-height: 88dvh; padding-top: clamp(120px, 16vh, 200px); }
+/* Cover gets nav clearance only — content sizes naturally so the
+   at-a-glance cards land in the same viewport on desktop, matching
+   the reference layout's tightly-grouped first-paint feel. */
+#cover .act-intro {
+  min-height: auto;
+  padding-top: clamp(72px, 9vh, 120px);
+  padding-bottom: var(--stack-sm);
+  justify-content: flex-start;
+}
 .act-intro-stack {
   display: flex;
   flex-direction: column;
   gap: var(--stack-md);
   max-width: 880px;
+}
+/* Cover specifically tightens to match the reference's first-paint density. */
+#cover .act-intro-stack { gap: var(--stack-sm); }
+@media (min-width: 901px) {
+  .act-intro {
+    padding-block: clamp(46px, 6.9vh, 83px) clamp(22px, 3.2vh, 40px);
+  }
+
+  .act-intro-stack {
+    gap: clamp(32px, 3.2vh, 36px);
+  }
+
+  #cover .act-intro {
+    padding-top: clamp(83px, 10.4vh, 138px);
+    padding-bottom: 22px;
+  }
+
+  #cover .act-intro-stack {
+    gap: 20px;
+  }
 }
 .act-intro h1,
 .act-intro h2 {
@@ -94,6 +147,13 @@ body { overflow-y: auto; overflow-x: hidden; }
   letter-spacing: -0.04em;
   font-weight: 400;
   text-wrap: balance;
+}
+@media (min-width: 901px) {
+  .act-intro h2.section-title {
+    font-size: clamp(30px, 4.5vw + 9px, 66px);
+    line-height: 1.02;
+    letter-spacing: -0.032em;
+  }
 }
 .act-intro .act-intro-lede {
   margin: 0;
@@ -120,6 +180,98 @@ body { overflow-y: auto; overflow-x: hidden; }
   border-radius: 999px;
   background: var(--accent);
 }
+@media (max-width: 720px) {
+  .act-intro {
+    padding-block: clamp(34px, 8vh, 56px) clamp(14px, 4vh, 24px);
+  }
+
+  #cover .act-intro {
+    padding-top: clamp(76px, 13vh, 104px);
+    padding-bottom: var(--stack-sm);
+  }
+
+  .act-intro-stack {
+    gap: clamp(18px, 5vw, 24px);
+    max-width: 100%;
+  }
+
+  #cover .act-intro-stack {
+    gap: var(--stack-sm);
+  }
+
+  .act-intro h1,
+  .act-intro h2 {
+    font-size: clamp(38px, 12vw, 56px);
+    line-height: 1.02;
+    letter-spacing: -0.032em;
+  }
+
+  .act-intro h2.section-title {
+    font-size: clamp(34px, 10.5vw, 48px);
+  }
+
+  .act-intro .act-intro-lede {
+    font-size: clamp(16px, 4.2vw, 18px);
+    line-height: 1.55;
+  }
+
+  .act-intro .act-intro-eyebrow,
+  .section-eyebrow {
+    letter-spacing: 0.12em;
+  }
+}
+/* — sample-confidence chip — discreet absolute-positioned signal in the
+   cover section's top-right. Out of document flow so it never pushes
+   the act-intro down; z-index below .scroll-nav (50) so it cannot
+   visually clip into the nav chrome. Suppressed when band === 'stable'
+   (the renderer returns ''). */
+.sample-confidence-chip {
+  position: absolute;
+  top: clamp(64px, 8vh, 88px);
+  right: var(--section-px);
+  z-index: 40;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--bg-2) 70%, transparent);
+  backdrop-filter: saturate(120%) blur(6px);
+  -webkit-backdrop-filter: saturate(120%) blur(6px);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--ink-mute);
+  cursor: help;
+  max-width: min(280px, calc(100vw - 2 * var(--section-px)));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sample-confidence-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--accent);
+  flex-shrink: 0;
+}
+.sample-confidence-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+@media (max-width: 720px) {
+  .sample-confidence-chip {
+    /* On narrow screens, drop into the upper-left of the cover so it
+       doesn't crowd the brand mark. */
+    top: clamp(60px, 7vh, 76px);
+    right: auto;
+    left: var(--section-px);
+    max-width: calc(100vw - 2 * var(--section-px));
+  }
+}
+
 /* — top nav chrome — */
 .scroll-nav {
   position: fixed;
@@ -298,11 +450,13 @@ body { overflow-y: auto; overflow-x: hidden; }
   display: flex;
   flex-direction: column;
   gap: var(--stack-md);
+  min-width: 0;
 }
 .block-header {
   display: flex;
   flex-direction: column;
   gap: var(--stack-xs);
+  min-width: 0;
 }
 
 /* — grid helpers — */
@@ -310,11 +464,13 @@ body { overflow-y: auto; overflow-x: hidden; }
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: var(--stack-md);
+  min-width: 0;
 }
 .grid-3 {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: var(--stack-md);
+  min-width: 0;
 }
 @media (max-width: 720px) {
   .grid-2,
@@ -330,6 +486,7 @@ body { overflow-y: auto; overflow-x: hidden; }
   gap: 0;
   border-collapse: collapse;
   border-top: 2px solid var(--line-table-header);
+  min-width: 0;
 }
 .data-table thead,
 .data-table tbody,
@@ -395,9 +552,95 @@ body { overflow-y: auto; overflow-x: hidden; }
 }
 
 @media (max-width: 720px) {
-  .data-table { grid-template-columns: 1fr 1fr; }
-  .data-table .th-criteria,
-  .data-table .td-criteria { display: none; }
+  .data-table {
+    display: block;
+    border-top: 1.5px solid var(--line-table-header);
+  }
+
+  .data-table thead {
+    display: none;
+  }
+
+  .data-table tbody {
+    display: grid;
+    gap: var(--stack-sm);
+  }
+
+  .data-table tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(84px, auto);
+    gap: 10px 16px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--line-table);
+  }
+
+  .data-table tbody tr:last-child {
+    border-bottom-width: 1.5px;
+    border-bottom-color: var(--line-table-header);
+  }
+
+  .data-table th,
+  .data-table td,
+  .data-table tbody tr:last-child td {
+    padding: 0;
+    border-bottom: 0;
+  }
+
+  .data-table td {
+    min-width: 0;
+  }
+
+  .data-table td::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 3px;
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    line-height: 1;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-mute);
+  }
+
+  .data-table td.td-name {
+    grid-column: 1 / -1;
+    gap: 10px;
+    align-items: center;
+  }
+
+  .data-table td.td-name::before {
+    content: none;
+  }
+
+  .data-table td.td-name .rule {
+    width: 3px;
+    min-height: 24px;
+  }
+
+  .data-table td.td-name .label {
+    min-width: 0;
+    font-size: 14px;
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+  }
+
+  .data-table td.td-criteria {
+    grid-column: 1 / -1;
+    font-size: 11.5px;
+    line-height: 1.45;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .data-table td.td-sessions,
+  .data-table td.td-share {
+    font-size: 13px;
+    line-height: 1.2;
+  }
+
+  .data-table td.td-share {
+    text-align: left;
+  }
 }
 
 /* — section eyebrow with prefixed icon — */
@@ -420,6 +663,7 @@ body { overflow-y: auto; overflow-x: hidden; }
   border-radius: var(--r-3);
   box-shadow: var(--sh-2);
   padding: clamp(20px, 2vw + 12px, 32px);
+  min-width: 0;
 }
 .figure-eyebrow {
   font-family: var(--font-mono);
@@ -445,6 +689,29 @@ body { overflow-y: auto; overflow-x: hidden; }
   line-height: 1.55;
   color: var(--ink-soft);
   text-wrap: pretty;
+}
+@media (max-width: 720px) {
+  .figure {
+    padding: clamp(16px, 5vw, 20px);
+    border-radius: var(--r-2);
+  }
+
+  .figure-eyebrow {
+    margin-bottom: var(--stack-xs);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+  }
+
+  .figure-stat {
+    font-size: clamp(34px, 12vw, 52px);
+    line-height: 1.02;
+  }
+
+  .figure-cap,
+  .section-lede {
+    font-size: 14px;
+    line-height: 1.55;
+  }
 }
 
 /* — kpi pill — */
@@ -707,6 +974,12 @@ body { overflow-y: auto; overflow-x: hidden; }
   gap: var(--stack-lg);
   align-items: start;
 }
+.impact-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 140px) minmax(0, 1fr);
+  gap: 24px;
+  align-items: center;
+}
 @media (max-width: 900px) {
   .business-grid { grid-template-columns: 1fr; }
   .business-grid aside {
@@ -714,21 +987,34 @@ body { overflow-y: auto; overflow-x: hidden; }
     top: auto !important;
   }
 }
+@media (max-width: 720px) {
+  .impact-row {
+    grid-template-columns: 1fr;
+    gap: var(--stack-sm);
+  }
 
-/* — closing router (three co-equal cards + pill row) ─────────────────
+  .impact-row .figure-eyebrow {
+    margin-bottom: 0;
+  }
+}
+
+/* — closing router (single trigger + native <dialog> modal) ──────────
    Visual restraint discipline (load-bearing):
-   - NO accent backgrounds, NO accent borders, NO button chrome
-   - Cards use the same .figure surface as the rest of the section
-   - CTAs are mono-text-link, NOT styled buttons
-   - Pills are inline links at body-copy weight, NOT a button bar
-   - Confirmation stays in observation register (✓ noted, --ink-soft)
+   - Trigger is a single text-link, NOT a styled CTA card. The
+     boundary statement above sets the truth frame; the trigger is
+     the only interactive surface in the closing section.
+   - Modal interior uses native form chrome with light styling. No
+     marketing-style "card" treatment per option, no accent fills,
+     no heavy shadows.
+   - Confirmation stays in observation register (✓ noted).
    The closing block must NOT be the highest-contrast block on the
    page — the KPI ledger above it carries that weight. */
 .closing-router {
   display: flex;
   flex-direction: column;
-  gap: var(--stack-lg);
+  gap: var(--stack-md);
   margin-top: var(--stack-xl);
+  align-items: center;
 }
 
 .closing-bridge {
@@ -741,346 +1027,341 @@ body { overflow-y: auto; overflow-x: hidden; }
   text-align: center;
 }
 
-.closing-card-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--stack-md);
-  align-items: stretch;
+.closing-trigger {
+  appearance: none;
+  background: none;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  padding: 10px 22px;
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  color: var(--ink);
+  cursor: pointer;
+  transition: border-color 180ms ease, color 180ms ease, background-color 180ms ease;
 }
-@media (max-width: 800px) {
-  .closing-card-grid { grid-template-columns: 1fr; }
+.closing-trigger:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background-color: color-mix(in oklab, var(--accent) 6%, transparent);
+}
+.closing-trigger:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
 }
 
-.closing-card {
+@media (max-width: 720px) {
+  .closing-router {
+    margin-top: var(--stack-lg);
+    align-items: stretch;
+  }
+  .closing-bridge {
+    text-align: left;
+  }
+  .closing-trigger {
+    align-self: flex-start;
+  }
+}
+
+/* — Closing modal — native <dialog> with progressive-disclosure form.
+   Browser handles backdrop, ESC-to-close, focus trap, scroll lock.
+   Conditional reveal driven by [data-choice] + [data-pill-something-else]
+   attributes on the dialog root, set by the JS handler on radio change. */
+dialog.closing-modal {
+  /* Reset native UA defaults so our paper-tone styling doesn't fight. */
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-3);
+  background: var(--bg-1);
+  color: var(--ink);
+  padding: 0;
+  max-width: min(480px, calc(100vw - 32px));
+  width: 100%;
+  box-shadow: 0 12px 48px rgba(20, 17, 13, 0.18);
+}
+dialog.closing-modal::backdrop {
+  background: color-mix(in oklab, var(--ink) 35%, transparent);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+}
+dialog.closing-modal[open] {
+  animation: closing-modal-in 200ms cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+@keyframes closing-modal-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.985); }
+  to   { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  dialog.closing-modal[open] { animation: none; }
+}
+
+.closing-modal-form {
   display: flex;
   flex-direction: column;
-  gap: var(--stack-sm);
-  padding: var(--stack-md);
-  background: var(--bg-1);
-  border: 1px solid var(--line);
-  border-radius: var(--r-3);
-  transition: border-color 200ms ease;
+  gap: var(--stack-md);
+  padding: clamp(20px, 4vw, 28px);
 }
-.closing-card:hover { border-color: var(--line-strong); }
-
-.closing-card-eyebrow {
-  font-family: var(--font-mono);
-  font-size: 10.5px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--ink-mute);
-  font-weight: 500;
+.closing-modal-header {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--stack-xs);
+  padding-right: 32px;
 }
-
-.closing-card-title {
+.closing-modal-title {
   margin: 0;
   font-family: var(--font-display);
-  font-variation-settings: 'opsz' 72, 'SOFT' 30, 'WONK' 0;
-  font-size: clamp(18px, 1vw + 14px, 22px);
+  font-size: clamp(20px, 1vw + 16px, 24px);
   line-height: 1.2;
   letter-spacing: -0.02em;
-  font-weight: 400;
+  font-weight: 500;
   color: var(--ink);
-  text-wrap: balance;
 }
-
-.closing-card-body {
+.closing-modal-lede {
   margin: 0;
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1.55;
   color: var(--ink-soft);
   text-wrap: pretty;
-  flex: 1 1 auto;
 }
-
-.closing-card-cta {
+.closing-modal-dismiss {
+  /* 44px hit area meets the WCAG 2.5.5 minimum target size, important
+     on mobile / touch where the prior 28px chip was too small to tap
+     reliably. The visual glyph stays the same — just the click area
+     grows. */
+  position: absolute;
+  top: -10px;
+  right: -10px;
   appearance: none;
   background: none;
-  border: none;
-  padding: 0;
-  margin-top: var(--stack-xs);
-  align-self: flex-start;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--ink-soft);
-  text-decoration: underline;
-  text-decoration-color: var(--line-strong);
-  text-underline-offset: 3px;
-  cursor: pointer;
-  transition: color 180ms, text-decoration-color 180ms;
-}
-.closing-card-cta:hover {
-  color: var(--accent);
-  text-decoration-color: currentColor;
-}
-.closing-card-cta:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 4px;
-  border-radius: 2px;
-}
-/* Submit-button-shaped CTA inside the inline form — same mono text-link
- * weight, but with a hairline pill border so the reader recognises it
- * as the action button (not just a link). Still no accent fill, no
- * shadow — visual restraint preserved. */
-.closing-card-form .closing-card-cta {
-  margin-top: 0;
-  padding: 6px 14px;
-  border: 1px solid var(--line-strong);
+  border: 0;
+  width: 44px;
+  height: 44px;
   border-radius: 999px;
-  text-decoration: none;
+  font-size: 20px;
+  line-height: 1;
+  color: var(--ink-mute);
+  cursor: pointer;
+  transition: background 120ms, color 120ms;
+}
+.closing-modal-dismiss:hover {
+  background: color-mix(in oklab, var(--ink) 6%, transparent);
   color: var(--ink);
 }
-.closing-card-form .closing-card-cta:hover {
-  border-color: var(--accent);
-  color: var(--accent);
+.closing-modal-dismiss:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
-.closing-card-note {
-  margin: 0;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--ink-mute);
-  letter-spacing: 0.04em;
-}
-
-.closing-card[data-state="logged"] .closing-card-cta,
-.closing-card[data-state="logged"] .closing-card-note,
-.closing-card[data-state="logged"] .closing-card-form {
-  display: none;
-}
-.closing-card[data-state="logged"] .closing-card-confirmation {
-  display: flex !important;
-  flex-direction: column;
-  gap: var(--stack-xs);
-}
-.closing-card-confirmation[hidden] { display: none; }
-
-.closing-card-confirmation-text {
-  margin: 0;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--ink-soft);
-  letter-spacing: 0.02em;
-}
-
-/* Inline form (visible from start on email-collecting cards). */
-.closing-card-form {
-  display: flex;
-  flex-direction: column;
-  gap: var(--stack-sm);
-  margin-top: var(--stack-xs);
-}
-.closing-card[data-state="logged"] .closing-card-form {
-  display: none;
-}
-
-.closing-card-followup {
-  display: flex;
-  flex-direction: column;
-  gap: var(--stack-xs);
-  margin-top: var(--stack-xs);
-}
-
-.closing-card-cadence {
-  display: flex;
-  gap: 12px;
-  border: none;
+/* Fieldsets — strip browser chrome, use legend as a small mono label. */
+.closing-modal-form fieldset {
+  border: 0;
   margin: 0;
   padding: 0;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--ink-soft);
+  display: flex;
+  flex-direction: column;
+  gap: var(--stack-xs);
 }
-.closing-card-cadence legend {
-  font-size: 10px;
-  color: var(--ink-mute);
-  text-transform: uppercase;
+.closing-modal-form legend {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
   letter-spacing: 0.12em;
-  margin-bottom: 4px;
-  padding: 0;
-  width: 100%;
-}
-.closing-card-cadence label {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  cursor: pointer;
-}
-
-.closing-card-email-label {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--ink-mute);
   text-transform: uppercase;
-  letter-spacing: 0.12em;
-}
-.closing-card-email-label input[type="email"] {
-  appearance: none;
-  border: none;
-  border-bottom: 1px solid var(--line-strong);
-  background: transparent;
-  padding: 4px 0;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--ink);
-  text-transform: none;
-  letter-spacing: 0;
-}
-.closing-card-email-label input[type="email"]:focus {
-  outline: none;
-  border-bottom-color: var(--accent);
-}
-
-.closing-card-followup-send {
-  align-self: flex-start;
-  appearance: none;
-  background: none;
-  border: none;
-  padding: 0;
-  margin-top: var(--stack-xs);
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--accent);
-  cursor: pointer;
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-
-/* Closing multi-select dropdown — replaces the prior pill row.
- * Native <details> as the disclosure mechanism; checkbox per option;
- * "something else" reveals the textarea. Single Send button submits.
- * Visual register stays quiet — same hairline borders as the cards
- * above. NO accent fill, NO button chrome, NO heavy shadows. */
-.closing-multiselect {
-  display: flex;
-  flex-direction: column;
-  gap: var(--stack-sm);
-  max-width: 520px;
-  margin-inline: auto;
-  margin-top: var(--stack-md);
-  align-items: stretch;
-}
-
-.closing-multiselect-lead-in {
-  margin: 0;
-  font-size: 13px;
-  color: var(--ink-soft);
-  text-align: center;
-}
-
-.closing-multiselect-details {
-  border: 1px solid var(--line-strong);
-  border-radius: var(--r-2);
-  background: var(--bg-1);
-}
-.closing-multiselect-details[open] {
-  border-color: var(--accent);
-}
-
-.closing-multiselect-summary {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--stack-xs);
-  padding: 10px 14px;
-  cursor: pointer;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--ink);
-  list-style: none;
-}
-.closing-multiselect-summary::-webkit-details-marker { display: none; }
-
-.closing-multiselect-chevron {
-  font-size: 11px;
   color: var(--ink-mute);
-  transition: transform 180ms ease;
-}
-.closing-multiselect-details[open] .closing-multiselect-chevron {
-  transform: rotate(180deg);
+  margin: 0 0 4px;
+  padding: 0;
 }
 
-.closing-multiselect-options {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 6px 8px 10px;
-  border-top: 1px solid var(--line);
-}
-
-.closing-multiselect-option {
+/* Choice rows — radio + label-stack (label + body). */
+.closing-modal-choice-row {
   display: flex;
   align-items: flex-start;
   gap: 10px;
   padding: 8px 10px;
   border-radius: var(--r-1);
-  font-size: 13px;
-  color: var(--ink-soft);
-  line-height: 1.4;
   cursor: pointer;
   transition: background 180ms;
 }
-.closing-multiselect-option:hover {
+.closing-modal-choice-row:hover {
   background: color-mix(in oklab, var(--accent) 6%, transparent);
 }
-.closing-multiselect-option input[type="checkbox"] {
+.closing-modal-choice-row input[type="radio"] {
+  margin: 4px 0 0 0;
+  accent-color: var(--accent);
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.closing-modal-choice-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.closing-modal-choice-label {
+  font-size: 14px;
+  color: var(--ink);
+  font-weight: 500;
+  line-height: 1.3;
+}
+.closing-modal-choice-body {
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  line-height: 1.45;
+  text-wrap: pretty;
+}
+
+/* Cadence — inline radios. */
+.closing-modal-cadence {
+  flex-direction: row !important;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+.closing-modal-cadence legend { width: 100%; }
+.closing-modal-cadence label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+.closing-modal-cadence input[type="radio"] { accent-color: var(--accent); }
+
+/* Pills — checkbox rows. */
+.closing-modal-pill-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 6px 10px;
+  border-radius: var(--r-1);
+  font-size: 13px;
+  color: var(--ink-soft);
+  cursor: pointer;
+  transition: background 180ms;
+}
+.closing-modal-pill-row:hover {
+  background: color-mix(in oklab, var(--accent) 6%, transparent);
+}
+.closing-modal-pill-row input[type="checkbox"] {
   margin: 2px 0 0 0;
   accent-color: var(--accent);
-  cursor: pointer;
   flex-shrink: 0;
 }
-.closing-multiselect-option input[type="checkbox"]:checked + span {
+.closing-modal-pill-row input[type="checkbox"]:checked + span {
   color: var(--ink);
 }
 
-.closing-multiselect-freeform {
+/* Freeform textarea + email field — shared label+input style. */
+.closing-modal-freeform,
+.closing-modal-email {
   display: flex;
   flex-direction: column;
   gap: 4px;
   font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--ink-mute);
-  text-transform: uppercase;
+  font-size: 10.5px;
   letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
 }
-.closing-multiselect-freeform[hidden] { display: none; }
-.closing-multiselect-freeform textarea {
+.closing-modal-freeform textarea,
+.closing-modal-email input {
   appearance: none;
   border: 1px solid var(--line-strong);
+  border-radius: var(--r-2);
   background: var(--bg-1);
   padding: 8px 10px;
   font-family: var(--font-sans);
   font-size: 13px;
   color: var(--ink);
-  border-radius: var(--r-2);
-  resize: vertical;
   text-transform: none;
   letter-spacing: 0;
+}
+.closing-modal-freeform textarea {
+  resize: vertical;
   min-height: 60px;
 }
-.closing-multiselect-freeform textarea:focus {
+.closing-modal-freeform textarea:focus,
+.closing-modal-email input:focus {
   outline: none;
   border-color: var(--accent);
 }
+.closing-modal-email input[aria-invalid="true"] {
+  border-color: var(--red, #b8362c);
+}
+.closing-modal-error {
+  display: inline-block;
+  margin-top: 4px;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--red, #b8362c);
+  line-height: 1.4;
+}
+.closing-modal-error[hidden] { display: none; }
 
-.closing-multiselect-send {
-  align-self: center;
+.closing-modal-actions {
+  display: flex;
+  justify-content: flex-end;
   margin-top: var(--stack-xs);
 }
+.closing-modal-submit {
+  appearance: none;
+  background: var(--ink);
+  color: var(--bg-1);
+  border: 0;
+  border-radius: 999px;
+  padding: 10px 22px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: background 180ms, transform 180ms;
+}
+.closing-modal-submit:hover {
+  background: var(--accent);
+}
+.closing-modal-submit:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.closing-modal-submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 
-.closing-multiselect[data-state="logged"] .closing-multiselect-details,
-.closing-multiselect[data-state="logged"] .closing-multiselect-freeform,
-.closing-multiselect[data-state="logged"] .closing-multiselect-send {
+.closing-modal-confirmation {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-soft);
+  letter-spacing: 0.02em;
+  text-align: center;
+  padding: 8px 0;
+}
+.closing-modal-confirmation[hidden] { display: none; }
+
+/* Conditional reveal — hide every element with a [data-when-choice]
+   marker by default; reveal only when the dialog's [data-choice]
+   matches one of the tokens. Attribute-list `~=` matching means a
+   single `data-when-choice="pi_early_access monitoring"` covers both
+   reveal cases (the email field) without needing :has(). */
+.closing-modal [data-when-choice] { display: none; }
+.closing-modal[data-choice="pi_early_access"] [data-when-choice~="pi_early_access"] { display: flex; }
+.closing-modal[data-choice="monitoring"]      [data-when-choice~="monitoring"]      { display: flex; }
+.closing-modal[data-choice="something_else"]  [data-when-choice~="something_else"]  { display: flex; }
+/* Freeform textarea — only when something_else picked AND the
+   `something_else` sub-pill is checked. */
+.closing-modal:not([data-pill-something-else="true"]) [data-when-pill="something_else"] { display: none; }
+
+/* Submitted state — hide form contents, show confirmation. */
+.closing-modal-form[data-state="logged"] fieldset,
+.closing-modal-form[data-state="logged"] .closing-modal-freeform,
+.closing-modal-form[data-state="logged"] .closing-modal-email,
+.closing-modal-form[data-state="logged"] .closing-modal-actions {
   display: none;
 }
-.closing-multiselect[data-state="logged"] .closing-multiselect-confirmation {
-  display: block !important;
-  text-align: center;
-}
-.closing-multiselect-confirmation[hidden] { display: none; }
 
 /* — final CTA card (Business) — */
 .cta-card {

@@ -41,10 +41,11 @@
   --tier-constrained: #b8362c;
   --tier-unknown: #8a857a;
 
-  /* — typography (Signifier pairing) — */
-  --font-sans: 'Schibsted Grotesk', system-ui, -apple-system, sans-serif;
-  --font-display: 'Fraunces', 'Iowan Old Style', Georgia, serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+  /* — typography (Instrument pairing — data-centric grotesk + serif accent) — */
+  --font-sans: 'Inter Tight', system-ui, -apple-system, sans-serif;
+  --font-display: 'Space Grotesk', system-ui, sans-serif;
+  --font-serif: 'Instrument Serif', 'Iowan Old Style', Georgia, serif;
+  --font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, monospace;
 
   /* fluid type ramp */
   --t-eyebrow: clamp(10px, 0.7vw + 6px, 11px);

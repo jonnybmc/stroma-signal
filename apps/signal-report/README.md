@@ -29,9 +29,11 @@ without further engagement.
   reading-progress hairline.
 - **Theme**: light default (warm cream paper aesthetic) with full dark
   parity via `[data-theme="dark"]`. One canonical accent (warm amber).
-- **Typography**: Signifier pairing — Fraunces (display, serif wedge) +
-  Schibsted Grotesk (sans) + JetBrains Mono (mono). Loaded via Google
-  Fonts CSS2 import.
+- **Typography**: Instrument pairing — Space Grotesk (display, large
+  headlines + stat numbers) + Inter Tight (sans, body + UI chrome) +
+  Instrument Serif (italic accent only — emphasis like *here*) + Geist
+  Mono (mono, small functional bits). Loaded via Google Fonts CSS2
+  import. Reads data-centric, not editorial-magazine.
 - **Editorial register**: tailored to the Paid-Media / PPC specialist and
   CMO. Glossary tooltips translate every Web-Vital into Paid-Media
   language (CPC / Quality Score / ROAS / CAC / CPA) with a "what this

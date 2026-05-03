@@ -65,8 +65,8 @@
     "Inter Variable", "Inter", system-ui, -apple-system, "Segoe UI Variable",
     "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --sr-mono:
-    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
-    "JetBrains Mono", "Liberation Mono", monospace;
+    "Geist Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
   --sr-serif-italic: "Georgia", "Times New Roman", serif;
 
   /* Type scale */

@@ -31,12 +31,12 @@ function renderTierTable(vm: ReportViewModel): string {
       const color = TIER_COLOR_VAR[t.key] ?? 'var(--tier-unknown)';
       return `
         <tr>
-          <td class="td-name"><span class="rule" style="background:${color};"></span><span class="label">${escapeHtml(
+          <td class="td-name" data-label="Tier"><span class="rule" style="background:${color};"></span><span class="label">${escapeHtml(
             t.label
           )}</span></td>
-          <td class="td-criteria mono">${escapeHtml(criteriaForTier(t.key))}</td>
-          <td class="td-sessions">${Math.round((t.share / 100) * vm.sample_size)}</td>
-          <td class="td-share">${Math.round(t.share)}%</td>
+          <td class="td-criteria mono" data-label="Criteria">${escapeHtml(criteriaForTier(t.key))}</td>
+          <td class="td-sessions" data-label="Sessions">${Math.round((t.share / 100) * vm.sample_size)}</td>
+          <td class="td-share" data-label="Share">${Math.round(t.share)}%</td>
         </tr>
       `;
     })
@@ -69,12 +69,12 @@ function renderDeviceTable(vm: ReportViewModel): string {
     .map((d) => {
       return `
         <tr>
-          <td class="td-name"><span class="rule" style="background:var(--ink-faint);"></span><span class="label">${escapeHtml(
+          <td class="td-name" data-label="Device"><span class="rule" style="background:var(--ink-faint);"></span><span class="label">${escapeHtml(
             d.label
           )}</span></td>
-          <td class="td-criteria mono">${escapeHtml(deviceCriteriaFor(d.key))}</td>
-          <td class="td-sessions">${Math.round((d.share / 100) * vm.sample_size)}</td>
-          <td class="td-share">${Math.round(d.share)}%</td>
+          <td class="td-criteria mono" data-label="Criteria">${escapeHtml(deviceCriteriaFor(d.key))}</td>
+          <td class="td-sessions" data-label="Sessions">${Math.round((d.share / 100) * vm.sample_size)}</td>
+          <td class="td-share" data-label="Share">${Math.round(d.share)}%</td>
         </tr>
       `;
     })
@@ -221,7 +221,7 @@ export function renderAudienceSection(vm: ReportViewModel): string {
   return `
     <section id="audience" class="section" data-tone="cream" aria-labelledby="audience-eyebrow">
       <div class="section-inner">
-        <div class="act-intro" style="padding-block:0;">
+        <div class="act-intro">
           <div class="act-intro-stack">
             ${renderReveal(`<div id="audience-eyebrow" class="act-intro-eyebrow"><span class="dot"></span>Act 01 · Audience shape</div>`)}
             ${renderReveal(vm.editorial.audience_headline_html, { delay: 120 })}

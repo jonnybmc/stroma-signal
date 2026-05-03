@@ -1,18 +1,28 @@
-// Client-side intent telemetry for the closing-section router.
+// Client-side intent telemetry for the closing-section modal.
 //
 // Discipline (load-bearing, see plan file):
+// - Single discreet trigger button opens a native <dialog>; modal form
+//   asks one question first ("What would help?"), reveals only the
+//   conditional fields the chosen path needs, and submits via one button.
 // - Delivery via navigator.sendBeacon() — Content-Type: text/plain;charset=utf-8
 //   so cross-origin POST to the snapshot engine does NOT trigger a CORS
-//   preflight. Survives page navigation. Fire-and-forget. Critical for the
-//   Rapid Fix click which redirects after queueing.
-// - intent_capture_id generated client-side at the moment of the first
-//   click; reused on the optional follow-up (email + cadence). Snapshot
-//   engine UPSERTs by capture id so one CTA click == one demand-signal row.
-// - Confirmation copy stays in observation register (✓ noted, not Thanks!).
+//   preflight. Survives page navigation. Fire-and-forget.
+// - Wire format unchanged: same `intent_*` event kinds, same UPSERT-by-
+//   intent_capture_id semantics on the snapshot-engine Turso table.
+//   PI / Rapid Fix / Monitoring → 1 event each. Something else → N
+//   events (one per checked sub-pill, distinct capture_ids per pill so
+//   row count == demand-signal count).
+// - Every event from this surface is `intent_stage: 'initial'`. The
+//   prior two-stage anonymous-then-followup flow is gone — the click
+//   that opens the modal carries no telemetry; submission carries
+//   everything in one shot.
+// - Confirmation copy stays in observation register (✓ noted, not
+//   Thanks! / Welcome!).
 // - Failure is silent. The signal in the snapshot-engine table is the
 //   source of truth; the client confirmation is only a UX cue.
 
 import {
+  isSignalReportInteractionV1,
   SIGNAL_REPORT_INTERACTION_INGEST_URL_DEFAULT,
   SIGNAL_REPORT_INTERACTION_VERSION,
   type SignalReportInteractionIntentCadence,
@@ -21,7 +31,11 @@ import {
   type SignalReportInteractionV1
 } from '@stroma-labs/signal-contracts';
 
-interface ResolvedReportContext {
+const RAPID_FIX_REDIRECT = 'https://www.stroma.design/book?service=rapid-fix';
+
+export type ClosingModalChoice = 'pi_early_access' | 'rapid_fix' | 'monitoring' | 'something_else';
+
+export interface ResolvedReportContext {
   domain: string | null;
   share_token: string | null;
   rv: 1 | undefined;
@@ -29,7 +43,7 @@ interface ResolvedReportContext {
 
 /** Resolve the report context once per boot. The `/r` URL carries the
  *  domain (`d=`), optional share token (`st=`), and rv version. */
-function resolveReportContext(): ResolvedReportContext {
+export function resolveReportContext(): ResolvedReportContext {
   if (typeof location === 'undefined') {
     return { domain: null, share_token: null, rv: undefined };
   }
@@ -42,7 +56,7 @@ function resolveReportContext(): ResolvedReportContext {
   };
 }
 
-function generateCaptureId(): string {
+export function generateCaptureId(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID();
   }
@@ -54,11 +68,29 @@ function generateCaptureId(): string {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
 }
 
-function buildEventId(): string {
+export function buildEventId(): string {
   return `evt_${generateCaptureId().replace(/-/g, '').slice(0, 24)}`;
 }
 
-function sendIntent(payload: SignalReportInteractionV1): boolean {
+export function basePayload(
+  ctx: ResolvedReportContext,
+  intentKind: SignalReportInteractionIntentKind,
+  captureId: string
+): SignalReportInteractionV1 {
+  return {
+    v: SIGNAL_REPORT_INTERACTION_VERSION,
+    event_kind: intentKind,
+    event_id: buildEventId(),
+    ts: Date.now(),
+    st: ctx.share_token ?? '',
+    route: 'r',
+    rv: ctx.rv,
+    intent_capture_id: captureId,
+    intent_stage: 'initial'
+  };
+}
+
+export function sendIntent(payload: SignalReportInteractionV1): boolean {
   const body = new Blob([JSON.stringify(payload)], { type: 'text/plain;charset=utf-8' });
 
   if (typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
@@ -86,188 +118,225 @@ function sendIntent(payload: SignalReportInteractionV1): boolean {
   return false;
 }
 
-interface CardState {
-  intentKind: SignalReportInteractionIntentKind;
-  captureId: string;
-  ctaHref: string | null;
-  collectsEmail: boolean;
-  collectsCadence: boolean;
+/** Typed snapshot of the modal form's current state. Extracted by
+ *  `readFormState` from a real `HTMLFormElement` at submit time;
+ *  unit tests build it directly so they don't need a DOM. */
+export interface ClosingModalFormState {
+  choice: ClosingModalChoice | null;
+  email?: string;
+  cadence?: SignalReportInteractionIntentCadence;
+  freeformText?: string;
+  pills: SignalReportInteractionIntentPillId[];
 }
 
-function readCardState(card: HTMLElement): CardState | null {
-  const intentKind = card.dataset.intentKind as SignalReportInteractionIntentKind | undefined;
-  if (!intentKind) return null;
+function readFormState(form: HTMLFormElement): ClosingModalFormState {
+  const formData = new FormData(form);
+  const choice = formData.get('choice');
+  const email = (formData.get('email') as string | null)?.trim();
+  const cadence = formData.get('cadence');
+  const freeformText = (formData.get('freeform_text') as string | null)?.trim();
+  const pills = formData.getAll('pill') as SignalReportInteractionIntentPillId[];
   return {
-    intentKind,
-    captureId: card.dataset.captureId ?? generateCaptureId(),
-    ctaHref: card.dataset.ctaHref && card.dataset.ctaHref.length > 0 ? card.dataset.ctaHref : null,
-    collectsEmail: card.dataset.collectsEmail === 'true',
-    collectsCadence: card.dataset.collectsCadence === 'true'
+    choice: typeof choice === 'string' ? (choice as ClosingModalChoice) : null,
+    email: email && email.length > 0 ? email : undefined,
+    cadence: typeof cadence === 'string' ? (cadence as SignalReportInteractionIntentCadence) : undefined,
+    freeformText: freeformText && freeformText.length > 0 ? freeformText : undefined,
+    pills
   };
 }
 
-function basePayload(
-  ctx: ResolvedReportContext,
-  intentKind: SignalReportInteractionIntentKind,
-  captureId: string
-): SignalReportInteractionV1 {
-  return {
-    v: SIGNAL_REPORT_INTERACTION_VERSION,
-    event_kind: intentKind,
-    event_id: buildEventId(),
-    ts: Date.now(),
-    st: ctx.share_token ?? '',
-    route: 'r',
-    rv: ctx.rv,
-    intent_capture_id: captureId,
-    intent_stage: 'initial'
-  };
-}
+/**
+ * Pure function: given a form-state snapshot, produce the intent events
+ * that would be sent on submit. Exported for unit tests.
+ *
+ * Returns an empty array when the form is in an invalid state (e.g.
+ * "something_else" picked but no sub-pill checked, or no choice picked).
+ * Caller blocks the submit when this returns `[]`.
+ *
+ * Mapping (matches the existing wire contract — see plan file):
+ *   - `pi_early_access` → 1 × `intent_pi_early_access` (with `intent_email` if non-empty)
+ *   - `rapid_fix` → 1 × `intent_rapid_fix` (no email/cadence regardless of form state)
+ *   - `monitoring` → 1 × `intent_monitoring` (with `intent_cadence` defaulting to weekly,
+ *     plus `intent_email` if non-empty)
+ *   - `something_else` + N pills → N × `intent_freeform`, distinct capture_ids,
+ *     each with `intent_pill_id`. The `something_else` pill carries
+ *     `intent_freeform_text` when the textarea is non-empty.
+ */
+export function buildEventsFromForm(
+  state: ClosingModalFormState,
+  ctx: ResolvedReportContext
+): SignalReportInteractionV1[] {
+  if (!state.choice) return [];
 
-function flipCardToConfirmation(card: HTMLElement, message?: string): void {
-  card.dataset.state = 'logged';
-  if (message != null) {
-    const text = card.querySelector<HTMLElement>('[data-closing-confirmation-text]');
-    if (text) text.textContent = message;
+  if (state.choice === 'pi_early_access') {
+    const payload = basePayload(ctx, 'intent_pi_early_access', generateCaptureId());
+    if (state.email) payload.intent_email = state.email;
+    return [payload];
   }
-  // Clear the hidden attribute so AT picks up the role="status" announcement.
-  // CSS reveals via display:flex !important regardless, but `hidden` would
-  // suppress the live-region read.
-  const slot = card.querySelector<HTMLElement>('.closing-card-confirmation');
-  if (slot) slot.hidden = false;
+
+  if (state.choice === 'rapid_fix') {
+    return [basePayload(ctx, 'intent_rapid_fix', generateCaptureId())];
+  }
+
+  if (state.choice === 'monitoring') {
+    const payload = basePayload(ctx, 'intent_monitoring', generateCaptureId());
+    if (state.email) payload.intent_email = state.email;
+    payload.intent_cadence = state.cadence ?? 'weekly';
+    return [payload];
+  }
+
+  // something_else → one event per checked sub-pill, each with own capture_id
+  if (state.pills.length === 0) return [];
+  return state.pills.map((pillId) => {
+    const payload = basePayload(ctx, 'intent_freeform', generateCaptureId());
+    payload.intent_pill_id = pillId;
+    if (pillId === 'something_else' && state.freeformText) {
+      payload.intent_freeform_text = state.freeformText.slice(0, 200);
+    }
+    return payload;
+  });
 }
 
-function attachCardClickHandlers(ctx: ResolvedReportContext): void {
-  for (const card of document.querySelectorAll<HTMLElement>('[data-closing-card]')) {
-    const state = readCardState(card);
-    if (!state) continue;
-    card.dataset.captureId = state.captureId;
+interface ModalElements {
+  trigger: HTMLButtonElement;
+  dialog: HTMLDialogElement;
+  form: HTMLFormElement;
+  dismiss: HTMLButtonElement | null;
+  confirmation: HTMLElement | null;
+  submit: HTMLButtonElement | null;
+  emailInput: HTMLInputElement | null;
+  emailError: HTMLElement | null;
+}
 
-    if (state.ctaHref) {
-      attachLinkCtaHandler(card, state, ctx);
+function findModalElements(): ModalElements | null {
+  const trigger = document.querySelector<HTMLButtonElement>('[data-closing-modal-open]');
+  const dialog = document.querySelector<HTMLDialogElement>('dialog#closing-modal');
+  const form = document.querySelector<HTMLFormElement>('[data-closing-modal-form]');
+  if (!trigger || !dialog || !form) return null;
+  return {
+    trigger,
+    dialog,
+    form,
+    dismiss: form.querySelector<HTMLButtonElement>('[data-closing-modal-dismiss]'),
+    confirmation: form.querySelector<HTMLElement>('[data-closing-modal-confirmation]'),
+    submit: form.querySelector<HTMLButtonElement>('[data-closing-modal-submit]'),
+    emailInput: form.querySelector<HTMLInputElement>('input[type="email"][name="email"]'),
+    emailError: form.querySelector<HTMLElement>('[data-closing-modal-email-error]')
+  };
+}
+
+/** Permissive email shape check — same heuristic the prior card-form
+ *  handler used (non-empty + contains "@"). The browser's `type="email"`
+ *  validator catches most malformed inputs at the field level; this
+ *  is the belt-and-braces guard at submit time. */
+function looksLikeEmail(value: string | undefined): boolean {
+  return typeof value === 'string' && value.length > 0 && value.includes('@');
+}
+
+/** True when the chosen path requires an email per the wire contract's
+ *  historical convention (PI Early Access + Monitoring collected email;
+ *  Rapid Fix + Something Else did not). Plan-locked decision. */
+function pathRequiresEmail(choice: ClosingModalChoice | null): boolean {
+  return choice === 'pi_early_access' || choice === 'monitoring';
+}
+
+function attachModalHandler(ctx: ResolvedReportContext): void {
+  const els = findModalElements();
+  if (!els) return;
+  const { trigger, dialog, form, dismiss, confirmation, submit, emailInput, emailError } = els;
+
+  function clearEmailError(): void {
+    if (emailInput) emailInput.removeAttribute('aria-invalid');
+    if (emailError) emailError.hidden = true;
+  }
+  function showEmailError(): void {
+    if (emailInput) {
+      emailInput.setAttribute('aria-invalid', 'true');
+      emailInput.focus();
+    }
+    if (emailError) emailError.hidden = false;
+  }
+
+  // Open via trigger (or via the keyboard-driven `Enter` on the trigger).
+  trigger.addEventListener('click', () => {
+    if (typeof dialog.showModal === 'function') {
+      dialog.showModal();
     } else {
-      attachFormSubmitHandler(card, state, ctx);
+      dialog.setAttribute('open', '');
     }
-  }
-}
-
-/** Rapid-Fix-style card: a single text-link CTA that POSTs the intent
- *  via sendBeacon (queued at the network layer before navigation) then
- *  lets the browser follow the link. */
-function attachLinkCtaHandler(card: HTMLElement, state: CardState, ctx: ResolvedReportContext): void {
-  const cta = card.querySelector<HTMLAnchorElement>('a[data-closing-cta]');
-  if (!cta) return;
-
-  cta.addEventListener('click', () => {
-    if (card.dataset.state === 'logged') return;
-    sendIntent(basePayload(ctx, state.intentKind, state.captureId));
-    flipCardToConfirmation(card, '✓ noted — opening the booking page');
-    // No preventDefault — let the <a> redirect.
   });
-}
 
-/** PI / Monitoring card: form with email field (and optional cadence)
- *  visible from the start. Submit POSTs ONE event with all data and
- *  transforms the card to the quiet confirmation state. The click IS
- *  the email submit — no two-stage anonymous-then-followup dance, so
- *  the in-between dishonest copy ("we will let you know" before any
- *  email exists) can't appear. */
-function attachFormSubmitHandler(card: HTMLElement, state: CardState, ctx: ResolvedReportContext): void {
-  const form = card.querySelector<HTMLFormElement>('[data-closing-form]');
-  if (!form) return;
+  // Dismiss button (the × in the modal header).
+  dismiss?.addEventListener('click', () => dialog.close());
 
-  form.addEventListener('submit', (e) => {
-    e.preventDefault();
-    if (card.dataset.state === 'logged') return;
-
-    const emailInput = state.collectsEmail ? card.querySelector<HTMLInputElement>('[data-closing-email]') : null;
-    const cadenceInput = state.collectsCadence
-      ? card.querySelector<HTMLInputElement>('[data-closing-cadence] input[type="radio"]:checked')
-      : null;
-
-    // For email-collecting cards, browser-native `required` + `type=email`
-    // catches empty / malformed input. Belt-and-braces here too.
-    if (state.collectsEmail) {
-      const value = emailInput?.value.trim() ?? '';
-      if (value.length === 0 || !value.includes('@')) {
-        emailInput?.focus();
-        return;
-      }
-    }
-
-    const intent_email = emailInput?.value.trim() || undefined;
-    const intent_cadence = (cadenceInput?.value as SignalReportInteractionIntentCadence | undefined) ?? undefined;
-
-    const payload: SignalReportInteractionV1 = {
-      ...basePayload(ctx, state.intentKind, state.captureId)
-    };
-    if (intent_email) payload.intent_email = intent_email;
-    if (intent_cadence) payload.intent_cadence = intent_cadence;
-
-    sendIntent(payload);
-    flipCardToConfirmation(card, '✓ noted — we will be in touch');
+  // Backdrop click closes — the dialog itself receives the click when
+  // the user clicks outside the form (since the form is a child of the
+  // dialog and stops propagation by being smaller than the dialog box).
+  dialog.addEventListener('click', (e) => {
+    if (e.target === dialog) dialog.close();
   });
-}
 
-function attachMultiselectHandler(ctx: ResolvedReportContext): void {
-  const form = document.querySelector<HTMLFormElement>('[data-closing-multiselect]');
-  if (!form) return;
-
-  const summaryLabel = form.querySelector<HTMLElement>('[data-closing-multiselect-label]');
-  const freeformWrap = form.querySelector<HTMLElement>('[data-closing-multiselect-freeform]');
-  const freeformText = form.querySelector<HTMLTextAreaElement>('[data-closing-multiselect-freeform-text]');
-  const checkboxes = form.querySelectorAll<HTMLInputElement>('input[type="checkbox"][name="closing-pill"]');
-
-  // Update the summary label as checkboxes flip + reveal the freeform
-  // textarea when "something else" is among the checked.
-  function refreshSummary(): void {
-    const checked = Array.from(checkboxes).filter((cb) => cb.checked);
-    if (summaryLabel) {
-      summaryLabel.textContent =
-        checked.length === 0
-          ? 'Choose any that apply'
-          : checked.length === 1
-            ? '1 selected'
-            : `${checked.length} selected`;
+  // Radio change drives CSS reveal via [data-choice] attribute. Also
+  // clears any stale email-error styling from a prior submit attempt.
+  form.addEventListener('change', (e) => {
+    const target = e.target;
+    if (!(target instanceof HTMLInputElement)) return;
+    if (target.name === 'choice') {
+      dialog.dataset.choice = target.value;
+      clearEmailError();
     }
-    const wantsFreeform = checked.some((cb) => cb.dataset.collectsFreeformText === 'true');
-    if (freeformWrap) freeformWrap.hidden = !wantsFreeform;
-  }
-  for (const cb of checkboxes) cb.addEventListener('change', refreshSummary);
-  refreshSummary();
+    if (target.name === 'pill' && target.value === 'something_else') {
+      dialog.dataset.pillSomethingElse = target.checked ? 'true' : '';
+    }
+    if (target.name === 'email') clearEmailError();
+  });
 
   form.addEventListener('submit', (e) => {
     e.preventDefault();
     if (form.dataset.state === 'logged') return;
 
-    const checked = Array.from(checkboxes).filter((cb) => cb.checked);
-    if (checked.length === 0) return;
+    const state = readFormState(form);
 
-    // Fire one intent event per checked option. Each gets its own
-    // capture_id so the snapshot-engine row count == demand-signal
-    // count. The "something_else" event carries the freeform text.
-    const freeformValue = freeformText?.value.trim() ?? '';
-    for (const cb of checked) {
-      const pillId = cb.value as SignalReportInteractionIntentPillId;
-      const payload: SignalReportInteractionV1 = {
-        ...basePayload(ctx, 'intent_freeform', generateCaptureId()),
-        intent_pill_id: pillId
-      };
-      if (pillId === 'something_else' && freeformValue) {
-        payload.intent_freeform_text = freeformValue.slice(0, 200);
-      }
-      sendIntent(payload);
+    // Email enforcement for paths that require it (PI / Monitoring).
+    // Rapid Fix + Something Else accept empty email per plan-locked
+    // decision (matches the prior three-card behaviour exactly).
+    if (pathRequiresEmail(state.choice) && !looksLikeEmail(state.email)) {
+      showEmailError();
+      return;
     }
 
+    const events = buildEventsFromForm(state, ctx);
+    if (events.length === 0) {
+      // No valid choice (browser-native `required` on the first radio
+      // catches this) or "something else" with no pill checked. Focus
+      // the first choice radio so the user lands on the gap.
+      form.querySelector<HTMLInputElement>('input[name="choice"]')?.focus();
+      return;
+    }
+
+    // Validate every event against the wire contract before sending so
+    // a future bug in buildEventsFromForm shows up here, not at the
+    // ingest endpoint.
+    if (!events.every((evt) => isSignalReportInteractionV1(evt))) return;
+
+    for (const evt of events) sendIntent(evt);
+
     form.dataset.state = 'logged';
-    const slot = form.querySelector<HTMLElement>('.closing-multiselect-confirmation');
-    if (slot) slot.hidden = false;
+    if (submit) submit.disabled = true;
+    if (confirmation) confirmation.hidden = false;
+
+    // Rapid Fix path — navigate to the booking page after sendIntent
+    // returns. sendBeacon is spec-bound to hold the request open across
+    // navigation, so the event flushes cleanly.
+    const choice = events[0]?.event_kind;
+    if (choice === 'intent_rapid_fix') {
+      window.location.assign(RAPID_FIX_REDIRECT);
+    }
   });
 }
 
 export function bootIntentTelemetry(): void {
   if (typeof document === 'undefined') return;
   const ctx = resolveReportContext();
-  attachCardClickHandlers(ctx);
-  attachMultiselectHandler(ctx);
+  attachModalHandler(ctx);
 }

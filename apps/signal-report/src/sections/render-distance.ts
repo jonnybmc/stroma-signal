@@ -206,7 +206,7 @@ export function renderDistanceSection(vm: ReportViewModel): string {
   return `
     <section id="distance" class="section" data-tone="paper" aria-labelledby="distance-eyebrow">
       <div class="section-inner">
-        <div class="act-intro" style="padding-block:0;">
+        <div class="act-intro">
           <div class="act-intro-stack">
             ${renderReveal(`<div id="distance-eyebrow" class="act-intro-eyebrow"><span class="dot"></span>Act 02 · Temporal comparison</div>`)}
             ${renderReveal(vm.editorial.distance_headline_html, { delay: 120 })}

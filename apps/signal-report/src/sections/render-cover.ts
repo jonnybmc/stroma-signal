@@ -41,15 +41,15 @@ function tierLegendItem(t: { key: string; label: string }): string {
 }
 
 /**
- * Sample-band banner — surfaced ABOVE the masthead when the report's
- * underlying sample size hasn't crossed the stable threshold (500).
- * Designed to make a thin report self-honest about its own confidence
- * without blocking the operator from running their query whenever they
- * want. Returns '' (no node emitted) when band === 'stable'.
+ * Sample-confidence signal — discreet chip in the cover section's
+ * top-right, just under the sticky nav. Out of document flow
+ * (`position: absolute`) so it never pushes the act-intro down, and
+ * z-indexed below the nav so it cannot clip into the nav chrome.
  *
- * Visual register: brand-olive accent border, dim copy. Sits inside
- * the section but BEFORE the cover hero so the recipient sees it
- * immediately on page load.
+ * Headline + sample count are visible inline; the full body
+ * (interpretation guidance) lives in a native `title` tooltip so
+ * recipients who care can dwell to read it, but it never competes
+ * with the cover hero for attention. Returns '' when band === 'stable'.
  */
 function renderSampleBandBanner(vm: ReportViewModel): string {
   if (vm.band === 'stable') return '';
@@ -58,27 +58,16 @@ function renderSampleBandBanner(vm: ReportViewModel): string {
     vm.band === 'preliminary'
       ? `Sample of ${vm.sample_size.toLocaleString('en-US')} session${vm.sample_size === 1 ? '' : 's'} measured. Ranges and percentiles stabilise around 100+ events; consider waiting for more traffic before sharing externally.`
       : `Sample of ${vm.sample_size.toLocaleString('en-US')} sessions measured. Direction is reliable but tier-level percentiles continue to firm up past 500 events.`;
+  const chipLabel = `${headline} · ${vm.sample_size.toLocaleString('en-US')} session${vm.sample_size === 1 ? '' : 's'}`;
   return `
     <div
       role="note"
-      aria-label="Sample-confidence note"
-      style="
-        display:flex;
-        flex-direction:column;
-        gap:4px;
-        padding:14px 18px;
-        margin-bottom:var(--stack-lg);
-        border-left:3px solid var(--accent);
-        background:color-mix(in oklab, var(--bg-2) 60%, transparent);
-        border-radius:6px;
-      "
+      aria-label="Sample-confidence note: ${escapeHtml(body)}"
+      title="${escapeHtml(body)}"
+      class="sample-confidence-chip"
     >
-      <div class="mono" style="font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--accent);">
-        ${escapeHtml(headline)}
-      </div>
-      <div style="font-size:13px;color:var(--ink-mute);line-height:1.5;">
-        ${escapeHtml(body)}
-      </div>
+      <span class="sample-confidence-dot" aria-hidden="true"></span>
+      <span class="sample-confidence-label">${escapeHtml(chipLabel)}</span>
     </div>
   `;
 }
@@ -92,8 +81,8 @@ export function renderCoverSection(vm: ReportViewModel): string {
   const slowerThanUrbanShare = 1 - (vm.act1_tiers.find((t) => t.key === 'urban')?.share ?? 0) / 100;
 
   return `
-    <section id="cover" class="section" data-tone="paper" aria-labelledby="cover-heading" style="padding-block:0;">
-      <div class="section-inner" style="gap:var(--stack-2xl);">
+    <section id="cover" class="section" data-tone="paper" aria-labelledby="cover-heading">
+      <div class="section-inner">
         ${renderSampleBandBanner(vm)}
         <div class="act-intro">
           <div class="act-intro-stack">
@@ -123,13 +112,7 @@ export function renderCoverSection(vm: ReportViewModel): string {
           </div>
         </div>
 
-        <div class="block" style="gap:var(--stack-md);">
-          ${renderReveal(
-            `<div class="block-header">
-              <h3 class="section-eyebrow">At a glance</h3>
-              <p class="section-lede">${escapeHtml(vm.editorial.cover_at_a_glance_lede)}</p>
-            </div>`
-          )}
+        <div class="block" style="gap:var(--stack-sm);">
           <div class="grid-3">
             ${renderReveal(
               `<div class="figure">
@@ -174,7 +157,6 @@ export function renderCoverSection(vm: ReportViewModel): string {
 
         ${renderReveal(
           `<div>
-            <h3 class="section-eyebrow" style="margin-bottom:12px;">How the audience splits, at a glance</h3>
             <div style="display:flex;height:36px;border-radius:var(--r-2);overflow:hidden;border:1px solid var(--line);">
               ${tiers.map(tierStripSegment).join('')}
             </div>
@@ -184,7 +166,6 @@ export function renderCoverSection(vm: ReportViewModel): string {
           </div>`
         )}
       </div>
-      <div style="height:var(--section-py);"></div>
     </section>
   `.trim();
 }

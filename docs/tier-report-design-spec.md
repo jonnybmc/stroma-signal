@@ -51,11 +51,14 @@ The report is a **vertical scroll narrative**, not a horizontal slide deck.
 - **Dark parity** — supported via `[data-theme="dark"]` attribute on the report root.
 - A single canonical accent (warm amber, Signifier-tuned) drives all KPI cameos, ledger highlights, glossary cues, and the reading-progress fill. **No data-driven mood/accent/density CSS variation** — language and tone carry the editorial mood; the visual stays one consistent voice.
 
-## Typography (Signifier pairing)
+## Typography (Instrument pairing)
 
-- **Display** — Fraunces (variable serif, opsz 144, SOFT 30, WONK 0). Used for hero numbers, act headlines, section titles.
-- **Sans** — Schibsted Grotesk. Used for body copy, ledes, captions.
-- **Mono** — JetBrains Mono. Used for eyebrows, scroll-spy chrome, KPI pills, footer metadata.
+Data-centric grotesk system with a serif accent — reads as a working instrument, not a fashion magazine. The prior Signifier pairing (Fraunces + Schibsted Grotesk + JetBrains Mono) leaned editorial; this one swaps the serif-led display for a wide grotesk and reserves serif for italic emphasis only.
+
+- **Display** — Space Grotesk. Used for hero numbers, big stat values (`58%`, `176`, `1d`), section titles, the giant cover headline. Wide proportions, geometric, weights 300–700.
+- **Sans** — Inter Tight. Used for body copy, ledes, captions, UI chrome. Narrow, neutral, optimised for reading at 13–17 px.
+- **Serif (accent)** — Instrument Serif. Used sparingly for italic emphasis inside body copy (e.g. *here*) and any one-off editorial flourish. Italic + roman variants; never used for full paragraphs.
+- **Mono** — Geist Mono. Used for eyebrows, scroll-spy chrome, KPI pills, footer metadata, tabular figures where column alignment matters.
 
 Loaded via Google Fonts CSS2 import with `<link rel="preconnect">` to `fonts.googleapis.com` + `fonts.gstatic.com`.
 

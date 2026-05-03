@@ -35,8 +35,9 @@ describe('fixture coverage — every scenario renders without null/undefined/NaN
         }
       });
 
-      it('renders the canonical CTA + boundary statement', () => {
-        expect(html, `${fx.id} missing Rapid Fix Plan CTA`).toContain('Rapid Fix Plan');
+      it('renders the canonical closing trigger + boundary statement', () => {
+        expect(html, `${fx.id} missing closing-modal trigger`).toContain('data-closing-modal-open');
+        expect(html, `${fx.id} missing closing-modal dialog`).toContain('id="closing-modal"');
         expect(html, `${fx.id} missing boundary statement`).toContain(vm.boundary_statement);
       });
 

@@ -211,8 +211,8 @@ describe('tier-report-design-spec.md alignment with report-view-model + canonica
     });
   });
 
-  describe('Typography: Signifier pairing (Fraunces + Schibsted Grotesk + JetBrains Mono)', () => {
-    for (const family of ['Fraunces', 'Schibsted Grotesk', 'JetBrains Mono']) {
+  describe('Typography: Instrument pairing (Space Grotesk + Inter Tight + Instrument Serif)', () => {
+    for (const family of ['Space Grotesk', 'Inter Tight', 'Instrument Serif']) {
       it(`spec names canonical font family "${family}"`, () => {
         expect(doc).toContain(family);
       });

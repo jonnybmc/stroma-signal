@@ -39,7 +39,8 @@ import {
 } from './view-model/builders/persona-paid-media-notes.js';
 
 export type {
-  ReportClosingCard,
+  ReportClosingModal,
+  ReportClosingModalChoice,
   ReportClosingPill,
   ReportEditorialCopy
 } from './view-model/builders/editorial-copy.js';
