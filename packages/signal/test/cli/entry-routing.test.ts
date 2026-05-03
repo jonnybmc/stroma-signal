@@ -4,7 +4,7 @@
 // silently shortcircuiting to printUsage instead of running the wizard.
 
 import { spawnSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -12,6 +12,7 @@ import { describe, expect, it } from 'vitest';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const CLI_BIN = join(here, '..', '..', 'dist', 'cli.mjs');
+const PKG_JSON = join(here, '..', '..', 'package.json');
 const FIXTURE_NEXT = join(here, 'fixtures', 'next-app-router');
 
 function runCli(
@@ -59,6 +60,26 @@ describe('CLI entry routing (dist/cli.mjs)', () => {
     expect(status).toBe(0);
     expect(stdout).toMatch(/^\d+\.\d+\.\d+/);
     expect(stdout).not.toContain('Usage:');
+  });
+
+  // B2 invariant: the CLI's --version output must match
+  // packages/signal/package.json's version field. They cannot disagree
+  // because both read from the same package.json (CLI via build-time
+  // json import, this test via fs read).
+  it('`signal --version` output equals packages/signal/package.json version (B2)', () => {
+    const { stdout } = runCli(['--version']);
+    const cliVersion = stdout.trim();
+    const pkgVersion = (JSON.parse(readFileSync(PKG_JSON, 'utf8')) as { version: string }).version;
+    expect(cliVersion).toBe(pkgVersion);
+  });
+
+  // M7: --no-clipboard removed for v1 (clipboard deferred to v0.2).
+  // Reserved for re-introduction when clipboard ships, at which point
+  // this test must be updated as a deliberate design decision.
+  it('`signal --no-clipboard` is unrecognised in v1 (M7: deferred to v0.2)', () => {
+    const { status, stderr } = runCli(['--no-clipboard']);
+    expect(status).toBe(2);
+    expect(stderr).toContain('Unknown argument: --no-clipboard');
   });
 
   // Regression test for the bug the user reported: bare `signal init`

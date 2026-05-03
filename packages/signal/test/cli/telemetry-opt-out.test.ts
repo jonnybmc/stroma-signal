@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { resolveOptOut } from '../../src/cli/telemetry/opt-out.js';
+import { DISCLOSURE_VERSION, resolveOptOut } from '../../src/cli/telemetry/opt-out.js';
 import type { TtyEnv } from '../../src/cli/util/tty.js';
 
 function makeTty(over: Partial<TtyEnv> = {}): TtyEnv {
@@ -21,7 +21,7 @@ describe('resolveOptOut — priority chain (first match wins)', () => {
       ttyEnv: makeTty(),
       env: { STROMA_TELEMETRY: '1', DO_NOT_TRACK: '0' }
     });
-    expect(result).toEqual({ enabled: false, reason: 'flag' });
+    expect(result).toEqual({ kind: 'disabled', reason: 'flag' });
   });
 
   it('2. STROMA_TELEMETRY=0 disables when no flag', () => {
@@ -30,7 +30,7 @@ describe('resolveOptOut — priority chain (first match wins)', () => {
       ttyEnv: makeTty(),
       env: { STROMA_TELEMETRY: '0' }
     });
-    expect(result).toEqual({ enabled: false, reason: 'env_stroma_telemetry' });
+    expect(result).toEqual({ kind: 'disabled', reason: 'env_stroma_telemetry' });
   });
 
   it('STROMA_TELEMETRY=false also disables', () => {
@@ -39,7 +39,7 @@ describe('resolveOptOut — priority chain (first match wins)', () => {
       ttyEnv: makeTty(),
       env: { STROMA_TELEMETRY: 'false' }
     });
-    expect(result.enabled).toBe(false);
+    expect(result.kind).toBe('disabled');
   });
 
   it('3. DO_NOT_TRACK=1 disables (industry-standard signal)', () => {
@@ -48,7 +48,7 @@ describe('resolveOptOut — priority chain (first match wins)', () => {
       ttyEnv: makeTty(),
       env: { DO_NOT_TRACK: '1' }
     });
-    expect(result).toEqual({ enabled: false, reason: 'env_do_not_track' });
+    expect(result).toEqual({ kind: 'disabled', reason: 'env_do_not_track' });
   });
 
   it('DO_NOT_TRACK=true also disables', () => {
@@ -57,7 +57,7 @@ describe('resolveOptOut — priority chain (first match wins)', () => {
       ttyEnv: makeTty(),
       env: { DO_NOT_TRACK: 'true' }
     });
-    expect(result.enabled).toBe(false);
+    expect(result.kind).toBe('disabled');
   });
 
   it('4. Non-TTY (CI=true) disables silently', () => {
@@ -65,7 +65,7 @@ describe('resolveOptOut — priority chain (first match wins)', () => {
       noTelemetryFlag: false,
       ttyEnv: makeTty({ isCi: true })
     });
-    expect(result).toEqual({ enabled: false, reason: 'non_tty_or_ci' });
+    expect(result).toEqual({ kind: 'disabled', reason: 'non_tty_or_ci' });
   });
 
   it('non-TTY stdout disables', () => {
@@ -73,7 +73,7 @@ describe('resolveOptOut — priority chain (first match wins)', () => {
       noTelemetryFlag: false,
       ttyEnv: makeTty({ isStdoutTty: false })
     });
-    expect(result).toEqual({ enabled: false, reason: 'non_tty_or_ci' });
+    expect(result).toEqual({ kind: 'disabled', reason: 'non_tty_or_ci' });
   });
 
   it('non-TTY stdin disables (piped input)', () => {
@@ -81,7 +81,7 @@ describe('resolveOptOut — priority chain (first match wins)', () => {
       noTelemetryFlag: false,
       ttyEnv: makeTty({ isStdinTty: false })
     });
-    expect(result).toEqual({ enabled: false, reason: 'non_tty_or_ci' });
+    expect(result).toEqual({ kind: 'disabled', reason: 'non_tty_or_ci' });
   });
 
   it('5. Persisted config file: explicitly disabled', () => {
@@ -92,14 +92,14 @@ describe('resolveOptOut — priority chain (first match wins)', () => {
       configReader: () => ({
         schema_version: 1,
         telemetry: false,
-        last_disclosure_version: '2026-05-03',
+        last_disclosure_version: DISCLOSURE_VERSION,
         decided_at: '2026-05-03T00:00:00.000Z'
       })
     });
-    expect(result).toEqual({ enabled: false, reason: 'persisted_config' });
+    expect(result).toEqual({ kind: 'disabled', reason: 'persisted_config' });
   });
 
-  it('5. Persisted config file: explicitly enabled', () => {
+  it('5. Persisted config file: explicitly enabled with current disclosure version', () => {
     const result = resolveOptOut({
       noTelemetryFlag: false,
       ttyEnv: makeTty(),
@@ -107,20 +107,66 @@ describe('resolveOptOut — priority chain (first match wins)', () => {
       configReader: () => ({
         schema_version: 1,
         telemetry: true,
-        last_disclosure_version: '2026-05-03',
+        last_disclosure_version: DISCLOSURE_VERSION,
         decided_at: '2026-05-03T00:00:00.000Z'
       })
     });
-    expect(result).toEqual({ enabled: true, reason: 'persisted_config' });
+    expect(result).toEqual({ kind: 'enabled', reason: 'persisted_config' });
   });
 
-  it('6. Default ON for first-ever interactive run', () => {
+  it('5. Persisted enabled with STALE disclosure version → needs_disclosure / stale_disclosure', () => {
+    const result = resolveOptOut({
+      noTelemetryFlag: false,
+      ttyEnv: makeTty(),
+      env: {},
+      configReader: () => ({
+        schema_version: 1,
+        telemetry: true,
+        last_disclosure_version: '2024-01-01',
+        decided_at: '2024-01-01T00:00:00.000Z'
+      })
+    });
+    expect(result).toEqual({ kind: 'needs_disclosure', reason: 'stale_disclosure' });
+  });
+
+  it('5. Persisted DISABLED with stale disclosure version stays disabled (opt-out is sticky across version bumps)', () => {
+    const result = resolveOptOut({
+      noTelemetryFlag: false,
+      ttyEnv: makeTty(),
+      env: {},
+      configReader: () => ({
+        schema_version: 1,
+        telemetry: false,
+        last_disclosure_version: '2024-01-01',
+        decided_at: '2024-01-01T00:00:00.000Z'
+      })
+    });
+    expect(result).toEqual({ kind: 'disabled', reason: 'persisted_config' });
+  });
+
+  it('6. No persisted config → needs_disclosure / first_run', () => {
     const result = resolveOptOut({
       noTelemetryFlag: false,
       ttyEnv: makeTty(),
       env: {},
       configReader: () => null
     });
-    expect(result).toEqual({ enabled: true, reason: 'default_on' });
+    expect(result).toEqual({ kind: 'needs_disclosure', reason: 'first_run' });
+  });
+
+  it('Test override of currentDisclosureVersion behaves correctly (matched → enabled)', () => {
+    const result = resolveOptOut({
+      noTelemetryFlag: false,
+      ttyEnv: makeTty(),
+      env: {},
+      currentDisclosureVersion: '2030-01-01',
+      configReader: () => ({
+        schema_version: 1,
+        telemetry: true,
+        last_disclosure_version: '2030-01-01',
+        decided_at: '2030-01-01T00:00:00.000Z'
+      })
+    });
+    expect(result).toEqual({ kind: 'enabled', reason: 'persisted_config' });
   });
 });

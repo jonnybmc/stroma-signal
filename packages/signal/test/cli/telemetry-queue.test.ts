@@ -1,4 +1,4 @@
-import type { SignalInstallEventV1 } from '@stroma-labs/signal-contracts';
+import type { SignalInstallEventV1 } from '@stroma-labs/signal-contracts/install-event';
 import { describe, expect, it, vi } from 'vitest';
 import { TelemetryQueue } from '../../src/cli/telemetry/queue.js';
 
@@ -70,11 +70,15 @@ describe('TelemetryQueue — enabled mode', () => {
   });
 
   it('flush awaits all pending requests', async () => {
-    let resolveFn: () => void = () => {};
+    // Capture each call's resolver so both promises actually resolve
+    // (previous version had a single-slot resolveFn variable that the
+    // second call overwrote, leaving the first hanging — masked by the
+    // pre-M4 buggy flush() that read pending.length-before).
+    const resolvers: Array<() => void> = [];
     const fetchMock = vi.fn().mockImplementation(
       () =>
         new Promise<Response>((resolve) => {
-          resolveFn = () => resolve({ status: 201 } as Response);
+          resolvers.push(() => resolve({ status: 201 } as Response));
         })
     );
     const queue = new TelemetryQueue({
@@ -84,10 +88,8 @@ describe('TelemetryQueue — enabled mode', () => {
     });
     queue.enqueue(makeEvent());
     queue.enqueue(makeEvent({ event_kind: 'install_completed', outcome: 'completed' }));
-    // Resolve both in-flight fetches before flush returns.
     setTimeout(() => {
-      resolveFn();
-      resolveFn();
+      for (const r of resolvers) r();
     }, 10);
     const result = await queue.flush({ timeoutMs: 500 });
     expect(result.flushed).toBe(2);
@@ -107,6 +109,47 @@ describe('TelemetryQueue — enabled mode', () => {
     const elapsed = Date.now() - start;
     // Should not block longer than ~timeoutMs + small overhead.
     expect(elapsed).toBeLessThan(500);
+  });
+
+  // M4 launch-fix: when the timeout fires before all sends settle,
+  // flush() must report the ACTUAL settled count, not the count at the
+  // start of flush (which was the bug — pending.length was set to
+  // length-before, then read AFTER setting `this.pending = []`,
+  // producing a misleading "flushed everything" log line).
+  it('M4: flush() reports honest settled count when timeout fires (not the pending-count-before)', async () => {
+    let resolveFn: () => void = () => {};
+    const fetchMock = vi
+      .fn()
+      // First call resolves immediately.
+      .mockImplementationOnce(() => Promise.resolve({ status: 201 } as Response))
+      // Second call hangs forever.
+      .mockImplementationOnce(
+        () =>
+          new Promise<Response>((resolve) => {
+            resolveFn = () => resolve({ status: 201 } as Response);
+          })
+      )
+      // Third call also hangs.
+      .mockImplementationOnce(() => new Promise<Response>(() => {}));
+    const queue = new TelemetryQueue({
+      enabled: true,
+      endpoint: 'http://localhost:1/install',
+      fetch: fetchMock as unknown as typeof globalThis.fetch
+    });
+    queue.enqueue(makeEvent());
+    queue.enqueue(makeEvent({ event_kind: 'install_completed', outcome: 'completed' }));
+    queue.enqueue(makeEvent({ event_kind: 'install_aborted', outcome: 'aborted' }));
+
+    // Resolve the second send mid-flush so it lands inside the
+    // timeout window.
+    setTimeout(() => resolveFn(), 20);
+
+    const result = await queue.flush({ timeoutMs: 100 });
+    // Two settled (immediate + the one we resolved mid-flight), one
+    // pending (third still hanging). The bug was that this would
+    // report 3 flushed, 0 pending regardless.
+    expect(result.flushed).toBe(2);
+    expect(result.pending).toBe(1);
   });
 
   it('fetch rejection is silent (does not throw) — telemetry never crashes the wizard', async () => {

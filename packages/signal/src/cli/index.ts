@@ -6,8 +6,7 @@
 import { argv, exit, stderr, stdout } from 'node:process';
 
 import { CliUsageError, parseInitArgs, printUsage, run } from './commands/init.js';
-
-const VERSION = '0.1.0-rc.4';
+import { CLI_VERSION } from './util/version.js';
 
 async function main(rawArgs: readonly string[]): Promise<number> {
   // Top-level arg routing: every flag goes to the init command. We
@@ -19,7 +18,7 @@ async function main(rawArgs: readonly string[]): Promise<number> {
 
   // Top-level fast paths.
   if (args.includes('--version') || args.includes('-V')) {
-    stdout.write(`${VERSION}\n`);
+    stdout.write(`${CLI_VERSION}\n`);
     return 0;
   }
   if (args.includes('--help') || args.includes('-h')) {
@@ -48,7 +47,7 @@ async function main(rawArgs: readonly string[]): Promise<number> {
   }
 
   try {
-    const result = await run(parsed, { cliVersion: VERSION });
+    const result = await run(parsed);
     return result.exitCode;
   } catch (err) {
     if (err instanceof CliUsageError) {

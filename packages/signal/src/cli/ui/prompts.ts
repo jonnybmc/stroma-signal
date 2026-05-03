@@ -26,6 +26,22 @@ import { isInteractive } from '../util/tty.js';
 import { c } from './ansi.js';
 import { activePromptHeader } from './panels.js';
 
+/**
+ * Sentinel thrown by all interactive prompts when the user aborts
+ * (Ctrl-C, Esc, or readline-detected SIGINT). The wizard's run() catches
+ * this to distinguish user-cancellation (exit 130, emit install_aborted
+ * post-consent) from other thrown errors (exit 1, emit install_error).
+ *
+ * Pre-disclosure aborts emit ZERO telemetry — see opt-out.ts state
+ * model and init.ts disclosure handling.
+ */
+export class AbortError extends Error {
+  constructor(message = 'Aborted by user') {
+    super(message);
+    this.name = 'AbortError';
+  }
+}
+
 export interface PromptStreams {
   input?: NodeJS.ReadableStream;
   output?: NodeJS.WritableStream;
@@ -58,19 +74,32 @@ export async function confirm(question: string, opts: { defaultYes?: boolean } &
   if (!isInteractiveOrDefault(opts)) return defaultYes;
   const { input, output } = resolveStreams(opts);
   const rl = createInterface({ input, output });
+  const ac = new AbortController();
+  const sigintHandler = (): void => ac.abort();
+  process.once('SIGINT', sigintHandler);
   try {
     output.write(`${activePromptHeader(question)}\n`);
     const suffix = defaultYes ? c.dim('(Y/n)') : c.dim('(y/N)');
-    const answer = (await rl.question(`  ${suffix} `)).trim().toLowerCase();
+    const answer = (await rl.question(`  ${suffix} `, { signal: ac.signal })).trim().toLowerCase();
     if (answer === '') return defaultYes;
     if (answer === 'y' || answer === 'yes') return true;
     if (answer === 'n' || answer === 'no') return false;
     // Unknown response — fall back to default rather than re-prompting
     // (CI-friendly + matches the principle of least frustration).
     return defaultYes;
+  } catch (err) {
+    if (isAbortLikeError(err)) throw new AbortError();
+    throw err;
   } finally {
+    process.off('SIGINT', sigintHandler);
     rl.close();
   }
+}
+
+function isAbortLikeError(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false;
+  const e = err as { name?: string; code?: string };
+  return e.name === 'AbortError' || e.code === 'ABORT_ERR';
 }
 
 export async function input(
@@ -81,15 +110,22 @@ export async function input(
   if (!isInteractiveOrDefault(opts)) return defaultValue;
   const { input: stream, output } = resolveStreams(opts);
   const rl = createInterface({ input: stream, output });
+  const ac = new AbortController();
+  const sigintHandler = (): void => ac.abort();
+  process.once('SIGINT', sigintHandler);
   try {
     output.write(`${activePromptHeader(question)}\n`);
     if (opts.hint) {
       output.write(`  ${c.dim(opts.hint)}\n`);
     }
     const suffix = defaultValue ? c.dim(`[${defaultValue}]`) : '';
-    const answer = (await rl.question(`  ${suffix} `)).trim();
+    const answer = (await rl.question(`  ${suffix} `, { signal: ac.signal })).trim();
     return answer === '' ? defaultValue : answer;
+  } catch (err) {
+    if (isAbortLikeError(err)) throw new AbortError();
+    throw err;
   } finally {
+    process.off('SIGINT', sigintHandler);
     rl.close();
   }
 }
@@ -220,7 +256,7 @@ function arrowKeySelect<T extends string>(
         // so the user sees feedback. The terminal's own ^C echo does
         // not reach us in raw mode.
         output.write('  (cancelled)\n');
-        reject(new Error('Aborted by user'));
+        reject(new AbortError());
         return;
       }
       if (key.name === 'up' || key.name === 'k') {

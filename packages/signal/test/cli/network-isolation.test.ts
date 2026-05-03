@@ -20,6 +20,7 @@ import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { run } from '../../src/cli/commands/init.js';
+import { AbortError } from '../../src/cli/ui/prompts.js';
 
 interface ListenerHarness {
   port: number;
@@ -29,39 +30,63 @@ interface ListenerHarness {
   close: () => Promise<void>;
 }
 
-let harness: ListenerHarness;
+let harness: ListenerHarness | undefined;
+let beforeAllError: Error | undefined;
 
 beforeAll(async () => {
-  let connections = 0;
-  const server = http.createServer((req, res) => {
-    connections += 1;
-    // Drain the body to avoid hanging the client (the queue.send() side
-    // expects the request to complete or be aborted).
-    req.on('data', () => {});
-    req.on('end', () => {
-      res.writeHead(201, { 'content-type': 'application/json' });
-      res.end('{"ok":true}');
+  try {
+    let connections = 0;
+    const server = http.createServer((req, res) => {
+      connections += 1;
+      // Drain the body to avoid hanging the client (the queue.send() side
+      // expects the request to complete or be aborted).
+      req.on('data', () => {});
+      req.on('end', () => {
+        res.writeHead(201, { 'content-type': 'application/json' });
+        res.end('{"ok":true}');
+      });
     });
-  });
-  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
-  const addr = server.address() as AddressInfo;
-  harness = {
-    port: addr.port,
-    url: `http://127.0.0.1:${addr.port}/api/v1/install`,
-    connectionCount: () => connections,
-    reset: () => {
-      connections = 0;
-    },
-    close: () =>
-      new Promise<void>((resolve, reject) => {
-        server.close((err) => (err ? reject(err) : resolve()));
-      })
-  };
+    await new Promise<void>((resolve, reject) => {
+      server.once('error', reject);
+      server.listen(0, '127.0.0.1', resolve);
+    });
+    const addr = server.address() as AddressInfo;
+    harness = {
+      port: addr.port,
+      url: `http://127.0.0.1:${addr.port}/api/v1/install`,
+      connectionCount: () => connections,
+      reset: () => {
+        connections = 0;
+      },
+      close: () =>
+        new Promise<void>((resolve, reject) => {
+          server.close((err) => (err ? reject(err) : resolve()));
+        })
+    };
+  } catch (err) {
+    // Surface a clear message if the sandbox blocks port binds rather
+    // than letting a downstream `harness.url` access throw "cannot
+    // read property of undefined" with no context.
+    beforeAllError =
+      err instanceof Error
+        ? new Error(`network-isolation harness failed to bind a localhost port: ${err.message}`)
+        : new Error('network-isolation harness failed to bind a localhost port');
+  }
 });
 
 afterAll(async () => {
-  await harness.close();
+  // Guard against partial setup — a failed beforeAll leaves harness
+  // undefined. Calling .close() on undefined would mask the real error.
+  if (harness) {
+    await harness.close();
+  }
 });
+
+function requireHarness(): ListenerHarness {
+  if (beforeAllError) throw beforeAllError;
+  if (!harness) throw new Error('network-isolation harness was never initialised');
+  return harness;
+}
 
 function makeTmpProject(): string {
   const dir = mkdtempSync(join(tmpdir(), 'signal-net-isol-'));
@@ -78,7 +103,8 @@ function captureWrite(): { stream: { write: (s: string) => void } } {
 
 describe('network isolation — zero requests when telemetry disabled (P2-12)', () => {
   it('--no-telemetry → zero connections', async () => {
-    harness.reset();
+    const h = requireHarness();
+    h.reset();
     const dir = makeTmpProject();
     await run(
       {
@@ -86,7 +112,6 @@ describe('network isolation — zero requests when telemetry disabled (P2-12)', 
         yes: true,
         json: true,
         noTelemetry: true,
-        noClipboard: true,
         verbose: false,
         skipInstallCheck: true,
         help: false,
@@ -97,14 +122,15 @@ describe('network isolation — zero requests when telemetry disabled (P2-12)', 
         stdout: captureWrite().stream,
         stderr: captureWrite().stream,
         isInteractive: () => false,
-        telemetryEndpoint: harness.url
+        telemetryEndpoint: h.url
       }
     );
-    expect(harness.connectionCount()).toBe(0);
+    expect(h.connectionCount()).toBe(0);
   });
 
   it('STROMA_TELEMETRY=0 (via decision override) → zero connections', async () => {
-    harness.reset();
+    const h = requireHarness();
+    h.reset();
     const dir = makeTmpProject();
     await run(
       {
@@ -112,7 +138,6 @@ describe('network isolation — zero requests when telemetry disabled (P2-12)', 
         yes: true,
         json: true,
         noTelemetry: false,
-        noClipboard: true,
         verbose: false,
         skipInstallCheck: true,
         help: false,
@@ -123,15 +148,16 @@ describe('network isolation — zero requests when telemetry disabled (P2-12)', 
         stdout: captureWrite().stream,
         stderr: captureWrite().stream,
         isInteractive: () => false,
-        telemetryEndpoint: harness.url,
-        telemetryDecisionOverride: { enabled: false, reason: 'env_stroma_telemetry' }
+        telemetryEndpoint: h.url,
+        telemetryDecisionOverride: { kind: 'disabled', reason: 'env_stroma_telemetry' }
       }
     );
-    expect(harness.connectionCount()).toBe(0);
+    expect(h.connectionCount()).toBe(0);
   });
 
   it('DO_NOT_TRACK=1 (via decision override) → zero connections', async () => {
-    harness.reset();
+    const h = requireHarness();
+    h.reset();
     const dir = makeTmpProject();
     await run(
       {
@@ -139,7 +165,6 @@ describe('network isolation — zero requests when telemetry disabled (P2-12)', 
         yes: true,
         json: true,
         noTelemetry: false,
-        noClipboard: true,
         verbose: false,
         skipInstallCheck: true,
         help: false,
@@ -150,15 +175,16 @@ describe('network isolation — zero requests when telemetry disabled (P2-12)', 
         stdout: captureWrite().stream,
         stderr: captureWrite().stream,
         isInteractive: () => false,
-        telemetryEndpoint: harness.url,
-        telemetryDecisionOverride: { enabled: false, reason: 'env_do_not_track' }
+        telemetryEndpoint: h.url,
+        telemetryDecisionOverride: { kind: 'disabled', reason: 'env_do_not_track' }
       }
     );
-    expect(harness.connectionCount()).toBe(0);
+    expect(h.connectionCount()).toBe(0);
   });
 
   it('non-TTY (CI) → zero connections (auto-disabled silently)', async () => {
-    harness.reset();
+    const h = requireHarness();
+    h.reset();
     const dir = makeTmpProject();
     await run(
       {
@@ -166,7 +192,6 @@ describe('network isolation — zero requests when telemetry disabled (P2-12)', 
         yes: true,
         json: true,
         noTelemetry: false,
-        noClipboard: true,
         verbose: false,
         skipInstallCheck: true,
         help: false,
@@ -177,15 +202,16 @@ describe('network isolation — zero requests when telemetry disabled (P2-12)', 
         stdout: captureWrite().stream,
         stderr: captureWrite().stream,
         isInteractive: () => false,
-        telemetryEndpoint: harness.url,
-        telemetryDecisionOverride: { enabled: false, reason: 'non_tty_or_ci' }
+        telemetryEndpoint: h.url,
+        telemetryDecisionOverride: { kind: 'disabled', reason: 'non_tty_or_ci' }
       }
     );
-    expect(harness.connectionCount()).toBe(0);
+    expect(h.connectionCount()).toBe(0);
   });
 
   it('persisted config disabled → zero connections', async () => {
-    harness.reset();
+    const h = requireHarness();
+    h.reset();
     const dir = makeTmpProject();
     await run(
       {
@@ -193,7 +219,6 @@ describe('network isolation — zero requests when telemetry disabled (P2-12)', 
         yes: true,
         json: true,
         noTelemetry: false,
-        noClipboard: true,
         verbose: false,
         skipInstallCheck: true,
         help: false,
@@ -204,17 +229,57 @@ describe('network isolation — zero requests when telemetry disabled (P2-12)', 
         stdout: captureWrite().stream,
         stderr: captureWrite().stream,
         isInteractive: () => false,
-        telemetryEndpoint: harness.url,
-        telemetryDecisionOverride: { enabled: false, reason: 'persisted_config' }
+        telemetryEndpoint: h.url,
+        telemetryDecisionOverride: { kind: 'disabled', reason: 'persisted_config' }
       }
     );
-    expect(harness.connectionCount()).toBe(0);
+    expect(h.connectionCount()).toBe(0);
+  });
+});
+
+describe('network isolation — disclosure abort pre-consent (B1)', () => {
+  it('Ctrl-C at the disclosure prompt → exit 130, ZERO connections (consent never happened)', async () => {
+    const h = requireHarness();
+    h.reset();
+    const dir = makeTmpProject();
+    const result = await run(
+      {
+        cwd: dir,
+        yes: true,
+        json: true,
+        noTelemetry: false,
+        verbose: false,
+        skipInstallCheck: true,
+        help: false,
+        version: false,
+        sink: 'dataLayer'
+      },
+      {
+        stdout: captureWrite().stream,
+        stderr: captureWrite().stream,
+        // Force the disclosure flow to run: needs_disclosure decision +
+        // a real interactive shell (so the disclosure branch fires) +
+        // an aborting prompt (so consent is never granted).
+        isInteractive: () => true,
+        telemetryEndpoint: h.url,
+        telemetryDecisionOverride: { kind: 'needs_disclosure', reason: 'first_run' },
+        disclosurePromptOverride: async (): Promise<boolean> => {
+          throw new AbortError();
+        },
+        writeDisclosureConfigOverride: () => {
+          throw new Error('writeDisclosureConfig must NOT be called when consent is aborted');
+        }
+      }
+    );
+    expect(result.exitCode).toBe(130);
+    expect(h.connectionCount()).toBe(0);
   });
 });
 
 describe('network isolation — negative control: enabled telemetry DOES connect', () => {
   it('telemetry enabled + non-interactive → at least one connection attempt', async () => {
-    harness.reset();
+    const h = requireHarness();
+    h.reset();
     const dir = makeTmpProject();
     await run(
       {
@@ -222,7 +287,6 @@ describe('network isolation — negative control: enabled telemetry DOES connect
         yes: true,
         json: true,
         noTelemetry: false,
-        noClipboard: true,
         verbose: false,
         skipInstallCheck: true,
         help: false,
@@ -233,8 +297,8 @@ describe('network isolation — negative control: enabled telemetry DOES connect
         stdout: captureWrite().stream,
         stderr: captureWrite().stream,
         isInteractive: () => false,
-        telemetryEndpoint: harness.url,
-        telemetryDecisionOverride: { enabled: true, reason: 'default_on' }
+        telemetryEndpoint: h.url,
+        telemetryDecisionOverride: { kind: 'enabled', reason: 'persisted_config' }
       }
     );
     expect(harness.connectionCount()).toBeGreaterThanOrEqual(1);

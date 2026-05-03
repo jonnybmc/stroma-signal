@@ -1,15 +1,35 @@
-// Telemetry opt-out resolution. Priority order (first match wins):
-//   1. --no-telemetry flag                 → 'flag'
-//   2. STROMA_TELEMETRY=0 env var          → 'env_stroma_telemetry'
-//   3. DO_NOT_TRACK=1 env var              → 'env_do_not_track'
-//   4. Non-TTY environment (CI / pipe)     → 'non_tty_or_ci'
-//   5. Persisted config file (XDG-aware)   → 'persisted_config'
-//   6. First-ever interactive run          → 'default_on'
+// Telemetry opt-out resolution. Returns a discriminated union so the
+// wizard can branch on `kind` instead of inferring intent from a flat
+// `enabled: boolean`. Eight inputs collapse into three result kinds:
 //
-// Critical invariant (P2-12): when telemetry is disabled by ANY of (1)-(5),
-// ZERO requests leave the machine — including install_started. The
-// emit queue is constructed with `enabled: false` and every enqueue()
-// becomes a hard no-op.
+//   disabled         — no prompt, no telemetry. Hard no-op everywhere.
+//   enabled          — no prompt, telemetry flows.
+//   needs_disclosure — render the disclosure panel + prompt BEFORE any
+//                      enqueue. Two sub-reasons: 'first_run' (no
+//                      persisted config) and 'stale_disclosure'
+//                      (persisted consent under an older disclosure
+//                      version — re-prompt to confirm under current
+//                      capture/never-capture lists).
+//
+// State table (priority top→bottom, first match wins):
+//
+//   --no-telemetry flag                            → disabled / flag
+//   STROMA_TELEMETRY=0                             → disabled / env_stroma_telemetry
+//   DO_NOT_TRACK=1                                 → disabled / env_do_not_track
+//   Non-TTY / CI                                   → disabled / non_tty_or_ci
+//   Persisted telemetry: false                     → disabled / persisted_config
+//   Persisted telemetry: true + version current    → enabled  / persisted_config
+//   Persisted telemetry: true + version stale      → needs_disclosure / stale_disclosure
+//   No persisted config                            → needs_disclosure / first_run
+//
+// P2-12 invariant: when telemetry is disabled, ZERO requests leave the
+// machine. The wizard constructs the queue with `enabled: false` and
+// every enqueue() is a hard no-op.
+//
+// `needs_disclosure` invariant: the wizard MUST NOT construct the
+// queue (and MUST NOT enqueue any event) until the user has answered
+// the disclosure prompt. If the user aborts at the prompt, ZERO
+// events are emitted — consent never happened.
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
@@ -22,13 +42,14 @@ export type TelemetryOptOutReason =
   | 'env_stroma_telemetry'
   | 'env_do_not_track'
   | 'non_tty_or_ci'
-  | 'persisted_config'
-  | 'default_on';
+  | 'persisted_config';
 
-export interface TelemetryDecision {
-  enabled: boolean;
-  reason: TelemetryOptOutReason;
-}
+export type DisclosureNeedReason = 'first_run' | 'stale_disclosure';
+
+export type TelemetryDecision =
+  | { kind: 'disabled'; reason: TelemetryOptOutReason }
+  | { kind: 'enabled'; reason: TelemetryOptOutReason }
+  | { kind: 'needs_disclosure'; reason: DisclosureNeedReason };
 
 export interface DisclosureConfig {
   schema_version: number;
@@ -38,6 +59,15 @@ export interface DisclosureConfig {
 }
 
 const DISCLOSURE_SCHEMA_VERSION = 1;
+
+/**
+ * Current disclosure version. Bump this whenever the capture /
+ * never-capture lists change OR the disclosure panel copy materially
+ * shifts. A bump triggers a re-prompt for everyone with persisted
+ * consent under the prior version. Format: 'YYYY-MM-DD' so version
+ * comparison is a simple string equality (no semver math needed).
+ */
+export const DISCLOSURE_VERSION = '2026-05-02';
 
 /** Resolve XDG-aware config file path with platform-specific fallback. */
 export function resolveConfigPath(
@@ -75,7 +105,7 @@ export function readDisclosureConfig(
       decided_at: parsed.decided_at ?? ''
     };
   } catch {
-    // Corrupt config — fall through to first-run disclosure.
+    // Corrupt config — treat as if no config (re-prompt as first_run).
     return null;
   }
 }
@@ -106,40 +136,54 @@ export interface ResolveOptOutDeps {
   platform?: NodeJS.Platform;
   /** Optional override for tests — skips file I/O. */
   configReader?: () => DisclosureConfig | null;
+  /** Optional override for tests — defaults to the module-level
+   *  DISCLOSURE_VERSION constant. */
+  currentDisclosureVersion?: string;
 }
 
 export function resolveOptOut(deps: ResolveOptOutDeps): TelemetryDecision {
   const env = deps.env ?? process.env;
   const platform = deps.platform ?? process.platform;
+  const currentVersion = deps.currentDisclosureVersion ?? DISCLOSURE_VERSION;
 
   // 1. Explicit flag.
-  if (deps.noTelemetryFlag) return { enabled: false, reason: 'flag' };
+  if (deps.noTelemetryFlag) return { kind: 'disabled', reason: 'flag' };
 
   // 2. STROMA_TELEMETRY env.
   if (env.STROMA_TELEMETRY === '0' || env.STROMA_TELEMETRY === 'false') {
-    return { enabled: false, reason: 'env_stroma_telemetry' };
+    return { kind: 'disabled', reason: 'env_stroma_telemetry' };
   }
 
   // 3. DO_NOT_TRACK industry-standard signal.
   if (env.DO_NOT_TRACK === '1' || env.DO_NOT_TRACK === 'true') {
-    return { enabled: false, reason: 'env_do_not_track' };
+    return { kind: 'disabled', reason: 'env_do_not_track' };
   }
 
   // 4. Non-TTY / CI auto-disable. A CI runner cannot meaningfully
   //    consent to a prompt that won't render, so we silently disable.
   if (deps.ttyEnv.isCi || !deps.ttyEnv.isStdoutTty || !deps.ttyEnv.isStdinTty) {
-    return { enabled: false, reason: 'non_tty_or_ci' };
+    return { kind: 'disabled', reason: 'non_tty_or_ci' };
   }
 
   // 5. Persisted config.
   const reader = deps.configReader ?? (() => readDisclosureConfig(env, platform));
   const config = reader();
   if (config) {
-    return { enabled: config.telemetry, reason: 'persisted_config' };
+    if (!config.telemetry) {
+      return { kind: 'disabled', reason: 'persisted_config' };
+    }
+    // Persisted enabled — but only honour without re-prompt when the
+    // disclosure version is current. A version bump means the
+    // capture/never-capture lists have changed since the user last
+    // consented, so we re-prompt.
+    if (config.last_disclosure_version === currentVersion) {
+      return { kind: 'enabled', reason: 'persisted_config' };
+    }
+    return { kind: 'needs_disclosure', reason: 'stale_disclosure' };
   }
 
-  // 6. Default ON for first-ever interactive run. (The actual disclosure
-  //    panel + persistence happens in the wizard flow before the first
-  //    enqueue — see Phase D.3 wiring.)
-  return { enabled: true, reason: 'default_on' };
+  // 6. No persisted config — first-ever interactive run. The wizard
+  //    must render the disclosure panel + prompt before constructing
+  //    the queue. Aborting at the prompt emits zero telemetry.
+  return { kind: 'needs_disclosure', reason: 'first_run' };
 }

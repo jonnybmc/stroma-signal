@@ -38,8 +38,8 @@ This doc is the recurring sweep checklist. Each sweep produces a single PR title
    - Script/syntax patterns (e.g. Svelte 5 runes vs Svelte 4 reactive)
    - Required peer deps or version floors
 4. **Update** `framework-recipes.md` snippets if drift is found. Update `recipe-currency-data.json` `verified_against_version` + `last_verified_at` for that recipe. Update `matrix.ts` SnippetSpec entries.
-5. **Regenerate** `docs/framework-recipes.md` from the matrix via `pnpm --filter @stroma-labs/signal generate:recipes-doc` (Phase C.6 deliverable).
-6. **Run** the snippet-compile gate (`pnpm test:cli:snippet-compile`) — the rendered snippets must build cleanly against fixture projects of the new framework version.
+5. **Regenerate** `docs/framework-recipes.md` from the matrix. Auto-generation (`generate:recipes-doc`) is on the v0.2 plan; for now this is manual: edit the file by hand to mirror the changed `matrix.ts` snippet, keeping the per-recipe headings, "verified against" line, and the `<!-- generated -->` markers. A diff against the matrix snapshot (`packages/signal/test/cli/__snapshots__/matrix.test.ts.snap`) is the easiest way to spot what changed.
+6. **Run** the snippet-compile gate (`pnpm test:cli:snippet-compile`) — the rendered snippets must parse cleanly against the per-framework parsers in `snippet-compile.test.ts`.
 7. **Commit** the sweep as a single PR.
 
 ## Pre-flight checklist before opening the sweep PR

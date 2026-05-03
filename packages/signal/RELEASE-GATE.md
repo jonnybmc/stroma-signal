@@ -27,6 +27,23 @@ SDK, runs `pnpm pack`, and for each available package manager:
 Package managers that aren't installed locally are skipped (the script
 soft-fails). On CI every PM should be available.
 
+## Manual gate — fresh-project smoke matrix (per-framework, launch-fix item A)
+
+Parser-level snippet validation cannot catch framework API drift (e.g.
+SvelteKit 5 runes shifting against the matrix entry, Remix v2 entry
+conventions changing). This per-framework matrix MUST be ticked before
+any tagged release. Each row is a fresh-project install, wizard run,
+boot, and event-fires-in-the-target-sink check.
+
+- [ ] **Next.js App Router** — `npx create-next-app@latest` (App Router) → `signal init` → `pnpm dev` boots → page loads with snippet → `dataLayer.find(e => e.event === 'perf_tier_report')` returns event.
+- [ ] **React Router v7 (framework mode)** — fresh `react-router` v7 framework-mode app → `signal init` → boot → emit.
+- [ ] **Remix v2** — fresh Remix v2 app → `signal init` → boot → emit.
+- [ ] **SvelteKit (Svelte 5 runes)** — fresh SvelteKit app on Svelte 5 → `signal init` → boot → emit. **Most-likely-to-drift** (runes API stable but tooling shifts); always run a fresh install, never assume the prior dry-run still applies.
+- [ ] **Vanilla** — plain HTML page with `<script type="module">` from the wizard's snippet → load → emit.
+
+Failure on any row blocks the release. Open an issue, fix the matrix
+entry + recipe, re-run the matching row from a fresh project.
+
 ## Manual gate — live fresh-user dry run (P2-14)
 
 Required for any RC bump that ships a wizard change. Catches end-to-end

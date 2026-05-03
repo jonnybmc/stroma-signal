@@ -54,7 +54,9 @@ export type SignalInstallOutcome = 'completed' | 'aborted' | 'error';
 
 export type SignalInstallErrorCategory =
   | 'detection_failed'
+  | 'prompt_failed'
   | 'snippet_render_failed'
+  | 'output_failed'
   | 'clipboard_failed'
   | 'telemetry_flush_failed'
   | 'unknown';
@@ -167,7 +169,9 @@ export const SIGNAL_INSTALL_VALID_OUTCOMES: ReadonlySet<SignalInstallOutcome> = 
 
 export const SIGNAL_INSTALL_VALID_ERROR_CATEGORIES: ReadonlySet<SignalInstallErrorCategory> = new Set([
   'detection_failed',
+  'prompt_failed',
   'snippet_render_failed',
+  'output_failed',
   'clipboard_failed',
   'telemetry_flush_failed',
   'unknown'

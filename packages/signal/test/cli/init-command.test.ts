@@ -92,20 +92,16 @@ describe('parseInitArgs', () => {
   });
 
   it('parses boolean flags', () => {
-    const args = parseInitArgs([
-      '--yes',
-      '--json',
-      '--no-telemetry',
-      '--no-clipboard',
-      '--verbose',
-      '--skip-install-check'
-    ]);
+    const args = parseInitArgs(['--yes', '--json', '--no-telemetry', '--verbose', '--skip-install-check']);
     expect(args.yes).toBe(true);
     expect(args.json).toBe(true);
     expect(args.noTelemetry).toBe(true);
-    expect(args.noClipboard).toBe(true);
     expect(args.verbose).toBe(true);
     expect(args.skipInstallCheck).toBe(true);
+  });
+
+  it('rejects --no-clipboard (M7: removed for v1; reserved for v0.2 when clipboard ships)', () => {
+    expect(() => parseInitArgs(['--no-clipboard'])).toThrow(CliUsageError);
   });
 
   it('parses short flags (-y, -V, -h)', () => {
@@ -214,7 +210,6 @@ describe('run() — JSON mode (deterministic)', () => {
         yes: true,
         json: true,
         noTelemetry: true,
-        noClipboard: true,
         verbose: false,
         skipInstallCheck: true,
         help: false,
@@ -249,7 +244,6 @@ describe('run() — JSON mode (deterministic)', () => {
         yes: true,
         json: true,
         noTelemetry: true,
-        noClipboard: true,
         verbose: false,
         skipInstallCheck: true,
         help: false,
@@ -275,7 +269,6 @@ describe('run() — JSON mode (deterministic)', () => {
         yes: true,
         json: true,
         noTelemetry: true,
-        noClipboard: true,
         verbose: false,
         skipInstallCheck: false,
         help: false,
@@ -303,7 +296,6 @@ describe('run() — JSON mode (deterministic)', () => {
         yes: true,
         json: true,
         noTelemetry: true,
-        noClipboard: true,
         verbose: false,
         skipInstallCheck: false,
         help: false,
@@ -327,7 +319,6 @@ describe('run() — JSON mode (deterministic)', () => {
         yes: true,
         json: true,
         noTelemetry: true,
-        noClipboard: true,
         verbose: false,
         skipInstallCheck: true,
         help: false,
@@ -353,7 +344,6 @@ describe('run() — JSON mode (deterministic)', () => {
         yes: true,
         json: true,
         noTelemetry: true,
-        noClipboard: true,
         verbose: false,
         skipInstallCheck: true,
         help: false,
@@ -377,7 +367,6 @@ describe('run() — JSON mode (deterministic)', () => {
           yes: true,
           json: true,
           noTelemetry: true,
-          noClipboard: true,
           verbose: false,
           skipInstallCheck: true,
           help: false,
@@ -399,7 +388,6 @@ describe('run() — JSON mode (deterministic)', () => {
         yes: true,
         json: true,
         noTelemetry: true,
-        noClipboard: true,
         verbose: false,
         skipInstallCheck: true,
         help: false,
@@ -431,7 +419,6 @@ describe('vanillaCandidate fallback wiring', () => {
         yes: true,
         json: true,
         noTelemetry: true,
-        noClipboard: true,
         verbose: false,
         skipInstallCheck: true,
         help: false,
@@ -452,3 +439,155 @@ describe('vanillaCandidate fallback wiring', () => {
 // Prevent unused import lint warning when PassThrough isn't used in
 // test paths above (it's reserved for future interactive prompt tests).
 void PassThrough;
+
+describe('M1 — ambiguous detection under --yes emits stderr warning', () => {
+  it('two high-confidence candidates + --yes → stderr warning surfaced', async () => {
+    // Build a fixture with both Next AND React Router v7 deps so the
+    // detector returns multiple high-confidence candidates. App-router
+    // marker so Next is detected as a high-confidence candidate.
+    const dir = makeTmpProject({
+      name: 'ambiguous',
+      dependencies: { next: '^16.2.4', 'react-router': '^7.0.0' }
+    });
+    const { mkdirSync } = await import('node:fs');
+    mkdirSync(join(dir, 'app'));
+    writeFileSync(join(dir, 'react-router.config.ts'), 'export default {};');
+
+    const stdout = captureWrites();
+    const stderr = captureWrites();
+    await run(
+      {
+        cwd: dir,
+        yes: true,
+        json: true,
+        noTelemetry: true,
+        verbose: false,
+        skipInstallCheck: true,
+        help: false,
+        version: false,
+        sink: 'dataLayer'
+      },
+      { stdout: stdout.stream, stderr: stderr.stream, isInteractive: () => false }
+    );
+    const stderrOut = stderr.captured();
+    expect(stderrOut).toContain('Warning: ambiguous framework detection');
+    expect(stderrOut).toContain('Use --framework <id>');
+  });
+
+  it('single high-confidence candidate + --yes → NO warning', async () => {
+    const dir = makeTmpProject({ name: 'one-fw', dependencies: { next: '^16.2.4' } });
+    const { mkdirSync } = await import('node:fs');
+    mkdirSync(join(dir, 'app'));
+
+    const stdout = captureWrites();
+    const stderr = captureWrites();
+    await run(
+      {
+        cwd: dir,
+        yes: true,
+        json: true,
+        noTelemetry: true,
+        verbose: false,
+        skipInstallCheck: true,
+        help: false,
+        version: false,
+        sink: 'dataLayer'
+      },
+      { stdout: stdout.stream, stderr: stderr.stream, isInteractive: () => false }
+    );
+    expect(stderr.captured()).not.toContain('ambiguous framework detection');
+  });
+});
+
+describe('H1 — abort + error telemetry with stage tracking', () => {
+  // We exercise the abort path by injecting a render-stage failure via
+  // a synthetic --framework that has no matrix entry. That throws at
+  // stage='snippet_render' → install_error w/ snippet_render_failed.
+  // For a real abort, the integration test in network-isolation
+  // covers the disclosure-pre-consent path; here we focus on the
+  // post-consent stage→category mapping.
+
+  it('snippet_render error → install_error with snippet_render_failed category', async () => {
+    const dir = makeTmpProject({ name: 'render-fail', dependencies: { next: '^16.2.4' } });
+    const { mkdirSync } = await import('node:fs');
+    mkdirSync(join(dir, 'app'));
+
+    const events: Array<{ event_kind: string; outcome?: string; error_category?: string }> = [];
+    const fetch = async (_url: string | URL | Request, init?: RequestInit): Promise<Response> => {
+      const body = init?.body ? JSON.parse(init.body as string) : null;
+      if (body) events.push(body);
+      return new Response(null, { status: 201 });
+    };
+
+    const stdout = captureWrites();
+    const stderr = captureWrites();
+    await expect(
+      run(
+        {
+          cwd: dir,
+          yes: true,
+          json: true,
+          noTelemetry: false,
+          verbose: false,
+          skipInstallCheck: true,
+          help: false,
+          version: false,
+          // Force a framework × sink combination not in the matrix to
+          // throw at the snippet_render stage. 'unknown' is in
+          // VALID_FRAMEWORKS but findSnippet returns null for it.
+          framework: 'unknown',
+          sink: 'dataLayer'
+        },
+        {
+          stdout: stdout.stream,
+          stderr: stderr.stream,
+          isInteractive: () => false,
+          telemetryDecisionOverride: { kind: 'enabled', reason: 'persisted_config' },
+          fetch,
+          telemetryEndpoint: 'http://127.0.0.1:1/install'
+        }
+      )
+    ).rejects.toThrow(/No snippet matrix entry/);
+
+    const errorEvent = events.find((e) => e.event_kind === 'install_error');
+    expect(errorEvent).toBeDefined();
+    expect(errorEvent?.outcome).toBe('error');
+    expect(errorEvent?.error_category).toBe('snippet_render_failed');
+  });
+
+  it('telemetry disabled → NO install_error fires (no emit when queue is no-op)', async () => {
+    const dir = makeTmpProject({ name: 'render-fail-no-tel', dependencies: { next: '^16.2.4' } });
+    const { mkdirSync } = await import('node:fs');
+    mkdirSync(join(dir, 'app'));
+
+    let fetchCalls = 0;
+    const stdout = captureWrites();
+    const stderr = captureWrites();
+    await expect(
+      run(
+        {
+          cwd: dir,
+          yes: true,
+          json: true,
+          noTelemetry: true,
+          verbose: false,
+          skipInstallCheck: true,
+          help: false,
+          version: false,
+          framework: 'unknown',
+          sink: 'dataLayer'
+        },
+        {
+          stdout: stdout.stream,
+          stderr: stderr.stream,
+          isInteractive: () => false,
+          fetch: async () => {
+            fetchCalls += 1;
+            return new Response(null, { status: 201 });
+          }
+        }
+      )
+    ).rejects.toThrow(/No snippet matrix entry/);
+    expect(fetchCalls).toBe(0);
+  });
+});

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -72,5 +73,52 @@ if (process.platform !== 'win32') {
   assert.ok(
     (cliStat.mode & 0o100) !== 0,
     `CLI bin must have owner-execute bit set (chmod +x). Current mode: ${cliStat.mode.toString(8)}`
+  );
+}
+
+// B2: CLI's --version output must equal packages/signal/package.json
+// version. Build-time read via cli/util/version.ts means they share a
+// single source; this assertion catches regressions where someone re-
+// introduces a hard-coded version constant.
+const cliVersionOutput = execFileSync(process.execPath, [cliPath, '--version'], { encoding: 'utf8' }).trim();
+assert.equal(
+  cliVersionOutput,
+  packageJson.version,
+  `CLI --version (${cliVersionOutput}) must match packages/signal/package.json version (${packageJson.version}). ` +
+    `If they disagree, somewhere is hard-coding the version instead of importing CLI_VERSION from cli/util/version.ts.`
+);
+
+// H3: bundle-size + fixture-marker assertions. The CLI MUST NOT bundle
+// signal-contracts fixtures (they're dev-only test data — ~1k lines of
+// SignalAggregateV1 + SignalEventV1 examples that have no business in
+// the published wizard binary).
+const CLI_BUNDLE_SIZE_LIMIT_BYTES = 100 * 1024; // 100 KB ceiling
+const cliSizeBytes = Buffer.byteLength(cliSource, 'utf8');
+assert.ok(
+  cliSizeBytes < CLI_BUNDLE_SIZE_LIMIT_BYTES,
+  `dist/cli.mjs is ${(cliSizeBytes / 1024).toFixed(1)} KB; ceiling is ${CLI_BUNDLE_SIZE_LIMIT_BYTES / 1024} KB. ` +
+    `Likely cause: an import pulled in unrelated code from @stroma-labs/signal-contracts (root) instead of ` +
+    `the narrow ./install-event subpath.`
+);
+
+// Fixture-marker scan — more important than the size cap because a
+// future fixture could be small AND wrong-to-bundle. Adding a fixture
+// to signal-contracts that gets pulled into the CLI must fail this
+// scan. Add new fixture identifiers here as they're introduced.
+const FIXTURE_MARKERS = [
+  'previewAggregateFixture',
+  'affirmingAggregateFixture',
+  'noisyAggregateFixture',
+  'mixedLifecycleAggregateFixture',
+  'strongLcpCoverageAggregateFixture',
+  'chromeColdNavFixture',
+  'safariFallbackFixture'
+];
+for (const marker of FIXTURE_MARKERS) {
+  assert.ok(
+    !cliSource.includes(marker),
+    `dist/cli.mjs contains fixture marker "${marker}". This means an import is reaching into ` +
+      `@stroma-labs/signal-contracts/fixtures via the root export. The CLI must import only from ` +
+      `@stroma-labs/signal-contracts/install-event so tree-shaking strips fixtures.`
   );
 }

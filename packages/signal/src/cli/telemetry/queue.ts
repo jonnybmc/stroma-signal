@@ -8,9 +8,9 @@
 // allocations, zero side effects. NO requests leave the machine.
 // (P2-12 invariant.)
 
-import type { SignalInstallEventV1 } from '@stroma-labs/signal-contracts';
+import type { SignalInstallEventV1 } from '@stroma-labs/signal-contracts/install-event';
 
-import { SIGNAL_INSTALL_INGEST_URL_DEFAULT } from '@stroma-labs/signal-contracts';
+import { SIGNAL_INSTALL_INGEST_URL_DEFAULT } from '@stroma-labs/signal-contracts/install-event';
 
 export interface TelemetryQueueOptions {
   enabled: boolean;
@@ -30,8 +30,19 @@ export interface FlushOptions {
   timeoutMs?: number;
 }
 
+interface PendingTracker {
+  /** The actual send promise (settles on success OR catch). Assigned
+   *  immediately after construction so the tracker can self-reference
+   *  in its `.finally()` to flip `settled`. */
+  promise: Promise<void>;
+  /** Set true when `promise` settles (success OR caught failure).
+   *  Read AFTER the flush race resolves to count actual settlements
+   *  vs items that timed out. */
+  settled: boolean;
+}
+
 export class TelemetryQueue {
-  private pending: Promise<void>[] = [];
+  private pending: PendingTracker[] = [];
   private readonly enabled: boolean;
   private readonly endpoint: string;
   private readonly perEventTimeoutMs: number;
@@ -49,28 +60,39 @@ export class TelemetryQueue {
   /** Hard no-op when disabled. */
   enqueue(event: SignalInstallEventV1): void {
     if (!this.enabled) return;
-    const promise = this.send(event).catch((err) => {
-      // Silent failure — telemetry never blocks or surfaces user-facing
-      // errors. Verbose log only.
-      this.logger?.(`telemetry: send failed (silent): ${err instanceof Error ? err.message : String(err)}`);
-    });
-    this.pending.push(promise);
+    const tracker: PendingTracker = { settled: false, promise: undefined as unknown as Promise<void> };
+    tracker.promise = this.send(event)
+      .catch((err) => {
+        // Silent failure — telemetry never blocks or surfaces user-facing
+        // errors. Verbose log only.
+        this.logger?.(`telemetry: send failed (silent): ${err instanceof Error ? err.message : String(err)}`);
+      })
+      .finally(() => {
+        tracker.settled = true;
+      });
+    this.pending.push(tracker);
   }
 
   /** Awaits all pending requests OR timeoutMs, whichever comes first.
-   *  Returns the count of requests that flushed cleanly. */
+   *  Returns the actually-settled count vs the not-yet-settled (which
+   *  the flush gave up on because the total timeout fired first). */
   async flush(options: FlushOptions = {}): Promise<{ flushed: number; pending: number }> {
     if (!this.enabled || this.pending.length === 0) {
       return { flushed: 0, pending: 0 };
     }
     const totalTimeoutMs = options.timeoutMs ?? 1500;
-    const before = this.pending.length;
+    const total = this.pending.length;
+    const allSettled = Promise.allSettled(this.pending.map((t) => t.promise));
     const timeoutPromise = new Promise<void>((resolve) => setTimeout(resolve, totalTimeoutMs));
-    await Promise.race([Promise.allSettled(this.pending), timeoutPromise]);
-    const flushed = this.pending.length;
-    this.logger?.(`telemetry: flushed ${flushed}/${before} pending events within ${totalTimeoutMs}ms`);
+    await Promise.race([allSettled, timeoutPromise]);
+    // Count what ACTUALLY settled — not what was pending when we
+    // started. A timeout that fires before half the items resolve
+    // should report (settled, total - settled), not (total, 0).
+    const flushed = this.pending.filter((t) => t.settled).length;
+    const remaining = total - flushed;
+    this.logger?.(`telemetry: flushed ${flushed}/${total} pending events within ${totalTimeoutMs}ms`);
     this.pending = [];
-    return { flushed, pending: 0 };
+    return { flushed, pending: remaining };
   }
 
   private async send(event: SignalInstallEventV1): Promise<void> {

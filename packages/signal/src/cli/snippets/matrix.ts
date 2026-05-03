@@ -14,6 +14,7 @@
 // packages/signal/src/cli/RECIPE-CURRENCY-SWEEP.md.
 
 import type { FrameworkId } from '../detect/framework.js';
+import { CLI_VERSION } from '../util/version.js';
 import { RECIPE_CURRENCY as recipeCurrency } from './recipe-currency-data.js';
 import {
   BEACON_ENDPOINT_PLACEHOLDER,
@@ -22,6 +23,12 @@ import {
   type SnippetFile,
   type SnippetSpec
 } from './types.js';
+
+// Pin vanilla CDN snippets to the wizard's own version so a developer
+// who copy-pastes today gets a stable, pinned recipe — not an
+// unbounded `@latest` resolution that could shift under them. L1
+// launch-fix.
+const ESM_SH_BASE = `https://esm.sh/@stroma-labs/signal@${CLI_VERSION}`;
 
 // The three sink import + init-call snippets — composed into each
 // framework's per-file body.
@@ -383,8 +390,8 @@ function vanillaFiles(sink: SinkChoice): SnippetFile[] {
         position: 'inside-body',
         body: `<!-- Add this <script type="module"> tag in your <head> or before </body>: -->
 <script type="module">
-  import { init } from 'https://esm.sh/@stroma-labs/signal';
-  import { createDataLayerSink } from 'https://esm.sh/@stroma-labs/signal/ga4';
+  import { init } from '${ESM_SH_BASE}';
+  import { createDataLayerSink } from '${ESM_SH_BASE}/ga4';
 ${initCallBody(sink, '  ')}
 </script>
 `
@@ -399,7 +406,7 @@ ${initCallBody(sink, '  ')}
         position: 'inside-body',
         body: `<!-- Add this <script type="module"> tag in your <head> or before </body>: -->
 <script type="module">
-  import { init, createBeaconSink } from 'https://esm.sh/@stroma-labs/signal';
+  import { init, createBeaconSink } from '${ESM_SH_BASE}';
 ${initCallBody(sink, '  ')}
 </script>
 `
@@ -413,7 +420,7 @@ ${initCallBody(sink, '  ')}
       position: 'inside-body',
       body: `<!-- Add this <script type="module"> tag in your <head> or before </body>: -->
 <script type="module">
-  import { init, createCallbackSink } from 'https://esm.sh/@stroma-labs/signal';
+  import { init, createCallbackSink } from '${ESM_SH_BASE}';
 ${initCallBody(sink, '  ')}
 </script>
 `
