@@ -1,0 +1,1384 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`rendered snippets per (framework × sink) — snapshot stability > renders angular-ngmodule × beacon with sampleRate=1.0 (+ beaconEndpoint when needed) 1`] = `
+{
+  "files": [
+    {
+      "action": "create",
+      "body": "import { init, createBeaconSink } from '@stroma-labs/signal';
+
+init({
+  sinks: [createBeaconSink({ endpoint: '/rum/signal' })],
+  sampleRate: 1
+});
+",
+      "path": "src/signal.ts",
+    },
+    {
+      "action": "modify",
+      "body": "// Add this side-effect import at the top of src/main.ts (before platformBrowserDynamic().bootstrapModule(...)):
+import './signal';
+",
+      "path": "src/main.ts",
+      "position": "top",
+    },
+  ],
+  "framework": "angular-ngmodule",
+  "notes": [
+    "NgModule is the legacy path. Consider migrating to standalone (default since Angular v17) — Angular v21 supports both.",
+    "See docs/collector-contract.md for the schema your beacon endpoint should accept.",
+  ],
+  "sink": "beacon",
+  "verified": {
+    "against_version": "angular@21 (legacy NgModule path)",
+    "last_verified_at": "2026-05-03",
+    "upstream_doc_url": "https://angular.dev/reference/migrations/standalone",
+  },
+}
+`;
+
+exports[`rendered snippets per (framework × sink) — snapshot stability > renders angular-ngmodule × callback with sampleRate=1.0 (+ beaconEndpoint when needed) 1`] = `
+{
+  "files": [
+    {
+      "action": "create",
+      "body": "import { init, createCallbackSink } from '@stroma-labs/signal';
+
+init({
+  sinks: [createCallbackSink({ onReport: (event) => {
+    // Receive every SignalEventV1. Send to your collector / log / etc.
+    console.log('[signal]', event);
+  } })],
+  sampleRate: 1
+});
+",
+      "path": "src/signal.ts",
+    },
+    {
+      "action": "modify",
+      "body": "// Add this side-effect import at the top of src/main.ts (before platformBrowserDynamic().bootstrapModule(...)):
+import './signal';
+",
+      "path": "src/main.ts",
+      "position": "top",
+    },
+  ],
+  "framework": "angular-ngmodule",
+  "notes": [
+    "NgModule is the legacy path. Consider migrating to standalone (default since Angular v17) — Angular v21 supports both.",
+  ],
+  "sink": "callback",
+  "verified": {
+    "against_version": "angular@21 (legacy NgModule path)",
+    "last_verified_at": "2026-05-03",
+    "upstream_doc_url": "https://angular.dev/reference/migrations/standalone",
+  },
+}
+`;
+
+exports[`rendered snippets per (framework × sink) — snapshot stability > renders angular-ngmodule × dataLayer with sampleRate=1.0 (+ beaconEndpoint when needed) 1`] = `
+{
+  "files": [
+    {
+      "action": "create",
+      "body": "import { init } from '@stroma-labs/signal';
+import { createDataLayerSink } from '@stroma-labs/signal/ga4';
+
+init({
+  sinks: [createDataLayerSink()],
+  sampleRate: 1
+});
+",
+      "path": "src/signal.ts",
+    },
+    {
+      "action": "modify",
+      "body": "// Add this side-effect import at the top of src/main.ts (before platformBrowserDynamic().bootstrapModule(...)):
+import './signal';
+",
+      "path": "src/main.ts",
+      "position": "top",
+    },
+  ],
+  "framework": "angular-ngmodule",
+  "notes": [
+    "NgModule is the legacy path. Consider migrating to standalone (default since Angular v17) — Angular v21 supports both.",
+  ],
+  "sink": "dataLayer",
+  "verified": {
+    "against_version": "angular@21 (legacy NgModule path)",
+    "last_verified_at": "2026-05-03",
+    "upstream_doc_url": "https://angular.dev/reference/migrations/standalone",
+  },
+}
+`;
+
+exports[`rendered snippets per (framework × sink) — snapshot stability > renders angular-standalone × beacon with sampleRate=1.0 (+ beaconEndpoint when needed) 1`] = `
+{
+  "files": [
+    {
+      "action": "create",
+      "body": "import { init, createBeaconSink } from '@stroma-labs/signal';
+
+init({
+  sinks: [createBeaconSink({ endpoint: '/rum/signal' })],
+  sampleRate: 1
+});
+",
+      "path": "src/signal.ts",
+    },
+    {
+      "action": "modify",
+      "body": "// Add this side-effect import at the top of src/main.ts (before bootstrapApplication(...)):
+import './signal';
+",
+      "path": "src/main.ts",
+      "position": "top",
+    },
+  ],
+  "framework": "angular-standalone",
+  "notes": [
+    "See docs/collector-contract.md for the schema your beacon endpoint should accept.",
+  ],
+  "sink": "beacon",
+  "verified": {
+    "against_version": "angular@21",
+    "last_verified_at": "2026-05-03",
+    "upstream_doc_url": "https://angular.dev/api/platform-browser/bootstrapApplication",
+  },
+}
+`;
+
+exports[`rendered snippets per (framework × sink) — snapshot stability > renders angular-standalone × callback with sampleRate=1.0 (+ beaconEndpoint when needed) 1`] = `
+{
+  "files": [
+    {
+      "action": "create",
+      "body": "import { init, createCallbackSink } from '@stroma-labs/signal';
+
+init({
+  sinks: [createCallbackSink({ onReport: (event) => {
+    // Receive every SignalEventV1. Send to your collector / log / etc.
+    console.log('[signal]', event);
+  } })],
+  sampleRate: 1
+});
+",
+      "path": "src/signal.ts",
+    },
+    {
+      "action": "modify",
+      "body": "// Add this side-effect import at the top of src/main.ts (before bootstrapApplication(...)):
+import './signal';
+",
+      "path": "src/main.ts",
+      "position": "top",
+    },
+  ],
+  "framework": "angular-standalone",
+  "notes": [],
+  "sink": "callback",
+  "verified": {
+    "against_version": "angular@21",
+    "last_verified_at": "2026-05-03",
+    "upstream_doc_url": "https://angular.dev/api/platform-browser/bootstrapApplication",
+  },
+}
+`;
+
+exports[`rendered snippets per (framework × sink) — snapshot stability > renders angular-standalone × dataLayer with sampleRate=1.0 (+ beaconEndpoint when needed) 1`] = `
+{
+  "files": [
+    {
+      "action": "create",
+      "body": "import { init } from '@stroma-labs/signal';
+import { createDataLayerSink } from '@stroma-labs/signal/ga4';
+
+init({
+  sinks: [createDataLayerSink()],
+  sampleRate: 1
+});
+",
+      "path": "src/signal.ts",
+    },
+    {
+      "action": "modify",
+      "body": "// Add this side-effect import at the top of src/main.ts (before bootstrapApplication(...)):
+import './signal';
+",
+      "path": "src/main.ts",
+      "position": "top",
+    },
+  ],
+  "framework": "angular-standalone",
+  "notes": [],
+  "sink": "dataLayer",
+  "verified": {
+    "against_version": "angular@21",
+    "last_verified_at": "2026-05-03",
+    "upstream_doc_url": "https://angular.dev/api/platform-browser/bootstrapApplication",
+  },
+}
+`;
+
+exports[`rendered snippets per (framework × sink) — snapshot stability > renders next-app-router × beacon with sampleRate=1.0 (+ beaconEndpoint when needed) 1`] = `
+{
+  "files": [
+    {
+      "action": "create",
+      "body": "'use client';
+
+import { useEffect } from 'react';
+
+export function SignalClient() {
+  useEffect(() => {
+    (async () => {
+      const { init, createBeaconSink } = await import('@stroma-labs/signal');
+      init({
+        sinks: [createBeaconSink({ endpoint: '/rum/signal' })],
+        sampleRate: 1
+      });
+    })();
+  }, []);
+  return null;
+}
+",
+      "path": "app/SignalClient.tsx",
+    },
+    {
+      "action": "modify",
+      "body": "// Add this import + render <SignalClient /> as a child of <body>:
+import { SignalClient } from './SignalClient';
+
+// Inside your RootLayout's <body>:
+//   <SignalClient />
+//   {children}
+",
+      "path": "app/layout.tsx",
+      "position": "inside-body",
+    },
+  ],
+  "framework": "next-app-router",
+  "notes": [
+    "Next.js canonical pattern is to render a Client Component as a child boundary inside Server Components — NOT side-effect imports of \`use client\` modules from layout.tsx.",
+    "See docs/collector-contract.md for the schema your beacon endpoint should accept.",
+  ],
+  "sink": "beacon",
+  "verified": {
+    "against_version": "next@16.2",
+    "last_verified_at": "2026-05-03",
+    "upstream_doc_url": "https://nextjs.org/docs/app/getting-started/server-and-client-components",
+  },
+}
+`;
+
+exports[`rendered snippets per (framework × sink) — snapshot stability > renders next-app-router × callback with sampleRate=1.0 (+ beaconEndpoint when needed) 1`] = `
+{
+  "files": [
+    {
+      "action": "create",
+      "body": "'use client';
+
+import { useEffect } from 'react';
+
+export function SignalClient() {
+  useEffect(() => {
+    (async () => {
+      const { init, createCallbackSink } = await import('@stroma-labs/signal');
+      init({
+        sinks: [createCallbackSink({ onReport: (event) => {
+          // Receive every SignalEventV1. Send to your collector / log / etc.
+          console.log('[signal]', event);
+        } })],
+        sampleRate: 1
+      });
+    })();
+  }, []);
+  return null;
+}
+",
+      "path": "app/SignalClient.tsx",
+    },
+    {
+      "action": "modify",
+      "body": "// Add this import + render <SignalClient /> as a child of <body>:
+import { SignalClient } from './SignalClient';
+
+// Inside your RootLayout's <body>:
+//   <SignalClient />
+//   {children}
+",
+      "path": "app/layout.tsx",
+      "position": "inside-body",
+    },
+  ],
+  "framework": "next-app-router",
+  "notes": [
+    "Next.js canonical pattern is to render a Client Component as a child boundary inside Server Components — NOT side-effect imports of \`use client\` modules from layout.tsx.",
+  ],
+  "sink": "callback",
+  "verified": {
+    "against_version": "next@16.2",
+    "last_verified_at": "2026-05-03",
+    "upstream_doc_url": "https://nextjs.org/docs/app/getting-started/server-and-client-components",
+  },
+}
+`;
+
+exports[`rendered snippets per (framework × sink) — snapshot stability > renders next-app-router × dataLayer with sampleRate=1.0 (+ beaconEndpoint when needed) 1`] = `
+{
+  "files": [
+    {
+      "action": "create",
+      "body": "'use client';
+
+import { useEffect } from 'react';
+
+export function SignalClient() {
+  useEffect(() => {
+    (async () => {
+      const { init } = await import('@stroma-labs/signal');
+      const { createDataLayerSink } = await import('@stroma-labs/signal/ga4');
+      init({
+        sinks: [createDataLayerSink()],
+        sampleRate: 1
+      });
+    })();
+  }, []);
+  return null;
+}
+",
+      "path": "app/SignalClient.tsx",
+    },
+    {
+      "action": "modify",
+      "body": "// Add this import + render <SignalClient /> as a child of <body>:
+import { SignalClient } from './SignalClient';
+
+// Inside your RootLayout's <body>:
+//   <SignalClient />
+//   {children}
+",
+      "path": "app/layout.tsx",
+      "position": "inside-body",
+    },
+  ],
+  "framework": "next-app-router",
+  "notes": [
+    "Next.js canonical pattern is to render a Client Component as a child boundary inside Server Components — NOT side-effect imports of \`use client\` modules from layout.tsx.",
+    "Wire your GA4 dataLayer → GTM tag using docs/gtm-recipe.md.",
+  ],
+  "sink": "dataLayer",
+  "verified": {
+    "against_version": "next@16.2",
+    "last_verified_at": "2026-05-03",
+    "upstream_doc_url": "https://nextjs.org/docs/app/getting-started/server-and-client-components",
+  },
+}
+`;
+
+exports[`rendered snippets per (framework × sink) — snapshot stability > renders next-pages-router × beacon with sampleRate=1.0 (+ beaconEndpoint when needed) 1`] = `
+{
+  "files": [
+    {
+      "action": "create",
+      "body": "import { init, createBeaconSink } from '@stroma-labs/signal';
+
+if (typeof window !== 'undefined') {
+  init({
+    sinks: [createBeaconSink({ endpoint: '/rum/signal' })],
+    sampleRate: 1
+  });
+}
+",
+      "path": "lib/signal.ts",
+    },
+    {
+      "action": "modify",
+      "body": "// Add this side-effect import at the top of pages/_app.tsx:
+import '@/lib/signal';
+",
+      "path": "pages/_app.tsx",
+      "position": "top",
+    },
+  ],
+  "framework": "next-pages-router",
+  "notes": [
+    "The \`typeof window !== "undefined"\` guard keeps Signal out of the server bundle.",
+    "See docs/collector-contract.md for the schema your beacon endpoint should accept.",
+  ],
+  "sink": "beacon",
+  "verified": {
+    "against_version": "next@16.2",
+    "last_verified_at": "2026-05-03",
+    "upstream_doc_url": "https://nextjs.org/docs/pages",
+  },
+}
+`;
+
+exports[`rendered snippets per (framework × sink) — snapshot stability > renders next-pages-router × callback with sampleRate=1.0 (+ beaconEndpoint when needed) 1`] = `
+{
+  "files": [
+    {
+      "action": "create",
+      "body": "import { init, createCallbackSink } from '@stroma-labs/signal';
+
+if (typeof window !== 'undefined') {
+  init({
+    sinks: [createCallbackSink({ onReport: (event) => {
+      // Receive every SignalEventV1. Send to your collector / log / etc.
+      console.log('[signal]', event);
+    } })],
+    sampleRate: 1
+  });
+}
+",
+      "path": "lib/signal.ts",
+    },
+    {
+      "action": "modify",
+      "body": "// Add this side-effect import at the top of pages/_app.tsx:
+import '@/lib/signal';
+",
+      "path": "pages/_app.tsx",
+      "position": "top",
+    },
+  ],
+  "framework": "next-pages-router",
+  "notes": [
+    "The \`typeof window !== "undefined"\` guard keeps Signal out of the server bundle.",
+  ],
+  "sink": "callback",
+  "verified": {
+    "against_version": "next@16.2",
+    "last_verified_at": "2026-05-03",
+    "upstream_doc_url": "https://nextjs.org/docs/pages",
+  },
+}
+`;
+
+exports[`rendered snippets per (framework × sink) — snapshot stability > renders next-pages-router × dataLayer with sampleRate=1.0 (+ beaconEndpoint when needed) 1`] = `
+{
+  "files": [
+    {
+      "action": "create",
+      "body": "import { init } from '@stroma-labs/signal';
+import { createDataLayerSink } from '@stroma-labs/signal/ga4';
+
+if (typeof window !== 'undefined') {
+  init({
+    sinks: [createDataLayerSink()],
+    sampleRate: 1
+  });
+}
+",
+      "path": "lib/signal.ts",
+    },
+    {
+      "action": "modify",
+      "body": "// Add this side-effect import at the top of pages/_app.tsx:
+import '@/lib/signal';
+",
+      "path": "pages/_app.tsx",
+      "position": "top",
+    },
+  ],
+  "framework": "next-pages-router",
+  "notes": [
+    "The \`typeof window !== "undefined"\` guard keeps Signal out of the server bundle.",
+  ],
+  "sink": "dataLayer",
+  "verified": {
+    "against_version": "next@16.2",
+    "last_verified_at": "2026-05-03",
+    "upstream_doc_url": "https://nextjs.org/docs/pages",
+  },
+}
+`;
+
+exports[`rendered snippets per (framework × sink) — snapshot stability > renders nuxt × beacon with sampleRate=1.0 (+ beaconEndpoint when needed) 1`] = `
+{
+  "files": [
+    {
+      "action": "create",
+      "body": "import { init, createBeaconSink } from '@stroma-labs/signal';
+
+export default defineNuxtPlugin(() => {
+  init({
+    sinks: [createBeaconSink({ endpoint: '/rum/signal' })],
+    sampleRate: 1
+  });
+});
+",
+      "path": "plugins/signal.client.ts",
+    },
+  ],
+  "framework": "nuxt",
+  "notes": [
+    "The \`.client.ts\` plugin suffix isolates browser-only init from SSR.",
+    "See docs/collector-contract.md for the schema your beacon endpoint should accept.",
+  ],
+  "sink": "beacon",
+  "verified": {
+    "against_version": "nuxt@4",
+    "last_verified_at": "2026-05-03",
+    "upstream_doc_url": "https://nuxt.com/docs/guide/directory-structure/plugins",
+  },
+}
+`;
+
+exports[`rendered snippets per (framework × sink) — snapshot stability > renders nuxt × callback with sampleRate=1.0 (+ beaconEndpoint when needed) 1`] = `
+{
+  "files": [
+    {
+      "action": "create",
+      "body": "import { init, createCallbackSink } from '@stroma-labs/signal';
+
+export default defineNuxtPlugin(() => {
+  init({
+    sinks: [createCallbackSink({ onReport: (event) => {
+      // Receive every SignalEventV1. Send to your collector / log / etc.
+      console.log('[signal]', event);
+    } })],
+    sampleRate: 1
+  });
+});
+",
+      "path": "plugins/signal.client.ts",
+    },
+  ],
+  "framework": "nuxt",
+  "notes": [
+    "The \`.client.ts\` plugin suffix isolates browser-only init from SSR.",
+  ],
+  "sink": "callback",
+  "verified": {
+    "against_version": "nuxt@4",
+    "last_verified_at": "2026-05-03",
+    "upstream_doc_url": "https://nuxt.com/docs/guide/directory-structure/plugins",
+  },
+}
+`;
+
+exports[`rendered snippets per (framework × sink) — snapshot stability > renders nuxt × dataLayer with sampleRate=1.0 (+ beaconEndpoint when needed) 1`] = `
+{
+  "files": [
+    {
+      "action": "create",
+      "body": "import { init } from '@stroma-labs/signal';
+import { createDataLayerSink } from '@stroma-labs/signal/ga4';
+
+export default defineNuxtPlugin(() => {
+  init({
+    sinks: [createDataLayerSink()],
+    sampleRate: 1
+  });
+});
+",
+      "path": "plugins/signal.client.ts",
+    },
+  ],
+  "framework": "nuxt",
+  "notes": [
+    "The \`.client.ts\` plugin suffix isolates browser-only init from SSR.",
+  ],
+  "sink": "dataLayer",
+  "verified": {
+    "against_version": "nuxt@4",
+    "last_verified_at": "2026-05-03",
+    "upstream_doc_url": "https://nuxt.com/docs/guide/directory-structure/plugins",
+  },
+}
+`;
+
+exports[`rendered snippets per (framework × sink) — snapshot stability > renders plain-react × beacon with sampleRate=1.0 (+ beaconEndpoint when needed) 1`] = `
+{
+  "files": [
+    {
+      "action": "create",
+      "body": "import { init, createBeaconSink } from '@stroma-labs/signal';
+
+init({
+  sinks: [createBeaconSink({ endpoint: '/rum/signal' })],
+  sampleRate: 1
+});
+",
+      "path": "src/signal.ts",
+    },
+    {
+      "action": "modify",
+      "body": "// Add this side-effect import at the top of src/main.tsx (before createRoot(...).render(...)):
+import './signal';
+",
+      "path": "src/main.tsx",
+      "position": "top",
+    },
+  ],
+  "framework": "plain-react",
+  "notes": [
+    "See docs/collector-contract.md for the schema your beacon endpoint should accept.",
+  ],
+  "sink": "beacon",
+  "verified": {
+    "against_version": "react@19 + vite@6",
+    "last_verified_at": "2026-05-03",
+    "upstream_doc_url": "https://vite.dev/guide/",
+  },
+}
+`;
+
+exports[`rendered snippets per (framework × sink) — snapshot stability > renders plain-react × callback with sampleRate=1.0 (+ beaconEndpoint when needed) 1`] = `
+{
+  "files": [
+    {
+      "action": "create",
+      "body": "import { init, createCallbackSink } from '@stroma-labs/signal';
+
+init({
+  sinks: [createCallbackSink({ onReport: (event) => {
+    // Receive every SignalEventV1. Send to your collector / log / etc.
+    console.log('[signal]', event);
+  } })],
+  sampleRate: 1
+});
+",
+      "path": "src/signal.ts",
+    },
+    {
+      "action": "modify",
+      "body": "// Add this side-effect import at the top of src/main.tsx (before createRoot(...).render(...)):
+import './signal';
+",
+      "path": "src/main.tsx",
+      "position": "top",
+    },
+  ],
+  "framework": "plain-react",
+  "notes": [],
+  "sink": "callback",
+  "verified": {
+    "against_version": "react@19 + vite@6",
+    "last_verified_at": "2026-05-03",
+    "upstream_doc_url": "https://vite.dev/guide/",
+  },
+}
+`;
+
+exports[`rendered snippets per (framework × sink) — snapshot stability > renders plain-react × dataLayer with sampleRate=1.0 (+ beaconEndpoint when needed) 1`] = `
+{
+  "files": [
+    {
+      "action": "create",
+      "body": "import { init } from '@stroma-labs/signal';
+import { createDataLayerSink } from '@stroma-labs/signal/ga4';
+
+init({
+  sinks: [createDataLayerSink()],
+  sampleRate: 1
+});
+",
+      "path": "src/signal.ts",
+    },
+    {
+      "action": "modify",
+      "body": "// Add this side-effect import at the top of src/main.tsx (before createRoot(...).render(...)):
+import './signal';
+",
+      "path": "src/main.tsx",
+      "position": "top",
+    },
+  ],
+  "framework": "plain-react",
+  "notes": [],
+  "sink": "dataLayer",
+  "verified": {
+    "against_version": "react@19 + vite@6",
+    "last_verified_at": "2026-05-03",
+    "upstream_doc_url": "https://vite.dev/guide/",
+  },
+}
+`;
+
+exports[`rendered snippets per (framework × sink) — snapshot stability > renders plain-svelte × beacon with sampleRate=1.0 (+ beaconEndpoint when needed) 1`] = `
+{
+  "files": [
+    {
+      "action": "create",
+      "body": "import { init, createBeaconSink } from '@stroma-labs/signal';
+
+init({
+  sinks: [createBeaconSink({ endpoint: '/rum/signal' })],
+  sampleRate: 1
+});
+",
+      "path": "src/signal.ts",
+    },
+    {
+      "action": "modify",
+      "body": "// Add this side-effect import at the top of src/main.ts (before mount(...)):
+import './signal';
+",
+      "path": "src/main.ts",
+      "position": "top",
+    },
+  ],
+  "framework": "plain-svelte",
+  "notes": [
+    "See docs/collector-contract.md for the schema your beacon endpoint should accept.",
+  ],
+  "sink": "beacon",
+  "verified": {
+    "against_version": "svelte@5",
+    "last_verified_at": "2026-05-03",
+    "upstream_doc_url": "https://svelte.dev/docs/svelte/getting-started",
+  },
+}
+`;
+
+exports[`rendered snippets per (framework × sink) — snapshot stability > renders plain-svelte × callback with sampleRate=1.0 (+ beaconEndpoint when needed) 1`] = `
+{
+  "files": [
+    {
+      "action": "create",
+      "body": "import { init, createCallbackSink } from '@stroma-labs/signal';
+
+init({
+  sinks: [createCallbackSink({ onReport: (event) => {
+    // Receive every SignalEventV1. Send to your collector / log / etc.
+    console.log('[signal]', event);
+  } })],
+  sampleRate: 1
+});
+",
+      "path": "src/signal.ts",
+    },
+    {
+      "action": "modify",
+      "body": "// Add this side-effect import at the top of src/main.ts (before mount(...)):
+import './signal';
+",
+      "path": "src/main.ts",
+      "position": "top",
+    },
+  ],
+  "framework": "plain-svelte",
+  "notes": [],
+  "sink": "callback",
+  "verified": {
+    "against_version": "svelte@5",
+    "last_verified_at": "2026-05-03",
+    "upstream_doc_url": "https://svelte.dev/docs/svelte/getting-started",
+  },
+}
+`;
+
+exports[`rendered snippets per (framework × sink) — snapshot stability > renders plain-svelte × dataLayer with sampleRate=1.0 (+ beaconEndpoint when needed) 1`] = `
+{
+  "files": [
+    {
+      "action": "create",
+      "body": "import { init } from '@stroma-labs/signal';
+import { createDataLayerSink } from '@stroma-labs/signal/ga4';
+
+init({
+  sinks: [createDataLayerSink()],
+  sampleRate: 1
+});
+",
+      "path": "src/signal.ts",
+    },
+    {
+      "action": "modify",
+      "body": "// Add this side-effect import at the top of src/main.ts (before mount(...)):
+import './signal';
+",
+      "path": "src/main.ts",
+      "position": "top",
+    },
+  ],
+  "framework": "plain-svelte",
+  "notes": [],
+  "sink": "dataLayer",
+  "verified": {
+    "against_version": "svelte@5",
+    "last_verified_at": "2026-05-03",
+    "upstream_doc_url": "https://svelte.dev/docs/svelte/getting-started",
+  },
+}
+`;
+
+exports[`rendered snippets per (framework × sink) — snapshot stability > renders plain-vue × beacon with sampleRate=1.0 (+ beaconEndpoint when needed) 1`] = `
+{
+  "files": [
+    {
+      "action": "create",
+      "body": "import { init, createBeaconSink } from '@stroma-labs/signal';
+
+init({
+  sinks: [createBeaconSink({ endpoint: '/rum/signal' })],
+  sampleRate: 1
+});
+",
+      "path": "src/signal.ts",
+    },
+    {
+      "action": "modify",
+      "body": "// Add this side-effect import at the top of src/main.ts (before createApp(...).mount(...)):
+import './signal';
+",
+      "path": "src/main.ts",
+      "position": "top",
+    },
+  ],
+  "framework": "plain-vue",
+  "notes": [
+    "See docs/collector-contract.md for the schema your beacon endpoint should accept.",
+  ],
+  "sink": "beacon",
+  "verified": {
+    "against_version": "vue@3 + vite@6",
+    "last_verified_at": "2026-05-03",
+    "upstream_doc_url": "https://vuejs.org/guide/quick-start.html",
+  },
+}
+`;
+
+exports[`rendered snippets per (framework × sink) — snapshot stability > renders plain-vue × callback with sampleRate=1.0 (+ beaconEndpoint when needed) 1`] = `
+{
+  "files": [
+    {
+      "action": "create",
+      "body": "import { init, createCallbackSink } from '@stroma-labs/signal';
+
+init({
+  sinks: [createCallbackSink({ onReport: (event) => {
+    // Receive every SignalEventV1. Send to your collector / log / etc.
+    console.log('[signal]', event);
+  } })],
+  sampleRate: 1
+});
+",
+      "path": "src/signal.ts",
+    },
+    {
+      "action": "modify",
+      "body": "// Add this side-effect import at the top of src/main.ts (before createApp(...).mount(...)):
+import './signal';
+",
+      "path": "src/main.ts",
+      "position": "top",
+    },
+  ],
+  "framework": "plain-vue",
+  "notes": [],
+  "sink": "callback",
+  "verified": {
+    "against_version": "vue@3 + vite@6",
+    "last_verified_at": "2026-05-03",
+    "upstream_doc_url": "https://vuejs.org/guide/quick-start.html",
+  },
+}
+`;
+
+exports[`rendered snippets per (framework × sink) — snapshot stability > renders plain-vue × dataLayer with sampleRate=1.0 (+ beaconEndpoint when needed) 1`] = `
+{
+  "files": [
+    {
+      "action": "create",
+      "body": "import { init } from '@stroma-labs/signal';
+import { createDataLayerSink } from '@stroma-labs/signal/ga4';
+
+init({
+  sinks: [createDataLayerSink()],
+  sampleRate: 1
+});
+",
+      "path": "src/signal.ts",
+    },
+    {
+      "action": "modify",
+      "body": "// Add this side-effect import at the top of src/main.ts (before createApp(...).mount(...)):
+import './signal';
+",
+      "path": "src/main.ts",
+      "position": "top",
+    },
+  ],
+  "framework": "plain-vue",
+  "notes": [],
+  "sink": "dataLayer",
+  "verified": {
+    "against_version": "vue@3 + vite@6",
+    "last_verified_at": "2026-05-03",
+    "upstream_doc_url": "https://vuejs.org/guide/quick-start.html",
+  },
+}
+`;
+
+exports[`rendered snippets per (framework × sink) — snapshot stability > renders react-router-v7 × beacon with sampleRate=1.0 (+ beaconEndpoint when needed) 1`] = `
+{
+  "files": [
+    {
+      "action": "create",
+      "body": "import { startTransition, StrictMode } from 'react';
+import { hydrateRoot } from 'react-dom/client';
+import { HydratedRouter } from 'react-router/dom';
+
+import { init, createBeaconSink } from '@stroma-labs/signal';
+
+init({
+  sinks: [createBeaconSink({ endpoint: '/rum/signal' })],
+  sampleRate: 1
+});
+
+startTransition(() => {
+  hydrateRoot(
+    document,
+    <StrictMode>
+      <HydratedRouter />
+    </StrictMode>
+  );
+});
+",
+      "path": "app/entry.client.tsx",
+    },
+  ],
+  "framework": "react-router-v7",
+  "notes": [
+    "entry.client.tsx is exposed via \`npx react-router reveal entry.client\` if not already present in your project.",
+    "See docs/collector-contract.md for the schema your beacon endpoint should accept.",
+  ],
+  "sink": "beacon",
+  "verified": {
+    "against_version": "react-router@7.14",
+    "last_verified_at": "2026-05-03",
+    "upstream_doc_url": "https://reactrouter.com/start/framework/route-module",
+  },
+}
+`;
+
+exports[`rendered snippets per (framework × sink) — snapshot stability > renders react-router-v7 × callback with sampleRate=1.0 (+ beaconEndpoint when needed) 1`] = `
+{
+  "files": [
+    {
+      "action": "create",
+      "body": "import { startTransition, StrictMode } from 'react';
+import { hydrateRoot } from 'react-dom/client';
+import { HydratedRouter } from 'react-router/dom';
+
+import { init, createCallbackSink } from '@stroma-labs/signal';
+
+init({
+  sinks: [createCallbackSink({ onReport: (event) => {
+    // Receive every SignalEventV1. Send to your collector / log / etc.
+    console.log('[signal]', event);
+  } })],
+  sampleRate: 1
+});
+
+startTransition(() => {
+  hydrateRoot(
+    document,
+    <StrictMode>
+      <HydratedRouter />
+    </StrictMode>
+  );
+});
+",
+      "path": "app/entry.client.tsx",
+    },
+  ],
+  "framework": "react-router-v7",
+  "notes": [
+    "entry.client.tsx is exposed via \`npx react-router reveal entry.client\` if not already present in your project.",
+  ],
+  "sink": "callback",
+  "verified": {
+    "against_version": "react-router@7.14",
+    "last_verified_at": "2026-05-03",
+    "upstream_doc_url": "https://reactrouter.com/start/framework/route-module",
+  },
+}
+`;
+
+exports[`rendered snippets per (framework × sink) — snapshot stability > renders react-router-v7 × dataLayer with sampleRate=1.0 (+ beaconEndpoint when needed) 1`] = `
+{
+  "files": [
+    {
+      "action": "create",
+      "body": "import { startTransition, StrictMode } from 'react';
+import { hydrateRoot } from 'react-dom/client';
+import { HydratedRouter } from 'react-router/dom';
+
+import { init } from '@stroma-labs/signal';
+import { createDataLayerSink } from '@stroma-labs/signal/ga4';
+
+init({
+  sinks: [createDataLayerSink()],
+  sampleRate: 1
+});
+
+startTransition(() => {
+  hydrateRoot(
+    document,
+    <StrictMode>
+      <HydratedRouter />
+    </StrictMode>
+  );
+});
+",
+      "path": "app/entry.client.tsx",
+    },
+  ],
+  "framework": "react-router-v7",
+  "notes": [
+    "entry.client.tsx is exposed via \`npx react-router reveal entry.client\` if not already present in your project.",
+  ],
+  "sink": "dataLayer",
+  "verified": {
+    "against_version": "react-router@7.14",
+    "last_verified_at": "2026-05-03",
+    "upstream_doc_url": "https://reactrouter.com/start/framework/route-module",
+  },
+}
+`;
+
+exports[`rendered snippets per (framework × sink) — snapshot stability > renders remix-v2 × beacon with sampleRate=1.0 (+ beaconEndpoint when needed) 1`] = `
+{
+  "files": [
+    {
+      "action": "create",
+      "body": "import { RemixBrowser } from '@remix-run/react';
+import { startTransition, StrictMode } from 'react';
+import { hydrateRoot } from 'react-dom/client';
+
+import { init, createBeaconSink } from '@stroma-labs/signal';
+
+init({
+  sinks: [createBeaconSink({ endpoint: '/rum/signal' })],
+  sampleRate: 1
+});
+
+startTransition(() => {
+  hydrateRoot(
+    document,
+    <StrictMode>
+      <RemixBrowser />
+    </StrictMode>
+  );
+});
+",
+      "path": "app/entry.client.tsx",
+    },
+  ],
+  "framework": "remix-v2",
+  "notes": [
+    "entry.client.tsx is exposed via \`npx remix reveal entry.client\` if not already present. Remix v2 is a distinct project from React Router v7.",
+    "See docs/collector-contract.md for the schema your beacon endpoint should accept.",
+  ],
+  "sink": "beacon",
+  "verified": {
+    "against_version": "remix@2 (legacy)",
+    "last_verified_at": "2026-05-03",
+    "upstream_doc_url": "https://v2.remix.run/docs/file-conventions/entry.client",
+  },
+}
+`;
+
+exports[`rendered snippets per (framework × sink) — snapshot stability > renders remix-v2 × callback with sampleRate=1.0 (+ beaconEndpoint when needed) 1`] = `
+{
+  "files": [
+    {
+      "action": "create",
+      "body": "import { RemixBrowser } from '@remix-run/react';
+import { startTransition, StrictMode } from 'react';
+import { hydrateRoot } from 'react-dom/client';
+
+import { init, createCallbackSink } from '@stroma-labs/signal';
+
+init({
+  sinks: [createCallbackSink({ onReport: (event) => {
+    // Receive every SignalEventV1. Send to your collector / log / etc.
+    console.log('[signal]', event);
+  } })],
+  sampleRate: 1
+});
+
+startTransition(() => {
+  hydrateRoot(
+    document,
+    <StrictMode>
+      <RemixBrowser />
+    </StrictMode>
+  );
+});
+",
+      "path": "app/entry.client.tsx",
+    },
+  ],
+  "framework": "remix-v2",
+  "notes": [
+    "entry.client.tsx is exposed via \`npx remix reveal entry.client\` if not already present. Remix v2 is a distinct project from React Router v7.",
+  ],
+  "sink": "callback",
+  "verified": {
+    "against_version": "remix@2 (legacy)",
+    "last_verified_at": "2026-05-03",
+    "upstream_doc_url": "https://v2.remix.run/docs/file-conventions/entry.client",
+  },
+}
+`;
+
+exports[`rendered snippets per (framework × sink) — snapshot stability > renders remix-v2 × dataLayer with sampleRate=1.0 (+ beaconEndpoint when needed) 1`] = `
+{
+  "files": [
+    {
+      "action": "create",
+      "body": "import { RemixBrowser } from '@remix-run/react';
+import { startTransition, StrictMode } from 'react';
+import { hydrateRoot } from 'react-dom/client';
+
+import { init } from '@stroma-labs/signal';
+import { createDataLayerSink } from '@stroma-labs/signal/ga4';
+
+init({
+  sinks: [createDataLayerSink()],
+  sampleRate: 1
+});
+
+startTransition(() => {
+  hydrateRoot(
+    document,
+    <StrictMode>
+      <RemixBrowser />
+    </StrictMode>
+  );
+});
+",
+      "path": "app/entry.client.tsx",
+    },
+  ],
+  "framework": "remix-v2",
+  "notes": [
+    "entry.client.tsx is exposed via \`npx remix reveal entry.client\` if not already present. Remix v2 is a distinct project from React Router v7.",
+  ],
+  "sink": "dataLayer",
+  "verified": {
+    "against_version": "remix@2 (legacy)",
+    "last_verified_at": "2026-05-03",
+    "upstream_doc_url": "https://v2.remix.run/docs/file-conventions/entry.client",
+  },
+}
+`;
+
+exports[`rendered snippets per (framework × sink) — snapshot stability > renders sveltekit × beacon with sampleRate=1.0 (+ beaconEndpoint when needed) 1`] = `
+{
+  "files": [
+    {
+      "action": "create",
+      "body": "<script lang="ts">
+  import type { LayoutProps } from './$types';
+  let { children }: LayoutProps = $props();
+
+  $effect(() => {
+    (async () => {
+      const { init, createBeaconSink } = await import('@stroma-labs/signal');
+      init({
+        sinks: [createBeaconSink({ endpoint: '/rum/signal' })],
+        sampleRate: 1
+      });
+    })();
+  });
+</script>
+
+{@render children?.()}
+",
+      "path": "src/routes/+layout.svelte",
+    },
+  ],
+  "framework": "sveltekit",
+  "notes": [
+    "Uses Svelte 5 runes ($props, $effect). \`$effect\` does NOT run on the server, so Signal stays out of SSR.",
+    "See docs/collector-contract.md for the schema your beacon endpoint should accept.",
+  ],
+  "sink": "beacon",
+  "verified": {
+    "against_version": "sveltekit@2 + svelte@5",
+    "last_verified_at": "2026-05-03",
+    "upstream_doc_url": "https://svelte.dev/docs/svelte/v5-migration-guide",
+  },
+}
+`;
+
+exports[`rendered snippets per (framework × sink) — snapshot stability > renders sveltekit × callback with sampleRate=1.0 (+ beaconEndpoint when needed) 1`] = `
+{
+  "files": [
+    {
+      "action": "create",
+      "body": "<script lang="ts">
+  import type { LayoutProps } from './$types';
+  let { children }: LayoutProps = $props();
+
+  $effect(() => {
+    (async () => {
+      const { init, createCallbackSink } = await import('@stroma-labs/signal');
+      init({
+        sinks: [createCallbackSink({ onReport: (event) => {
+          // Receive every SignalEventV1. Send to your collector / log / etc.
+          console.log('[signal]', event);
+        } })],
+        sampleRate: 1
+      });
+    })();
+  });
+</script>
+
+{@render children?.()}
+",
+      "path": "src/routes/+layout.svelte",
+    },
+  ],
+  "framework": "sveltekit",
+  "notes": [
+    "Uses Svelte 5 runes ($props, $effect). \`$effect\` does NOT run on the server, so Signal stays out of SSR.",
+  ],
+  "sink": "callback",
+  "verified": {
+    "against_version": "sveltekit@2 + svelte@5",
+    "last_verified_at": "2026-05-03",
+    "upstream_doc_url": "https://svelte.dev/docs/svelte/v5-migration-guide",
+  },
+}
+`;
+
+exports[`rendered snippets per (framework × sink) — snapshot stability > renders sveltekit × dataLayer with sampleRate=1.0 (+ beaconEndpoint when needed) 1`] = `
+{
+  "files": [
+    {
+      "action": "create",
+      "body": "<script lang="ts">
+  import type { LayoutProps } from './$types';
+  let { children }: LayoutProps = $props();
+
+  $effect(() => {
+    (async () => {
+      const { init } = await import('@stroma-labs/signal');
+      const { createDataLayerSink } = await import('@stroma-labs/signal/ga4');
+      init({
+        sinks: [createDataLayerSink()],
+        sampleRate: 1
+      });
+    })();
+  });
+</script>
+
+{@render children?.()}
+",
+      "path": "src/routes/+layout.svelte",
+    },
+  ],
+  "framework": "sveltekit",
+  "notes": [
+    "Uses Svelte 5 runes ($props, $effect). \`$effect\` does NOT run on the server, so Signal stays out of SSR.",
+  ],
+  "sink": "dataLayer",
+  "verified": {
+    "against_version": "sveltekit@2 + svelte@5",
+    "last_verified_at": "2026-05-03",
+    "upstream_doc_url": "https://svelte.dev/docs/svelte/v5-migration-guide",
+  },
+}
+`;
+
+exports[`rendered snippets per (framework × sink) — snapshot stability > renders vanilla × beacon with sampleRate=1.0 (+ beaconEndpoint when needed) 1`] = `
+{
+  "files": [
+    {
+      "action": "modify",
+      "body": "<!-- Add this <script type="module"> tag in your <head> or before </body>: -->
+<script type="module">
+  import { init, createBeaconSink } from 'https://esm.sh/@stroma-labs/signal';
+  init({
+    sinks: [createBeaconSink({ endpoint: '/rum/signal' })],
+    sampleRate: 1
+  });
+</script>
+",
+      "path": "index.html",
+      "position": "inside-body",
+    },
+  ],
+  "framework": "vanilla",
+  "notes": [
+    "See docs/collector-contract.md for the schema your beacon endpoint should accept.",
+  ],
+  "sink": "beacon",
+  "verified": {
+    "against_version": "html@*",
+    "last_verified_at": "2026-05-03",
+    "upstream_doc_url": "https://developer.mozilla.org/en-US/docs/Web/HTML/Element/script",
+  },
+}
+`;
+
+exports[`rendered snippets per (framework × sink) — snapshot stability > renders vanilla × callback with sampleRate=1.0 (+ beaconEndpoint when needed) 1`] = `
+{
+  "files": [
+    {
+      "action": "modify",
+      "body": "<!-- Add this <script type="module"> tag in your <head> or before </body>: -->
+<script type="module">
+  import { init, createCallbackSink } from 'https://esm.sh/@stroma-labs/signal';
+  init({
+    sinks: [createCallbackSink({ onReport: (event) => {
+      // Receive every SignalEventV1. Send to your collector / log / etc.
+      console.log('[signal]', event);
+    } })],
+    sampleRate: 1
+  });
+</script>
+",
+      "path": "index.html",
+      "position": "inside-body",
+    },
+  ],
+  "framework": "vanilla",
+  "notes": [],
+  "sink": "callback",
+  "verified": {
+    "against_version": "html@*",
+    "last_verified_at": "2026-05-03",
+    "upstream_doc_url": "https://developer.mozilla.org/en-US/docs/Web/HTML/Element/script",
+  },
+}
+`;
+
+exports[`rendered snippets per (framework × sink) — snapshot stability > renders vanilla × dataLayer with sampleRate=1.0 (+ beaconEndpoint when needed) 1`] = `
+{
+  "files": [
+    {
+      "action": "modify",
+      "body": "<!-- Add this <script type="module"> tag in your <head> or before </body>: -->
+<script type="module">
+  import { init } from 'https://esm.sh/@stroma-labs/signal';
+  import { createDataLayerSink } from 'https://esm.sh/@stroma-labs/signal/ga4';
+  init({
+    sinks: [createDataLayerSink()],
+    sampleRate: 1
+  });
+</script>
+",
+      "path": "index.html",
+      "position": "inside-body",
+    },
+  ],
+  "framework": "vanilla",
+  "notes": [],
+  "sink": "dataLayer",
+  "verified": {
+    "against_version": "html@*",
+    "last_verified_at": "2026-05-03",
+    "upstream_doc_url": "https://developer.mozilla.org/en-US/docs/Web/HTML/Element/script",
+  },
+}
+`;
