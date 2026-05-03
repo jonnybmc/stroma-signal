@@ -14,15 +14,23 @@ async function main(rawArgs: readonly string[]): Promise<number> {
   // accept `signal init <flags>`, `signal <flags>`, `signal --help`,
   // and `signal --version` as equivalent — a single-command CLI
   // doesn't need a strict subcommand grammar.
-  let args = rawArgs;
-  if (args[0] === 'init') args = args.slice(1);
+  const hadInitSubcommand = rawArgs[0] === 'init';
+  const args = hadInitSubcommand ? rawArgs.slice(1) : rawArgs;
 
   // Top-level fast paths.
   if (args.includes('--version') || args.includes('-V')) {
     stdout.write(`${VERSION}\n`);
     return 0;
   }
-  if (args.includes('--help') || args.includes('-h') || args.length === 0) {
+  if (args.includes('--help') || args.includes('-h')) {
+    printUsage((s) => stdout.write(s));
+    return 0;
+  }
+  // Bare `signal` (no subcommand AND no flags) → show help.
+  // `signal init` (with or without flags) → run the wizard interactively;
+  // missing inputs are filled by interactive prompts in TTY contexts and
+  // by sensible defaults in non-TTY contexts.
+  if (!hadInitSubcommand && args.length === 0) {
     printUsage((s) => stdout.write(s));
     return 0;
   }
