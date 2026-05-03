@@ -84,8 +84,12 @@ export default [
         tsconfig: './tsconfig.cli.json',
         declaration: false,
         declarationMap: false,
-        sourceMap: true,
-        outDir: 'dist'
+        sourceMap: true
+        // Note: omitting `outDir` here. Rollup writes the bundle via
+        // `output.file: 'dist/cli.mjs'`; the typescript plugin's outDir
+        // would be a redundant + conflicting hint when rollup is the
+        // emitter. Earlier experiments showed it confused the plugin's
+        // file-include resolution.
       }),
       terser({
         format: {

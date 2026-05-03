@@ -18,14 +18,26 @@
 // 2 (install_framework_picked), 7 (install_completed), and on any
 // thrown error (install_error). Not wired in this commit — comes in D.3.
 
+import { randomUUID } from 'node:crypto';
+import { arch as osArch, platform as osPlatform } from 'node:os';
 import { isAbsolute, resolve as resolvePath } from 'node:path';
-
+import type {
+  SignalInstallErrorCategory,
+  SignalInstallEventKind,
+  SignalInstallEventV1,
+  SignalInstallFrameworkConfidence,
+  SignalInstallFrameworkVersionSource,
+  SignalInstallOsPlatform
+} from '@stroma-labs/signal-contracts';
 import { detectFrameworks, type FrameworkCandidate, type FrameworkId, vanillaCandidate } from '../detect/framework.js';
 import { detectMonorepo, mergedDeps, readPackageJson } from '../detect/package-json.js';
 import { detectPackageManager, type PackageManager } from '../detect/package-manager.js';
 import { findSnippet, SUPPORTED_FRAMEWORKS_IN_MATRIX } from '../snippets/matrix.js';
+import { RECIPE_CURRENCY as recipeCurrency } from '../snippets/recipe-currency-data.js';
 import { renderSnippet } from '../snippets/render-snippet.js';
 import type { SinkChoice } from '../snippets/types.js';
+import { resolveOptOut, type TelemetryDecision } from '../telemetry/opt-out.js';
+import { TelemetryQueue } from '../telemetry/queue.js';
 import { c, configureColor } from '../ui/ansi.js';
 import { bullet, info, intro, outro } from '../ui/panels.js';
 import { input, select } from '../ui/prompts.js';
@@ -278,7 +290,74 @@ export interface RunDeps {
   stdout?: { write: (s: string) => void };
   /** Override for tests — error stream. */
   stderr?: { write: (s: string) => void };
+  /** Override for tests — fetch impl for telemetry queue. */
+  fetch?: typeof globalThis.fetch;
+  /** Override for tests — pre-resolved telemetry decision. */
+  telemetryDecisionOverride?: TelemetryDecision;
+  /** Override for tests — telemetry endpoint URL. */
+  telemetryEndpoint?: string;
 }
+
+function osPlatformToEnum(platform: NodeJS.Platform): SignalInstallOsPlatform {
+  if (platform === 'linux') return 'linux';
+  if (platform === 'darwin') return 'darwin';
+  if (platform === 'win32') return 'win32';
+  return 'other';
+}
+
+function buildEvent(opts: {
+  kind: SignalInstallEventKind;
+  installCaptureId: string;
+  cliVersion: string;
+  installedSignalVersion: string | null;
+  framework: FrameworkId;
+  frameworkVersion: string | null;
+  frameworkVersionSource: SignalInstallFrameworkVersionSource;
+  frameworkConfidence: SignalInstallFrameworkConfidence;
+  frameworkVersionAheadOfRecipe: boolean;
+  /** SignalInstallSink — wider than SinkChoice (includes 'undecided'). */
+  sink: SinkChoice | 'undecided';
+  sampleRate: number | null;
+  packageManager: PackageManager;
+  outcome?: 'completed' | 'aborted' | 'error';
+  errorCategory?: SignalInstallErrorCategory;
+}): SignalInstallEventV1 {
+  return {
+    v: 1,
+    event_kind: opts.kind,
+    install_capture_id: opts.installCaptureId,
+    event_id: randomUUID(),
+    ts: Date.now(),
+    cli_version: opts.cliVersion,
+    installed_signal_version: opts.installedSignalVersion,
+    framework: opts.framework,
+    framework_version: opts.frameworkVersion,
+    framework_version_source: opts.frameworkVersionSource,
+    framework_confidence: opts.frameworkConfidence,
+    framework_version_ahead_of_recipe: opts.frameworkVersionAheadOfRecipe,
+    sink: opts.sink,
+    sample_rate: opts.sampleRate,
+    package_manager: opts.packageManager,
+    node_version: process.version,
+    os_platform: osPlatformToEnum(osPlatform()),
+    ...(opts.outcome ? { outcome: opts.outcome } : {}),
+    ...(opts.errorCategory ? { error_category: opts.errorCategory } : {})
+  };
+}
+
+function compareMajor(detectedVersion: string | null, verifiedAgainst: string): boolean {
+  if (!detectedVersion) return false;
+  // verifiedAgainst examples: 'next@16.2', 'sveltekit@2 + svelte@5', 'angular@21'
+  // detectedVersion: '16.2.4' / '7.14.2' / null
+  const detectedMajor = Number.parseInt((detectedVersion.match(/^(\d+)/) ?? ['', '0'])[1] ?? '0', 10);
+  const verifiedMajor = Number.parseInt((verifiedAgainst.match(/@\s*(\d+)/) ?? ['', '0'])[1] ?? '0', 10);
+  if (!Number.isFinite(detectedMajor) || !Number.isFinite(verifiedMajor) || verifiedMajor === 0) {
+    return false;
+  }
+  return detectedMajor > verifiedMajor;
+}
+
+void osArch; // imported for future use (e.g. arm vs x64 stamp); not on contract yet.
 
 export async function run(args: InitArgs, deps: RunDeps = {}): Promise<{ exitCode: number; json?: InitJsonOutput }> {
   // Configure color BEFORE any panel render — respects NO_COLOR /
@@ -295,6 +374,24 @@ export async function run(args: InitArgs, deps: RunDeps = {}): Promise<{ exitCod
     else stdout.write(s);
   };
   const interactive = deps.isInteractive?.() ?? (isInteractive(ttyEnv) && !args.yes && !args.json);
+
+  // Telemetry decision + queue. enqueue() is a hard no-op when
+  // disabled — zero requests leave the machine. Flush at every exit
+  // path. P2-12 invariant.
+  const telemetryDecision =
+    deps.telemetryDecisionOverride ?? resolveOptOut({ noTelemetryFlag: args.noTelemetry, ttyEnv });
+  const installCaptureId = randomUUID();
+  const cliVersion = deps.cliVersion ?? '0.1.0-rc.4';
+  const telemetry = new TelemetryQueue({
+    enabled: telemetryDecision.enabled,
+    endpoint: deps.telemetryEndpoint ?? process.env.STROMA_INSTALL_INGEST_URL,
+    fetch: deps.fetch,
+    logger: args.verbose
+      ? (msg) => {
+          stderr.write(`${c.dim(msg)}\n`);
+        }
+      : undefined
+  });
 
   // ── 1. Parse / validate args (already done by parseInitArgs) ─────
   if (args.help) {
@@ -331,6 +428,26 @@ export async function run(args: InitArgs, deps: RunDeps = {}): Promise<{ exitCod
     ? detectMonorepo(pkgResult.dir)
     : { isMonorepo: false, workspaceRoot: null, detectedFrom: null };
   const pmDetect = detectPackageManager({ cwd: pkgResult.dir ?? args.cwd });
+
+  // Telemetry: install_started — fired immediately after detection but
+  // BEFORE any user prompts. Captures node/os/pm even if user aborts
+  // mid-flow.
+  telemetry.enqueue(
+    buildEvent({
+      kind: 'install_started',
+      installCaptureId,
+      cliVersion,
+      installedSignalVersion: null,
+      framework: 'unknown',
+      frameworkVersion: null,
+      frameworkVersionSource: 'unknown',
+      frameworkConfidence: 'low',
+      frameworkVersionAheadOfRecipe: false,
+      sink: 'undecided',
+      sampleRate: null,
+      packageManager: pmDetect.pm
+    })
+  );
 
   if (!args.json) {
     chromeWrite(
@@ -419,6 +536,29 @@ export async function run(args: InitArgs, deps: RunDeps = {}): Promise<{ exitCod
   const rendered = renderSnippet(spec, { sampleRate, beaconEndpoint });
   const nextSteps = buildNextSteps(sink);
 
+  // Telemetry: framework_picked event with the resolved sink + sample
+  // rate. Carries the recipe-currency-pressure flag (true when detected
+  // framework version major > recipe's verified.against_version major).
+  const recipeKey = chosenFramework === 'unknown' ? null : (chosenFramework as keyof typeof recipeCurrency.recipes);
+  const recipeMeta = recipeKey ? recipeCurrency.recipes[recipeKey] : null;
+  const aheadOfRecipe = recipeMeta ? compareMajor(detected.versionSpec, recipeMeta.verified_against_version) : false;
+  telemetry.enqueue(
+    buildEvent({
+      kind: 'install_framework_picked',
+      installCaptureId,
+      cliVersion,
+      installedSignalVersion: installedVersion,
+      framework: chosenFramework,
+      frameworkVersion: detected.versionSpec,
+      frameworkVersionSource: 'spec',
+      frameworkConfidence: detected.confidence,
+      frameworkVersionAheadOfRecipe: aheadOfRecipe,
+      sink,
+      sampleRate,
+      packageManager: pmDetect.pm
+    })
+  );
+
   // ── 7. Emit ──────────────────────────────────────────────────────
   if (args.json) {
     const json: InitJsonOutput = {
@@ -441,6 +581,24 @@ export async function run(args: InitArgs, deps: RunDeps = {}): Promise<{ exitCod
       outcome: 'completed'
     };
     stdout.write(`${JSON.stringify(json)}\n`);
+    telemetry.enqueue(
+      buildEvent({
+        kind: 'install_completed',
+        installCaptureId,
+        cliVersion,
+        installedSignalVersion: installedVersion,
+        framework: chosenFramework,
+        frameworkVersion: detected.versionSpec,
+        frameworkVersionSource: 'spec',
+        frameworkConfidence: detected.confidence,
+        frameworkVersionAheadOfRecipe: aheadOfRecipe,
+        sink,
+        sampleRate,
+        packageManager: pmDetect.pm,
+        outcome: 'completed'
+      })
+    );
+    await telemetry.flush({ timeoutMs: 1500 });
     return { exitCode: 0, json };
   }
 
@@ -512,5 +670,24 @@ export async function run(args: InitArgs, deps: RunDeps = {}): Promise<{ exitCod
     );
   }
 
+  // Telemetry: install_completed at end of pretty-mode flow.
+  telemetry.enqueue(
+    buildEvent({
+      kind: 'install_completed',
+      installCaptureId,
+      cliVersion,
+      installedSignalVersion: installedVersion,
+      framework: chosenFramework,
+      frameworkVersion: detected.versionSpec,
+      frameworkVersionSource: 'spec',
+      frameworkConfidence: detected.confidence,
+      frameworkVersionAheadOfRecipe: aheadOfRecipe,
+      sink,
+      sampleRate,
+      packageManager: pmDetect.pm,
+      outcome: 'completed'
+    })
+  );
+  await telemetry.flush({ timeoutMs: 1500 });
   return { exitCode: 0 };
 }

@@ -14,7 +14,7 @@
 // packages/signal/src/cli/RECIPE-CURRENCY-SWEEP.md.
 
 import type { FrameworkId } from '../detect/framework.js';
-import recipeCurrency from './recipe-currency-data.json' with { type: 'json' };
+import { RECIPE_CURRENCY as recipeCurrency } from './recipe-currency-data.js';
 import {
   BEACON_ENDPOINT_PLACEHOLDER,
   SAMPLE_RATE_PLACEHOLDER,

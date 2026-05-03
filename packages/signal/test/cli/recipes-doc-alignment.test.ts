@@ -21,7 +21,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import { SUPPORTED_FRAMEWORKS_IN_MATRIX } from '../../src/cli/snippets/matrix.js';
-import recipeCurrency from '../../src/cli/snippets/recipe-currency-data.json' with { type: 'json' };
+import { RECIPE_CURRENCY as recipeCurrency } from '../../src/cli/snippets/recipe-currency-data.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const RECIPES_DOC_PATH = path.resolve(here, '../../../../docs/framework-recipes.md');
