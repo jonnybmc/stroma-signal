@@ -73,13 +73,19 @@ export async function confirm(question: string, opts: { defaultYes?: boolean } &
   }
 }
 
-export async function input(question: string, opts: { defaultValue?: string } & PromptDeps = {}): Promise<string> {
+export async function input(
+  question: string,
+  opts: { defaultValue?: string; hint?: string } & PromptDeps = {}
+): Promise<string> {
   const defaultValue = opts.defaultValue ?? '';
   if (!isInteractiveOrDefault(opts)) return defaultValue;
   const { input: stream, output } = resolveStreams(opts);
   const rl = createInterface({ input: stream, output });
   try {
     output.write(`${activePromptHeader(question)}\n`);
+    if (opts.hint) {
+      output.write(`  ${c.dim(opts.hint)}\n`);
+    }
     const suffix = defaultValue ? c.dim(`[${defaultValue}]`) : '';
     const answer = (await rl.question(`  ${suffix} `)).trim();
     return answer === '' ? defaultValue : answer;

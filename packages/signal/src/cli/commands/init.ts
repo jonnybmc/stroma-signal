@@ -484,11 +484,23 @@ export async function run(args: InitArgs, deps: RunDeps = {}): Promise<{ exitCod
   if (args.sink) sink = args.sink;
   else if (interactive) {
     sink = await select(
-      'Where should events go?',
+      'Where should the captured Web Vitals + network/device tier events go?',
       [
-        { value: 'dataLayer', label: 'GA4 / dataLayer' },
-        { value: 'beacon', label: 'Your own warehouse (beacon endpoint)' },
-        { value: 'callback', label: 'Custom callback (full control)' }
+        {
+          value: 'dataLayer',
+          label: 'GA4 / dataLayer',
+          hint: 'pushes a perf_tier_report event onto window.dataLayer for GTM → GA4'
+        },
+        {
+          value: 'beacon',
+          label: 'Your own warehouse (beacon endpoint)',
+          hint: 'POSTs each event to a URL you provide; full SignalEventV1 schema'
+        },
+        {
+          value: 'callback',
+          label: 'Custom callback (full control)',
+          hint: 'invokes a function you supply with each event — log, sample, branch, anything'
+        }
       ],
       { ...deps.promptStreams }
     );
@@ -497,14 +509,22 @@ export async function run(args: InitArgs, deps: RunDeps = {}): Promise<{ exitCod
   // ── 4. Sample rate + (conditional) beacon endpoint ───────────────
   let sampleRate = args.sampleRate ?? 1.0;
   if (interactive && args.sampleRate === undefined) {
-    const raw = await input('Sample rate? (0 < n ≤ 1)', { defaultValue: '1.0', ...deps.promptStreams });
+    const raw = await input('Sample rate? (fraction of page loads to capture)', {
+      defaultValue: '1.0',
+      hint: '1.0 = every page load · 0.5 = half · 0.1 = 10% · keep at 1.0 unless you exceed ~10M events/month',
+      ...deps.promptStreams
+    });
     const parsed = Number.parseFloat(raw);
     if (Number.isFinite(parsed) && parsed > 0 && parsed <= 1) sampleRate = parsed;
   }
   let beaconEndpoint = args.beaconEndpoint;
   if (sink === 'beacon' && !beaconEndpoint) {
     if (interactive) {
-      beaconEndpoint = await input('Beacon endpoint URL?', { defaultValue: '/rum/signal', ...deps.promptStreams });
+      beaconEndpoint = await input('Beacon endpoint URL?', {
+        defaultValue: '/rum/signal',
+        hint: 'absolute URL or same-origin path that will receive POSTed events (see docs/collector-contract.md for the schema)',
+        ...deps.promptStreams
+      });
     } else {
       beaconEndpoint = '/rum/signal';
     }
