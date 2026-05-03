@@ -16,6 +16,34 @@ pnpm add @stroma-labs/signal                 # latest stable (when published)
 
 Bump the exact pin example whenever a new `-rc.N` is cut so onboarders default to the freshest pinned snapshot.
 
+## [Unreleased]
+
+### Added — `signal init` install wizard + install telemetry feature
+
+- **New CLI: `signal init` — `npx @stroma-labs/signal init`** detects your framework from `package.json`, asks a small set of questions (sink, sample rate, optional beacon endpoint), and prints the framework-correct snippet ready to paste. Surfaces a Step 0 install panel with the right package-manager command (`pnpm add` / `npm install` / `yarn add` / `bun add`) when `@stroma-labs/signal` isn't yet a project dependency. Hand-rolled UI primitives — zero new runtime dependencies on the published `@stroma-labs/signal` package. Bin field added; shebang preserved through Rollup + terser.
+- **12 framework × 3 sink = 36 snippet matrix entries**, all verified May 2026 against current upstream docs:
+  * Next.js App Router (Client Component composition pattern, NOT side-effect import)
+  * Next.js Pages Router (`typeof window` guard)
+  * React Router v7 framework mode (`entry.client.tsx` with `HydratedRouter`)
+  * Remix v2 (`entry.client.tsx` with `RemixBrowser`)
+  * Nuxt (`.client.ts` plugin)
+  * SvelteKit (Svelte 5 runes — `$props` + `$effect`)
+  * Plain Vue / Plain Svelte / Plain React (Vite entry side-effect import)
+  * Angular standalone (`bootstrapApplication`) + Angular NgModule (legacy)
+  * Vanilla (`<script type="module">` with esm.sh CDN)
+- **Non-interactive mode**: every interactive prompt has a flag equivalent (`--framework`, `--sink`, `--sample-rate`, `--beacon-endpoint`, `--cwd`, `--yes`, `--json`, `--no-telemetry`, `--no-clipboard`, `--verbose`, `--skip-install-check`). `--json` mode outputs a single line of JSON to stdout (chrome to stderr) for CI / docs-screenshot pipelines.
+- **Anonymous install telemetry** to `https://api.stroma.design/api/v1/install` — opt-out by default with a prominent first-run disclosure. Captures: framework + version, sink choice, sample rate, package manager, Node version, OS family, CLI version. NEVER captures: project name, file paths, file contents, free text, emails, hostnames, full user-agent string. Disable via `--no-telemetry`, `STROMA_TELEMETRY=0`, `DO_NOT_TRACK=1` (industry standard), or run in CI / non-TTY environment (auto-disabled silently). Network-isolation test gates the zero-requests-when-disabled invariant.
+- **Recipe currency discipline**: per-recipe `verified_against_version` + `last_verified_at` + `upstream_doc_url` metadata in `packages/signal/src/cli/snippets/recipe-currency-data.json`. Quarterly sweep checklist documented in `packages/signal/src/cli/RECIPE-CURRENCY-SWEEP.md` — runs every Feb / May / Aug / Nov + within 2 weeks of any tracked framework's major release + when snapshot-engine telemetry's `recipe_currency_pressure` for any framework exceeds 5%.
+- **`SignalInstallEventV1` contract** in `@stroma-labs/signal-contracts` with full validator + 12 cross-repo wire-format drift fixtures.
+- Snapshot-engine companion: new `src/features/install/` encapsulated module mirrors the existing intent module (deletion-test discipline preserved), `POST /api/v1/install` + `GET /api/v1/install/stats`, dedicated `install_events` Turso table with per-phase timestamps + idempotent retry via `last_event_id`, zod `.strict()` mode, 4 KB body cap, NO User-Agent header capture.
+- Existing intent module: removed dead `weekly_inbox` value from the `pill_id` CHECK constraint (pre-existing drift between migration text and validator/contract enums); added migration-validator alignment test that catches future drift in either direction.
+
+### Notes
+
+- Wizard adds zero runtime dependencies to the published `@stroma-labs/signal` package — both `check-release-readiness.mjs` invariants stay intact (no `dependencies` block, no bundled deps in the packed artifact).
+- `dist/cli.mjs` bundles `@stroma-labs/signal-contracts` validators inline (workspace-private package; would otherwise leak at consumer install time).
+- ~72 KB minified CLI bundle; runtime SDK (`dist/index.mjs`) size unchanged at ≤ 6,656 bytes gzipped.
+
 ## [0.1.0-rc.3] - 2026-05-02
 
 ### Added (RC3 — Closing-section needs-inquiry router + intent-capture telemetry)

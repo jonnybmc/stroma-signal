@@ -39,13 +39,19 @@ Signal is the substrate evidence layer underneath whatever you already use. GA4 
 
 ## Install
 
+The fastest path is the `signal init` wizard — it detects your framework, asks a couple of questions, and prints the right snippet:
+
 ```bash
-pnpm add @stroma-labs/signal@next
+npx @stroma-labs/signal init
 ```
 
-ESM-only. Works in any modern browser. Zero runtime dependencies.
+Then add Signal to your project deps as the wizard's Step 0 instructs (`pnpm add @stroma-labs/signal` / `npm install @stroma-labs/signal` / etc.).
+
+ESM-only. Works in any modern browser. Zero runtime dependencies in the published runtime bundle.
 
 > 📋 **Before you install**, read [operator-expectations.md](./docs/operator-expectations.md) — capture model (SPA/MPA), GA4 quotas, BigQuery costs, browser support, privacy posture. One page. The honest "what am I signing up for" answer.
+
+If you'd rather skip the wizard and copy-paste, [framework-recipes.md](./docs/framework-recipes.md) has the snippets the wizard generates for every supported framework × sink combination.
 
 ## Quickstart — pick one
 
