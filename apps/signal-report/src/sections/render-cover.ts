@@ -66,7 +66,7 @@ export function renderCoverSection(vm: ReportViewModel): string {
               </div>`
             )}
             ${renderReveal(
-              `<h1 id="cover-heading" class="display" style="margin:0;font-size:clamp(56px,8vw + 16px,132px);font-weight:400;letter-spacing:-0.045em;line-height:0.94;">${escapeHtml(
+              `<h1 id="cover-heading" class="display" style="margin:0;font-size:clamp(36px,4.4vw + 14px,80px);font-weight:400;letter-spacing:-0.035em;line-height:1.02;overflow-wrap:anywhere;word-break:break-word;hyphens:none;">${escapeHtml(
                 vm.hero_title
               )}</h1>`,
               { delay: 120 }

@@ -218,10 +218,11 @@ describe('editorial copy — audience section adapts to populated tier count + m
     expect(vm.editorial.audience_headline_html).not.toContain('three different');
   });
 
-  it('full-depth fixture gets the "three different audiences" headline', () => {
+  it('full-depth fixture (4 classified tiers ≥5%) gets the "four different audiences" headline', () => {
     const vm = buildReportViewModel(fullDepthAggregateFixture);
-    expect(vm.editorial.audience_headline_html).toContain('three different audiences');
+    expect(vm.editorial.audience_headline_html).toContain('four different audiences');
     expect(vm.editorial.audience_headline_html).toContain('the same campaign');
+    expect(vm.editorial.audience_headline_html).not.toContain('three different');
     expect(vm.editorial.audience_headline_html).not.toContain('checkout');
   });
 

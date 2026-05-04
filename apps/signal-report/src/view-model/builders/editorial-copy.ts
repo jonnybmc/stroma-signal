@@ -242,7 +242,10 @@ function pickAudienceHeadline(shape: EditorialDataShape): string {
   if (shape.classified_tier_count === 2) {
     return `<h2 class="section-title">Your traffic isn't one user. It's <span class="brand-text">two distinct audiences</span> experiencing the same campaign differently.</h2>`;
   }
-  return `<h2 class="section-title">Your traffic isn't one user. It's <span class="brand-text">three different audiences</span> sharing the same campaign.</h2>`;
+  if (shape.classified_tier_count === 3) {
+    return `<h2 class="section-title">Your traffic isn't one user. It's <span class="brand-text">three different audiences</span> sharing the same campaign.</h2>`;
+  }
+  return `<h2 class="section-title">Your traffic isn't one user. It's <span class="brand-text">four different audiences</span> sharing the same campaign.</h2>`;
 }
 
 function pickAudienceLede(shape: EditorialDataShape): string {
