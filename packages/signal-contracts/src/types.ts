@@ -307,7 +307,7 @@ export interface SignalVitalsNavigationTiming {
   // responseStart can precede activationStart on prerender.
   activation_adjusted_ttfb_ms: number | null;
 
-  // Raw anchor timestamps for downstream verification + future TTFB
+  // Raw anchor timestamps for downstream verification + TTFB
   // recalculation (ms relative to nav startTime).
   first_interim_response_start_ms: number | null;
   final_response_headers_start_ms: number | null;

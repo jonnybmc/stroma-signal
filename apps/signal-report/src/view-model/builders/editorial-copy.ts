@@ -116,10 +116,9 @@ export interface ReportEditorialCopy {
 
   // Business
   business_headline_html: string;
-  /** Act 4 lede — mood-aware. Was previously identical for urgent and
-   *  sober (mood wiring decorative); now urgent / sober / affirming
-   *  carry distinct register so the lede honestly previews the
-   *  severity of the rows below. */
+  /** Act 4 lede — mood-aware. Urgent / sober / affirming each carry
+   *  distinct register so the lede honestly previews the severity of
+   *  the rows below. */
   act4_lede: string;
   business_section_eyebrow: string;
   /** Truth-boundary disclosure rendered ONCE beneath the section eyebrow,
@@ -135,11 +134,6 @@ export interface ReportEditorialCopy {
    *  time) without naming a product. HTML — may carry inline emphasis. */
   business_role_question_html: string;
 
-  /** Boundary-statement-anchored bridge sentence rendered above the
-   *  closing modal trigger. Question-led ("What would help most from
-   *  here?"), not packaging-led. Single source of truth for the
-   *  truth-boundary language; no near-paraphrase elsewhere. */
-  business_closing_bridge_html: string;
   /** Closing-section modal copy — trigger label + dialog interior. */
   business_closing_modal: ReportClosingModal;
   /** Sub-pills revealed inside the modal when "Something else" is
@@ -157,9 +151,6 @@ export function bandWaitDelta(deltaMs: number | null): WaitDeltaBand {
 export function buildEditorialCopy(
   shape: EditorialDataShape,
   race: ReportRaceViewModel,
-  // act3 reserved for future per-stage / per-mode copy variants the
-  // current pickers don't yet need; keep on the signature so adding
-  // them later doesn't churn every call site.
   _act3: ReportAct3ViewModel,
   personaContrast: ReportPersonaContrast,
   contextStrip: ReportContextStripViewModel | null
@@ -195,7 +186,6 @@ export function buildEditorialCopy(
     business_role_question_html:
       'The useful next question depends on your role: <em class="sr-italic-serif">campaign exposure</em>, <em class="sr-italic-serif">page diagnosis</em>, or <em class="sr-italic-serif">measurement over time</em>.',
 
-    business_closing_bridge_html: pickClosingBridge(),
     business_closing_modal: pickClosingModal(shape),
     business_closing_pills: pickClosingPills()
   };
@@ -408,17 +398,7 @@ function pickAct4Lede(shape: EditorialDataShape): string {
   return 'Every number above meets a KPI someone on your team is accountable for. This is where the measured gap shows up in the business.';
 }
 
-// ─── Closing-section bridge + cards + pills ───────────────────────────
-
-function pickClosingBridge(): string {
-  // The closing bridge USED to append "What would help most from here?"
-  // to the boundary statement, but the modal's trigger button + dialog
-  // title both ask the same question — three near-identical
-  // restatements in one section. Empty bridge keeps the boundary
-  // statement clean as the truth-frame; the trigger button below it IS
-  // the question.
-  return '';
-}
+// ─── Closing-section cards + pills ────────────────────────────────────
 
 function pickClosingModal(shape: EditorialDataShape): ReportClosingModal {
   // Choice labels are first-person customer voice — needs the user

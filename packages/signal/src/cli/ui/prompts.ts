@@ -220,7 +220,7 @@ function arrowKeySelect<T extends string>(
     const renderOptions = (initial: boolean): void => {
       if (!initial) {
         // Move cursor up by (choices.length + 1 hint line) to overwrite
-        // the previously-rendered option block in place.
+        // the rendered option block in place.
         output.write(ANSI_CURSOR_UP_N(choices.length + 1));
       }
       for (let i = 0; i < choices.length; i += 1) {

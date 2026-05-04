@@ -1,7 +1,5 @@
 // Stroma Signal `signal init` CLI — entry point.
-//
-// Routes argv to the init command. Single subcommand for v1; future
-// commands (e.g. `signal upgrade`, `signal doctor`) plug in here.
+// Routes argv to the init command.
 
 import { argv, exit, stderr, stdout } from 'node:process';
 

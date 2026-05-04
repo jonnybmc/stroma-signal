@@ -40,12 +40,6 @@ function tierLegendItem(t: { key: string; label: string }): string {
   `;
 }
 
-// The sample-confidence note used to render here as an absolutely-
-// positioned chip in the cover top-right. It now lives in the sticky
-// nav (render-shell.ts → renderSampleBandNote) so the disclaimer
-// follows the recipient's eye through every section, not just the
-// masthead.
-
 export function renderCoverSection(vm: ReportViewModel): string {
   const tiers = vm.act1_tiers.map((t) => ({
     key: t.key,

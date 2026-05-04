@@ -65,10 +65,9 @@ function renderClosingTrigger(vm: ReportViewModel): string {
   //   3. Single discreet trigger button — opens the dialog.
   // No card chrome, no per-option visual weight — restraint is the point.
   const modal = vm.editorial.business_closing_modal;
-  const bridgeSuffix = vm.editorial.business_closing_bridge_html ? ` ${vm.editorial.business_closing_bridge_html}` : '';
   return `
     <div class="closing-router">
-      ${renderReveal(`<p class="closing-bridge">${escapeHtml(vm.boundary_statement)}${bridgeSuffix}</p>`)}
+      ${renderReveal(`<p class="closing-bridge">${escapeHtml(vm.boundary_statement)}</p>`)}
       ${renderReveal(`<p class="closing-role-question">${vm.editorial.business_role_question_html}</p>`, { delay: 60 })}
       ${renderReveal(
         `<button type="button" class="closing-trigger" data-closing-modal-open aria-haspopup="dialog" aria-controls="closing-modal">${escapeHtml(modal.trigger_label)} →</button>`,

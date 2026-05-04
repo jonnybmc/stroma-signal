@@ -1007,11 +1007,10 @@ export function decodeSignalReportUrl(value: string | URL): SignalAggregateV1 {
     navigation_timing_story: readOptionalNavigationTimingStory(params),
     top_page_path: params.get('v'),
     warnings,
-    // Sample-confidence band — read from URL when present (rc.4+);
-    // back-fill from sample_size when absent so older URLs (pre-band)
-    // still decode cleanly. The threshold logic lives in
-    // deriveSampleBand() so any future change applies uniformly to
-    // both back-fill and live aggregates.
+    // Sample-confidence band — read from URL when present; back-fill
+    // from sample_size when absent so older URLs (pre-band param)
+    // still decode cleanly. Threshold logic lives in deriveSampleBand()
+    // so back-fill and live aggregates resolve identically.
     band: readSampleBandParam(params, sampleSize)
   };
 

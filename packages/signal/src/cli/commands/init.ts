@@ -22,7 +22,7 @@
 // emit ZERO telemetry — see disclosure flow + opt-out.ts.
 
 import { randomUUID } from 'node:crypto';
-import { arch as osArch, platform as osPlatform } from 'node:os';
+import { platform as osPlatform } from 'node:os';
 import { isAbsolute, resolve as resolvePath } from 'node:path';
 import type {
   SignalInstallErrorCategory,
@@ -377,15 +377,13 @@ function compareMajor(detectedVersion: string | null, verifiedAgainst: string): 
   return detectedMajor > verifiedMajor;
 }
 
-void osArch; // imported for future use (e.g. arm vs x64 stamp); not on contract yet.
-
 /**
  * Wizard stage — updated at every phase boundary so the catch block
  * can attribute a thrown error to a specific user-facing step. Maps to
  * the coarse `error_category` enum on `SignalInstallEventV1` for ingest.
  *
  * `disclosure` is special: errors at this stage emit ZERO telemetry
- * because consent has not yet happened. See B1 in the launch-fix plan.
+ * because consent has not yet happened.
  */
 export type WizardStage =
   | 'disclosure'

@@ -47,8 +47,6 @@ export type {
 
 // Dominance share threshold below which the LCP / INP story narratives
 // fall back to hedged copy instead of claiming a single dominant cause.
-// Kept as a named constant so future buyer-research feedback
-// can tune the aggressiveness of single-cause claims in one place.
 export const SIGNAL_STORY_HEDGED_THRESHOLD_PCT = 35;
 
 export type ReportMotionMode = 'full' | 'reduced';
