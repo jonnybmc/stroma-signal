@@ -45,14 +45,22 @@ describe('buildEventsFromForm', () => {
     expect(events[0]?.intent_email).toBe('jane@example.com');
   });
 
-  it('rapid_fix → 1 event, no email/cadence regardless of form state', () => {
+  it('rapid_fix without email → 1 event, no email/cadence', () => {
+    const events = buildEventsFromForm(state({ choice: 'rapid_fix' }), ctx);
+    expect(events).toHaveLength(1);
+    expect(events[0]?.event_kind).toBe('intent_rapid_fix');
+    expect(events[0]?.intent_email).toBeUndefined();
+    expect(events[0]?.intent_cadence).toBeUndefined();
+  });
+
+  it('rapid_fix with email → forwards intent_email (cadence still ignored — not a scheduled flow)', () => {
     const events = buildEventsFromForm(
-      state({ choice: 'rapid_fix', email: 'should-be-dropped@example.com', cadence: 'monthly' }),
+      state({ choice: 'rapid_fix', email: 'jane@example.com', cadence: 'monthly' }),
       ctx
     );
     expect(events).toHaveLength(1);
     expect(events[0]?.event_kind).toBe('intent_rapid_fix');
-    expect(events[0]?.intent_email).toBeUndefined();
+    expect(events[0]?.intent_email).toBe('jane@example.com');
     expect(events[0]?.intent_cadence).toBeUndefined();
   });
 

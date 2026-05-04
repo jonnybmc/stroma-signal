@@ -153,7 +153,7 @@ function readFormState(form: HTMLFormElement): ClosingModalFormState {
  *
  * Mapping (matches the existing wire contract — see plan file):
  *   - `pi_early_access` → 1 × `intent_pi_early_access` (with `intent_email` if non-empty)
- *   - `rapid_fix` → 1 × `intent_rapid_fix` (no email/cadence regardless of form state)
+ *   - `rapid_fix` → 1 × `intent_rapid_fix` (with `intent_email` if non-empty)
  *   - `monitoring` → 1 × `intent_monitoring` (with `intent_cadence` defaulting to weekly,
  *     plus `intent_email` if non-empty)
  *   - `something_else` + N pills → N × `intent_freeform`, distinct capture_ids,
@@ -173,7 +173,9 @@ export function buildEventsFromForm(
   }
 
   if (state.choice === 'rapid_fix') {
-    return [basePayload(ctx, 'intent_rapid_fix', generateCaptureId())];
+    const payload = basePayload(ctx, 'intent_rapid_fix', generateCaptureId());
+    if (state.email) payload.intent_email = state.email;
+    return [payload];
   }
 
   if (state.choice === 'monitoring') {
