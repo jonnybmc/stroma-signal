@@ -51,10 +51,10 @@ describe('fixture coverage — every scenario renders without null/undefined/NaN
         if (vm.band === 'preliminary') {
           expect(html, `${fx.id} (band=preliminary) missing band note`).toContain('Early read');
         } else if (vm.band === 'provisional') {
-          expect(html, `${fx.id} (band=provisional) missing band note`).toContain('Firming up');
+          expect(html, `${fx.id} (band=provisional) missing band note`).toContain('Building sample');
         } else {
           expect(html, `${fx.id} (band=stable) leaks band note`).not.toContain('Early read');
-          expect(html, `${fx.id} (band=stable) leaks band note`).not.toContain('Firming up');
+          expect(html, `${fx.id} (band=stable) leaks band note`).not.toContain('Building sample');
           expect(html, `${fx.id} (band=stable) leaks band note container`).not.toContain('scroll-nav-note');
         }
       });

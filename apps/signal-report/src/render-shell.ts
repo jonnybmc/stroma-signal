@@ -30,7 +30,7 @@ export type SectionId = (typeof SECTION_ORDER)[number]['id'];
  *  reports with sufficient evidence. */
 function renderSampleBandNote(vm: ReportViewModel): string {
   if (vm.band === 'stable') return '';
-  const headline = vm.band === 'preliminary' ? 'Early read' : 'Firming up';
+  const headline = vm.band === 'preliminary' ? 'Early read' : 'Building sample';
   const sessions = `${vm.sample_size.toLocaleString('en-US')} session${vm.sample_size === 1 ? '' : 's'}`;
   const guidance =
     vm.band === 'preliminary'
