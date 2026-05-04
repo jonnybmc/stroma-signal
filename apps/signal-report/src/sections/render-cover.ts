@@ -156,11 +156,12 @@ export function renderCoverSection(vm: ReportViewModel): string {
         </div>
 
         ${renderReveal(
-          `<div>
-            <div style="display:flex;height:36px;border-radius:var(--r-2);overflow:hidden;border:1px solid var(--line);">
+          `<div class="cover-tier-strip">
+            <div class="cover-tier-strip-eyebrow">Audience split · by network tier</div>
+            <div class="cover-tier-strip-bar">
               ${tiers.map(tierStripSegment).join('')}
             </div>
-            <div style="display:flex;margin-top:10px;gap:16px;flex-wrap:wrap;font-size:10px;">
+            <div class="cover-tier-strip-legend">
               ${tiers.map(tierLegendItem).join('')}
             </div>
           </div>`

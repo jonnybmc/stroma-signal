@@ -220,6 +220,38 @@ body { overflow-y: auto; overflow-x: hidden; }
     letter-spacing: 0.12em;
   }
 }
+/* — cover tier-strip — small mono eyebrow above the audience split bar so
+   the chart reads as a labelled diagnostic, not decorative chrome. Same
+   eyebrow register as section-eyebrows elsewhere; smaller scale because
+   it labels a single visual element, not a section. */
+.cover-tier-strip {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.cover-tier-strip-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+  font-weight: 500;
+}
+.cover-tier-strip-bar {
+  display: flex;
+  height: 36px;
+  border-radius: var(--r-2);
+  overflow: hidden;
+  border: 1px solid var(--line);
+}
+.cover-tier-strip-legend {
+  display: flex;
+  margin-top: 2px;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-size: 10px;
+}
+
 /* — sample-confidence chip — discreet absolute-positioned signal in the
    cover section's top-right. Out of document flow so it never pushes
    the act-intro down; z-index below .scroll-nav (50) so it cannot
