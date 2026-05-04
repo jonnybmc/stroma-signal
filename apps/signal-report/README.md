@@ -78,5 +78,6 @@ pnpm test:unit
 The view-model + render-honesty + spec-alignment tests cover the
 five-section structure, mood-driven editorial template selection, mode
 transitions (`reduced` / `legacy`), forbidden-words discipline, glossary
-KPI translation, and the optional Rapid Fix Plan CTA. E2E coverage lives
-in `tests/e2e/proof-of-life.spec.ts` and `tests/e2e/report-visual.spec.ts`.
+KPI translation, and the closing-section demand-sampling modal. E2E
+coverage lives in `tests/e2e/proof-of-life.spec.ts` and
+`tests/e2e/report-visual.spec.ts`.

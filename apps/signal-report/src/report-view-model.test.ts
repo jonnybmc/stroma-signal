@@ -24,7 +24,6 @@ describe('report view model', () => {
     expect(viewModel.act3.active_stage_keys).toEqual(['fcp', 'lcp', 'inp']);
     expect(viewModel.act3.stages.map((stage) => stage.key)).toEqual(['fcp', 'lcp', 'inp']);
     expect(viewModel.mood_tier).toBe('urgent');
-    expect(viewModel.offer_cards.map((card) => card.title)).toEqual(['Rapid Fix Plan']);
   });
 
   it('drops to a reduced measured funnel when INP coverage is too weak', () => {
@@ -89,29 +88,6 @@ describe('report view model', () => {
     for (const device of empties) {
       expect(device.narrative).toMatch(/No sessions/);
     }
-  });
-
-  it('builds actionable signal cells each naming the product-team decision they unlock', () => {
-    const viewModel = buildReportViewModel(strongLcpCoverageAggregateFixture);
-    const cells = viewModel.actionable_signals.cells;
-
-    expect(cells.length).toBeGreaterThan(0);
-    // Every cell carries a concrete product-team decision string — no cell
-    // is allowed to leak through without naming the action it unlocks.
-    for (const cell of cells) {
-      expect(cell.decision.length).toBeGreaterThan(10);
-      expect(cell.label.length).toBeGreaterThan(0);
-      expect(cell.value.length).toBeGreaterThan(0);
-    }
-    // CPU cores and Browser cells are always present because the underlying
-    // fields are universally captured (hardwareConcurrency + UA parsing).
-    // Form-factor cell leads when present — derived from device_screen_w
-    // which is universally captured on every event.
-    const cellKeys = cells.map((cell) => cell.key);
-    expect(cellKeys).toContain('form-factor');
-    expect(cellKeys[0]).toBe('form-factor');
-    expect(cellKeys).toContain('js-budget');
-    expect(cellKeys).toContain('testing-matrix');
   });
 
   it('builds the persistent credibility strip with all five measured fields', () => {
@@ -298,27 +274,6 @@ describe('report view model', () => {
     }
   });
 
-  it('builds evidence items with all required provenance fields', () => {
-    const viewModel = buildReportViewModel(strongLcpCoverageAggregateFixture);
-    const labels = viewModel.evidence_items.map((item) => item.label);
-
-    expect(labels).toContain('Sample');
-    expect(labels).toContain('Window');
-    expect(labels).toContain('Comparison tier');
-    expect(labels).toContain('Race metric');
-    expect(labels).toContain('Fallback honesty');
-    expect(labels).toContain('Threshold basis');
-    expect(labels).toContain('Poor-session share');
-    expect(labels).toContain('Measured funnel coverage');
-
-    for (const item of viewModel.evidence_items) {
-      expect(item.value).not.toBe('');
-      expect(item.value).not.toContain('undefined');
-      expect(item.value).not.toContain('NaN');
-      expect(['neutral', 'steady', 'watch', 'alert']).toContain(item.tone);
-    }
-  });
-
   it('builds credibility strip with non-zero values for production fixtures', () => {
     const viewModel = buildReportViewModel(strongLcpCoverageAggregateFixture);
     const strip = viewModel.credibility_strip;
@@ -449,13 +404,6 @@ describe('report view model', () => {
       expect(viewModel.editorial.act4_lede).not.toContain('undefined');
       expect(viewModel.act3.narrative_line).not.toContain('undefined');
       expect(viewModel.act3.threshold_basis).not.toContain('undefined');
-
-      // Evidence items all valid
-      for (const item of viewModel.evidence_items) {
-        expect(item.value).not.toBe('');
-        expect(item.value).not.toContain('NaN');
-        expect(item.value).not.toContain('undefined');
-      }
 
       // Act 4 summary points clean
       for (const point of viewModel.act4_summary_points) {

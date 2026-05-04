@@ -62,12 +62,6 @@ export const REPORT_SCENE_BUDGETS = {
   act3DropBodyBudget: 12
 } as const;
 
-export interface ReportEvidenceItem {
-  label: string;
-  value: string;
-  tone: 'neutral' | 'steady' | 'watch' | 'alert';
-}
-
 export interface ReportTierVisual {
   key: ReportTierKey;
   label: string;
@@ -247,36 +241,6 @@ export interface ReportFormFactorViewModel {
   segments: Array<{ label: string; share: number }>;
 }
 
-export type SignalTone = 'alert' | 'watch' | 'steady' | 'neutral';
-
-export interface ReportSignalBucket {
-  label: string;
-  share: number;
-  tone: SignalTone;
-}
-
-/**
- * A single actionable signal cell on the Actionable signals slide. Each
- * cell names the product-team decision it unlocks so the report is
- * self-documenting about WHY the signal matters, not just what it is.
- *
- * When `buckets` is populated the renderer draws a horizontal stacked bar
- * with proportional segments. When absent it falls back to a flat mono
- * text value (used for quartile signals like downlink / RTT).
- */
-export interface ReportSignalCell {
-  key: string;
-  label: string;
-  value: string;
-  decision: string;
-  coverage_caveat: string | null;
-  buckets: ReportSignalBucket[] | null;
-}
-
-export interface ReportActionableSignalsViewModel {
-  cells: ReportSignalCell[];
-}
-
 export interface ReportPersonaProfile {
   label: string;
   share: number;
@@ -333,7 +297,6 @@ export interface ReportViewModel {
   hero_title: string;
   hero_lede: string;
   boundary_statement: string;
-  evidence_items: ReportEvidenceItem[];
   credibility_strip: ReportCredibilityStripViewModel;
   form_factor: ReportFormFactorViewModel | null;
   act1_tiers: ReportTierVisual[];
@@ -342,7 +305,6 @@ export interface ReportViewModel {
   // Null when the aggregate carried no context_story or none of the
   // rows crossed their narration threshold — renderer hides the strip.
   act1_context_strip: ReportContextStripViewModel | null;
-  actionable_signals: ReportActionableSignalsViewModel;
   race: ReportRaceViewModel;
   act3: ReportAct3ViewModel;
   act4_summary_points: string[];
@@ -357,7 +319,6 @@ export interface ReportViewModel {
   // re-apologises — proceeds with confident observation about what the
   // data IS showing.
   act4_impact_rows: ReportAct4ImpactRow[];
-  offer_cards: Array<{ title: string; body: string; href: string; cta: string }>;
   // Editorial copy registry — per-section headlines, ledes, and framing
   // strings keyed on (mood × data shape). Renderers consume these
   // verbatim so the artifact never asserts a story the data does not
@@ -446,10 +407,6 @@ export function selectMotionMode(prefersReducedMotion: boolean): ReportMotionMod
 
 function asDurationLabel(value: number): string {
   return value >= 1000 ? `${(value / 1000).toFixed(1)}s` : `${value}ms`;
-}
-
-function asPercentLabel(value: number | null): string {
-  return value == null ? 'n/a' : `${value}%`;
 }
 
 function particleCountForShare(share: number): number {
@@ -1069,66 +1026,6 @@ function buildAct3ViewModel(aggregate: SignalAggregateV1, moodHint: ReportMoodTi
   };
 }
 
-function buildEvidenceItems(
-  aggregate: SignalAggregateV1,
-  race: ReportRaceViewModel,
-  act3: ReportAct3ViewModel,
-  mood: ReportMoodTier
-): ReportEvidenceItem[] {
-  return [
-    { label: 'Sample', value: `${aggregate.sample_size} sessions`, tone: 'neutral' },
-    { label: 'Window', value: `${aggregate.period_days} days`, tone: 'neutral' },
-    {
-      label: 'Comparison tier',
-      value: race.race_available ? race.comparison_label : 'No race yet',
-      tone: mood === 'urgent' ? 'alert' : 'neutral'
-    },
-    {
-      label: 'Race metric',
-      value: race.metric === 'none' ? 'Awaiting comparable data' : race.metric_label,
-      tone: race.metric === 'none' ? 'watch' : 'steady'
-    },
-    {
-      label: 'Fallback honesty',
-      value: race.fallback_label,
-      tone: race.metric === 'none' ? 'watch' : 'neutral'
-    },
-    {
-      label: 'Threshold basis',
-      value: act3.threshold_basis,
-      tone: 'neutral'
-    },
-    {
-      label: 'Poor-session share',
-      value:
-        act3.active_stage_keys.length === 0 && act3.mode !== 'legacy'
-          ? 'Unavailable'
-          : asPercentLabel(act3.poor_session_share),
-      tone:
-        act3.active_stage_keys.length === 0
-          ? 'neutral'
-          : (act3.poor_session_share ?? 0) >= 35
-            ? 'alert'
-            : (act3.poor_session_share ?? 0) >= 12
-              ? 'watch'
-              : 'steady'
-    },
-    {
-      label: 'Measured funnel coverage',
-      value:
-        act3.active_stage_keys.length === 0 && act3.mode !== 'legacy'
-          ? 'Unavailable'
-          : asPercentLabel(act3.measured_session_coverage),
-      tone:
-        act3.active_stage_keys.length === 0
-          ? 'neutral'
-          : (act3.measured_session_coverage ?? 0) >= 75
-            ? 'steady'
-            : 'watch'
-    }
-  ];
-}
-
 // Editorial framings keyed off a measured `mood_tier` (itself derived
 // from real aggregate shares via `selectMoodTier`). The strings below
 // are author-written prose, not fabricated metrics — every number the
@@ -1185,21 +1082,6 @@ function buildAct4SummaryPoints(
   }
 
   return points;
-}
-
-function buildOfferCards(): Array<{ title: string; body: string; href: string; cta: string }> {
-  // Single optional CTA. The report is a complete artifact — a team should be
-  // able to take it into a sprint review and act on it without engaging
-  // Stroma for help. This card exists for the teams that prefer hands-on
-  // execution support, not as a gate on the report's usefulness.
-  return [
-    {
-      title: 'Rapid Fix Plan',
-      body: 'Optional: if you want hands-on help executing on the gap, the Rapid Fix Plan traces it to the landing pages and routes causing the most drag and returns a sequenced fix order.',
-      href: 'https://www.stroma.design/book?service=rapid-fix',
-      cta: 'Commission a plan'
-    }
-  ];
 }
 
 export interface ReportMotionPayload {
@@ -1320,25 +1202,6 @@ function buildFormFactor(aggregate: SignalAggregateV1): ReportFormFactorViewMode
   ].sort((a, b) => b.share - a.share);
   if (segments.every((segment) => segment.share === 0)) return null;
   return { segments };
-}
-
-/**
- * Format a histogram record into the "label: pct · label: pct" compact line
- * used inside signal cell values. Zero-share buckets are filtered out.
- */
-function formatHistogramLine(
-  entries: ReadonlyArray<{ label: string; share: number }>,
-  { separator = ' · ' }: { separator?: string } = {}
-): string {
-  const filtered = entries.filter((entry) => entry.share > 0);
-  if (filtered.length === 0) return '—';
-  return filtered.map((entry) => `${entry.label} ${entry.share}%`).join(separator);
-}
-
-function filterBuckets(
-  entries: ReadonlyArray<{ label: string; share: number; tone: SignalTone }>
-): ReportSignalBucket[] {
-  return entries.filter((entry) => entry.share > 0);
 }
 
 function dominantBucket<K extends string>(hist: Record<K, number>, fallback: K): K {
@@ -1509,163 +1372,6 @@ function buildPersonaContrast(aggregate: SignalAggregateV1): ReportPersonaContra
   };
 }
 
-function buildActionableSignals(aggregate: SignalAggregateV1): ReportActionableSignalsViewModel {
-  const cells: ReportSignalCell[] = [];
-  const formFactor = aggregate.form_factor_distribution;
-  const hardware = aggregate.device_hardware;
-  const network = aggregate.network_signals;
-  const environment = aggregate.environment;
-
-  // Form-factor cell leads the Actionable Signals section when present —
-  // it is the single most buyer-legible signal in the section for paid-media
-  // / CRO / SEO operators, mapping directly to Google's mobile-page-experience
-  // scoring. Buckets are sorted magnitude-first so the dominant form factor
-  // reads first regardless of what the real distribution looks like.
-  if (formFactor) {
-    const formFactorBuckets = filterBuckets(
-      [
-        { label: 'Mobile', share: formFactor.mobile, tone: 'neutral' as SignalTone },
-        { label: 'Tablet', share: formFactor.tablet, tone: 'neutral' as SignalTone },
-        { label: 'Desktop', share: formFactor.desktop, tone: 'neutral' as SignalTone }
-      ].sort((a, b) => b.share - a.share)
-    );
-    cells.push({
-      key: 'form-factor',
-      label: 'Form factor',
-      value: formatHistogramLine(formFactorBuckets),
-      decision:
-        "Informs Google's mobile-page-experience and mobile-usability scoring. A mobile-heavy share with a weak mobile-tier experience is where paid-media ROI typically leaks.",
-      coverage_caveat: null,
-      buckets: formFactorBuckets
-    });
-  }
-
-  if (hardware) {
-    const cores = hardware.cores_hist;
-    const coresBuckets = filterBuckets([
-      { label: '≤2', share: cores['1'] + cores['2'], tone: 'alert' },
-      { label: '4', share: cores['4'], tone: 'watch' },
-      { label: '6', share: cores['6'], tone: 'neutral' },
-      { label: '8', share: cores['8'], tone: 'steady' },
-      { label: '12+', share: cores['12_plus'], tone: 'steady' }
-    ]);
-    cells.push({
-      key: 'js-budget',
-      label: 'CPU cores',
-      value: formatHistogramLine(coresBuckets),
-      decision: 'These signals suggest your current page assumptions may not hold for lower-capability devices.',
-      coverage_caveat: null,
-      buckets: coresBuckets
-    });
-
-    const memory = hardware.memory_gb_hist;
-    const memoryCoverageCaveat =
-      hardware.memory_coverage < 100 ? `Chromium · ${hardware.memory_coverage}% coverage` : null;
-    const memoryBuckets = filterBuckets([
-      { label: '≤2 GB', share: memory['0_5'] + memory['1'] + memory['2'], tone: 'alert' },
-      { label: '4 GB', share: memory['4'], tone: 'watch' },
-      { label: '8+ GB', share: memory['8_plus'], tone: 'steady' },
-      { label: 'Unknown', share: memory.unknown, tone: 'neutral' }
-    ]);
-    cells.push({
-      key: 'memory-budget',
-      label: 'Memory',
-      value: formatHistogramLine(memoryBuckets),
-      decision: 'Memory constraints at this share may increase the risk of tab eviction and out-of-memory pressure.',
-      coverage_caveat: memoryCoverageCaveat,
-      buckets: memoryBuckets
-    });
-  }
-
-  if (network) {
-    const effectiveCoverageCaveat =
-      network.effective_type_coverage < 100 ? `Chromium · ${network.effective_type_coverage}% coverage` : null;
-    const effectiveBuckets = filterBuckets([
-      { label: '4G', share: network.effective_type_hist['4g'], tone: 'steady' },
-      { label: '3G', share: network.effective_type_hist['3g'], tone: 'watch' },
-      { label: '2G', share: network.effective_type_hist['2g'], tone: 'alert' },
-      { label: 'slow-2G', share: network.effective_type_hist.slow_2g, tone: 'alert' },
-      { label: 'Unknown', share: network.effective_type_hist.unknown, tone: 'neutral' }
-    ]);
-    cells.push({
-      key: 'adaptive-loading',
-      label: 'Effective type',
-      value: formatHistogramLine(effectiveBuckets),
-      decision: 'A meaningful share of sessions arrive on constrained connection types where heavy assets weigh more.',
-      coverage_caveat: effectiveCoverageCaveat,
-      buckets: effectiveBuckets
-    });
-
-    if (network.downlink_mbps) {
-      const dl = network.downlink_mbps;
-      cells.push({
-        key: 'page-weight-budget',
-        label: 'Downlink (Mbps)',
-        value: `${dl.p25} / ${dl.p50} / ${dl.p75} Mbps`,
-        decision: 'Downlink distribution shows where page-weight assumptions start to break down.',
-        coverage_caveat: effectiveCoverageCaveat,
-        buckets: [
-          { label: `p25 · ${dl.p25}`, share: 33, tone: 'alert' as SignalTone },
-          { label: `p50 · ${dl.p50}`, share: 34, tone: 'watch' as SignalTone },
-          { label: `p75 · ${dl.p75}`, share: 33, tone: 'steady' as SignalTone }
-        ]
-      });
-    }
-
-    if (network.rtt_ms) {
-      const rtt = network.rtt_ms;
-      cells.push({
-        key: 'request-consolidation',
-        label: 'RTT (ms)',
-        value: `${rtt.p25} / ${rtt.p50} / ${rtt.p75} ms`,
-        decision: 'Round-trip latency at the slow end indicates where request overhead compounds.',
-        coverage_caveat: effectiveCoverageCaveat,
-        buckets: [
-          { label: `p25 · ${rtt.p25}`, share: 33, tone: 'steady' as SignalTone },
-          { label: `p50 · ${rtt.p50}`, share: 34, tone: 'watch' as SignalTone },
-          { label: `p75 · ${rtt.p75}`, share: 33, tone: 'alert' as SignalTone }
-        ]
-      });
-    }
-
-    if (network.save_data_share > 0) {
-      const saveDataBuckets = filterBuckets([
-        { label: 'Save-Data on', share: network.save_data_share, tone: 'watch' },
-        { label: 'Off', share: 100 - network.save_data_share, tone: 'neutral' }
-      ]);
-      cells.push({
-        key: 'save-data',
-        label: 'Save-Data',
-        value: `${network.save_data_share}% of sessions`,
-        decision: 'A measurable share of sessions explicitly signals a preference for lighter delivery.',
-        coverage_caveat: null,
-        buckets: saveDataBuckets
-      });
-    }
-  }
-
-  if (environment) {
-    const browsers = environment.browser_hist;
-    const browserBuckets = filterBuckets([
-      { label: 'Chrome', share: browsers.chrome, tone: 'steady' },
-      { label: 'Safari', share: browsers.safari, tone: 'neutral' },
-      { label: 'Firefox', share: browsers.firefox, tone: 'neutral' },
-      { label: 'Edge', share: browsers.edge, tone: 'neutral' },
-      { label: 'Other', share: browsers.other, tone: 'neutral' }
-    ]);
-    cells.push({
-      key: 'testing-matrix',
-      label: 'Browser',
-      value: formatHistogramLine(browserBuckets),
-      decision: 'Browser distribution shows where cross-platform assumptions may diverge from real audience.',
-      coverage_caveat: null,
-      buckets: browserBuckets
-    });
-  }
-
-  return { cells };
-}
-
 export function buildReportViewModel(aggregate: SignalAggregateV1): ReportViewModel {
   const race = buildRaceViewModel(aggregate);
   const preliminaryAct3 = buildAct3ViewModel(aggregate, 'sober');
@@ -1713,8 +1419,7 @@ export function buildReportViewModel(aggregate: SignalAggregateV1): ReportViewMo
     race,
     act3,
     personaContrast,
-    contextStrip,
-    aggregate.lcp_story?.dominant_culprit_kind ?? null
+    contextStrip
   );
 
   return {
@@ -1737,19 +1442,16 @@ export function buildReportViewModel(aggregate: SignalAggregateV1): ReportViewMo
     hero_title: heroCopy.hero_title,
     hero_lede: heroCopy.hero_lede,
     boundary_statement: BOUNDARY_STATEMENT,
-    evidence_items: buildEvidenceItems(aggregate, race, act3, mood),
     credibility_strip: buildCredibilityStrip(aggregate, race),
     form_factor: buildFormFactor(aggregate),
     act1_tiers: tiers,
     act1_device_tiers: deviceTiers,
     persona_contrast: personaContrast,
     act1_context_strip: contextStrip,
-    actionable_signals: buildActionableSignals(aggregate),
     race,
     act3,
     act4_summary_points: buildAct4SummaryPoints(aggregate, race, act3),
     act4_impact_rows: impactRows,
-    offer_cards: buildOfferCards(),
     editorial
   };
 }

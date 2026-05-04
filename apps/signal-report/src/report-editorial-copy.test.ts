@@ -155,10 +155,10 @@ describe('editorial copy — business section adapts to ledger presence + shape 
     }
   });
 
-  it('section eyebrow is the canonical "What this evidence can tell you" framing', () => {
+  it('section eyebrow is the canonical declarative framing (no implied list of actions)', () => {
     for (const fixture of [previewAggregateFixture, fullDepthAggregateFixture, zeroClassifiedAggregateFixture]) {
       const vm = buildReportViewModel(fixture);
-      expect(vm.editorial.business_section_eyebrow).toBe('What this evidence can tell you');
+      expect(vm.editorial.business_section_eyebrow).toBe('What this evidence shows');
     }
   });
 
@@ -173,18 +173,6 @@ describe('editorial copy — business section adapts to ledger presence + shape 
     expect(vm.editorial.business_role_question_html).toContain('campaign exposure');
     expect(vm.editorial.business_role_question_html).toContain('page diagnosis');
     expect(vm.editorial.business_role_question_html).toContain('measurement over time');
-  });
-
-  it('shape-not-proven fixtures get the "data could and could not say" aside lede', () => {
-    const vm = buildReportViewModel(zeroClassifiedAggregateFixture);
-    expect(vm.editorial.business_aside_lede_html).toContain('what the data could and could not say');
-    expect(vm.editorial.business_aside_lede_html).not.toContain('proves the');
-  });
-
-  it('shape-proven fixtures get the "proves the shape" aside lede', () => {
-    const vm = buildReportViewModel(strongLcpCoverageAggregateFixture);
-    expect(vm.editorial.business_aside_lede_html).toContain('proves the');
-    expect(vm.editorial.business_aside_lede_html).toContain('shape');
   });
 
   it('act4_lede is mood-aware — urgent / sober / affirming each carry distinct register', () => {
@@ -202,40 +190,6 @@ describe('editorial copy — business section adapts to ledger presence + shape 
     expect(urgentVm.editorial.act4_lede).not.toBe(soberVm.editorial.act4_lede);
     expect(soberVm.editorial.act4_lede).not.toBe(affirmingVm.editorial.act4_lede);
     expect(urgentVm.editorial.act4_lede).not.toBe(affirmingVm.editorial.act4_lede);
-  });
-
-  it('what-this-enables bullets always include the QBR baseline', () => {
-    for (const fixture of [previewAggregateFixture, fullDepthAggregateFixture, zeroClassifiedAggregateFixture]) {
-      const vm = buildReportViewModel(fixture);
-      expect(vm.editorial.business_what_this_enables[0]).toMatch(/QBR or sprint review/i);
-    }
-  });
-
-  it('what-this-enables omits the "reshape constrained cohort" bullet when constrained persona empty', () => {
-    const vm = buildReportViewModel(mobileTabletOnlyAggregateFixture);
-    if (vm.persona_contrast.constrained.is_empty) {
-      const bullets = vm.editorial.business_what_this_enables.join(' ').toLowerCase();
-      expect(bullets).not.toContain('constrained-cohort landing path');
-    }
-  });
-
-  it('what-this-enables INCLUDES the "reshape constrained cohort" bullet on multi-tier fixtures with non-empty constrained persona', () => {
-    // Regression lock — the bullet was previously dead code for every
-    // fixture (picker referenced `populated_tier_count`, a field that
-    // doesn't exist on EditorialDataShape). Now firing on full-depth
-    // (4 classified tiers, populated constrained cohort).
-    const vm = buildReportViewModel(fullDepthAggregateFixture);
-    expect(vm.persona_contrast.constrained.is_empty).toBe(false);
-    const bullets = vm.editorial.business_what_this_enables.join(' ').toLowerCase();
-    expect(bullets).toContain('reshape the constrained-cohort landing path');
-  });
-
-  it('what-this-enables hero-image bullet only fires when dominant culprit is hero_image', () => {
-    const vm = buildReportViewModel(fullDepthAggregateFixture);
-    if (vm.race.lcp_story?.dominant_culprit_kind === 'hero_image') {
-      const bullets = vm.editorial.business_what_this_enables.join(' ');
-      expect(bullets).toContain('hero-image fix');
-    }
   });
 });
 
@@ -301,11 +255,6 @@ describe('editorial copy — cover section adapts to classified share + tier cou
     const vm = buildReportViewModel(strongLcpCoverageAggregateFixture);
     expect(vm.editorial.cover_headline_card_caption.toLowerCase()).toContain('urban baseline');
     expect(vm.editorial.cover_headline_card_caption).not.toContain('could not be classified');
-  });
-
-  it('affirming fixture: at-a-glance lede softens to "more contained than the headline implies"', () => {
-    const vm = buildReportViewModel(affirmingAggregateFixture);
-    expect(vm.editorial.cover_at_a_glance_lede.toLowerCase()).toContain('contained');
   });
 });
 

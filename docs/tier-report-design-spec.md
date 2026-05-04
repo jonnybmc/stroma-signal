@@ -148,15 +148,14 @@ The evidence ledger is rendered from `act4_impact_rows` — each row carries a m
 
 Tonal discipline (load-bearing, see `feedback_no_self_deprecation_in_artifacts`): the row-level copy never re-apologises ("the report doesn't see X", "outside the scope of this report"). The boundary lives once in the section-lede; rows describe mechanism + user-behaviour consequence with confidence. The principal operator translates user-behaviour observations into KPI implications themselves.
 
-After the ledger, the section closes with a **needs-inquiry router** — three co-equal cards + a multi-select demand-signal dropdown, anchored on the boundary statement. Visual restraint is load-bearing: the router uses the same `.figure` token surface as the rest of the section (no accent backgrounds, no button chrome on CTAs, hairline-pill submit buttons, hairline-bottom-only email inputs). Editorial register is needs-inquiry — every card title reads as a natural answer to the bridge question ("See which campaigns this affects.", "Get a fix list for this page.", "Run this report on a schedule."), declarative-imperative, never a packaged offer. Confirmations stay in observation register (`✓ thanks — we will let you know when it ships`, never `You're in!` or `Welcome!`).
+After the ledger, the section closes with a **demand-sampling modal** — a single trigger button (`What would help next?`) opens a native `<dialog>` carrying four customer-lens choices + a sub-pill multi-select for "something else". Editorial register is first-person customer voice — every choice label reads as a need the user might say aloud (`I want to know which of my campaigns this is hitting`, `I just want a fix list for this page — not another diagnostic`, `I want this report on a schedule, not by hand each cycle`). Stroma's voice only appears in the choice body, describing what the choice maps to without promising delivery. Confirmations stay in observation register (`✓ noted — we will be in touch`).
 
-The three cards capture latent demand for, in order:
+The four top-level choices map 1:1 to existing intent event kinds:
 
 1. **Campaign-attribution layer early access** (`intent_pi_early_access`) — joins substrate × spend × conversions; not yet shipped, free at click; collects optional email follow-up.
-2. **Rapid Fix Plan** (`intent_rapid_fix`) — Stroma consulting engagement. Click logs intent then redirects to the booking page on `stroma.design`. Project-scoped pricing disclosed only on the booking page, never on the card.
-3. **Scheduled monitoring** (`intent_monitoring`) — automated weekly/daily report regeneration; not yet shipped, free at click; collects optional email + cadence follow-up.
-
-The five pills capture freeform demand we haven't yet productized: weekly-inbox digest of this domain, multi-page reports for the same domain, multi-client / portfolio rollout, competitor / market context, and "something else" (which expands inline into a 200-char freeform text field).
+2. **Page diagnostic fix list** (`intent_rapid_fix`) — pure intent capture; user signals they want a prioritised fix list for the highest-pressure page surfaced by the report. No inline redirect, no booking flow — Stroma uses the demand signal to assess whether to build / offer this; email is the opt-in follow-up channel for if/when it ships.
+3. **Scheduled monitoring** (`intent_monitoring`) — automated weekly/monthly report regeneration; not yet shipped, free at click; collects optional email + cadence follow-up.
+4. **Something else** (`intent_freeform` × N) — sub-pills capture latent demand for cohorts the modal hasn't named explicitly: multi-page rollout for the same domain, multi-client / portfolio rollout, competitor / market context, and a freeform text field for anything else.
 
 Every CTA emits a `SignalReportInteractionV1` event with the relevant `intent_*` kind via `navigator.sendBeacon()` to `https://api.stroma.design/api/v1/intent` (the snapshot-engine ingest endpoint). Server-side persistence + observability live in the `stroma-snapshot-engine` repo's `src/features/intent/` module — fully encapsulated, deletable in a single mount-call removal. A stable client-generated `intent_capture_id` UPSERTs initial-click + follow-up-email events into one demand-signal row.
 
@@ -303,7 +302,7 @@ If an older `rv=1` URL predates the additive funnel block:
 
 The report is a proof artifact, not a consulting deliverable.
 
-The single closing-section CTA — `Rapid Fix Plan` — pinpoints the landing pages and routes carrying the most drag and returns a sequenced fix order. It is a Stroma consultancy engagement, opt-in, and explicitly framed as optional: a team should be able to take the report alone into a sprint review and act on it.
+The closing-section modal is a **demand-sampling instrument** — four customer-lens choices (`I want to know which campaigns…`, `I just want a fix list for this page…`, `I want this report on a schedule…`, `Something else`), each capturing intent without committing Stroma to delivery. No inline redirect, no booking flow, no commerce — the modal collects user needs the same way an interview would, and email is the opt-in channel for if/when each option ships.
 
 The closing section must close the evidence journey cleanly:
 

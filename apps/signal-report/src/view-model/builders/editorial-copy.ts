@@ -93,7 +93,6 @@ export interface ReportClosingPill {
 
 export interface ReportEditorialCopy {
   // Cover
-  cover_at_a_glance_lede: string;
   cover_headline_card_caption: string;
 
   // Audience
@@ -135,8 +134,6 @@ export interface ReportEditorialCopy {
    *  choices (campaign exposure / page diagnosis / measurement over
    *  time) without naming a product. HTML — may carry inline emphasis. */
   business_role_question_html: string;
-  business_aside_lede_html: string;
-  business_what_this_enables: string[];
 
   /** Boundary-statement-anchored bridge sentence rendered above the
    *  closing modal trigger. Question-led ("What would help most from
@@ -165,11 +162,9 @@ export function buildEditorialCopy(
   // them later doesn't churn every call site.
   _act3: ReportAct3ViewModel,
   personaContrast: ReportPersonaContrast,
-  contextStrip: ReportContextStripViewModel | null,
-  dominantCulpritKind: string | null
+  contextStrip: ReportContextStripViewModel | null
 ): ReportEditorialCopy {
   return {
-    cover_at_a_glance_lede: pickCoverAtAGlanceLede(shape),
     cover_headline_card_caption: pickCoverHeadlineCardCaption(shape),
 
     audience_headline_html: pickAudienceHeadline(shape),
@@ -194,13 +189,11 @@ export function buildEditorialCopy(
 
     business_headline_html: pickBusinessHeadline(shape),
     act4_lede: pickAct4Lede(shape),
-    business_section_eyebrow: 'What this evidence can tell you',
+    business_section_eyebrow: 'What this evidence shows',
     business_section_boundary_lede:
       'This report measures post-click experience pressure. It does not measure revenue loss, CPA movement, or campaign impact. Read these signals as evidence of where performance may be distorting outcomes — not proof of commercial loss.',
     business_role_question_html:
       'The useful next question depends on your role: <em class="sr-italic-serif">campaign exposure</em>, <em class="sr-italic-serif">page diagnosis</em>, or <em class="sr-italic-serif">measurement over time</em>.',
-    business_aside_lede_html: pickBusinessAsideLede(shape),
-    business_what_this_enables: pickWhatThisEnables(shape, dominantCulpritKind),
 
     business_closing_bridge_html: pickClosingBridge(),
     business_closing_modal: pickClosingModal(shape),
@@ -209,19 +202,6 @@ export function buildEditorialCopy(
 }
 
 // ─── Cover ─────────────────────────────────────────────────────────────
-
-function pickCoverAtAGlanceLede(shape: EditorialDataShape): string {
-  if (shape.mood === 'affirming') {
-    return 'Three numbers — and the gap is more contained than the headline implies.';
-  }
-  if (!shape.race_available && shape.classified_share_pct < 50) {
-    return 'Three framing numbers. Volume and coverage matter most here — the race needs a richer sample to defend.';
-  }
-  if (!shape.race_available) {
-    return 'Three framing numbers. The race needs more comparable cohort data than this window holds.';
-  }
-  return 'The three numbers that frame the entire report.';
-}
 
 function pickCoverHeadlineCardCaption(shape: EditorialDataShape): string {
   if (shape.unknown_tier_dominant || shape.classified_tier_count === 0) {
@@ -426,41 +406,6 @@ function pickAct4Lede(shape: EditorialDataShape): string {
     return 'The gap here is real but moderate. Every number above still lands on a KPI someone on your team is accountable for — read this section as where it falls, not as a verdict on cause.';
   }
   return 'Every number above meets a KPI someone on your team is accountable for. This is where the measured gap shows up in the business.';
-}
-
-function pickBusinessAsideLede(shape: EditorialDataShape): string {
-  if (!shape.shape_proven) {
-    return 'This report shows what the data could and could not say. Root cause, business exposure in your own currency, and a fix order need a richer sample to defend.';
-  }
-  return 'This report proves the <em>shape</em> of the gap. Root cause, business exposure in your own currency, and a fix order are the next read.';
-}
-
-function pickWhatThisEnables(shape: EditorialDataShape, dominantCulpritKind: string | null): string[] {
-  const bullets: string[] = ['Bring this report into the next QBR or sprint review.'];
-
-  if (shape.race_available && shape.wait_delta_band !== 'none') {
-    bullets.push('Pair tier evidence with a landing-page audit before the next paid-media review.');
-  }
-
-  // "Reshape" framing per actionability discipline — never "exclude" the cohort.
-  if (shape.classified_tier_count >= 2 && !shape.constrained_persona_empty) {
-    bullets.push('Reshape the constrained-cohort landing path — a lighter route, not an excluded audience.');
-  }
-
-  // Re-test framing depends on the dominant LCP culprit, when known.
-  if (dominantCulpritKind === 'hero_image') {
-    bullets.push('Re-test Quality Score after a hero-image fix.');
-  } else if (dominantCulpritKind === 'background_image') {
-    bullets.push('Re-test Quality Score after a background-image / above-the-fold weight pass.');
-  } else if (dominantCulpritKind === 'icon') {
-    bullets.push('Re-test Quality Score after a font / icon-stack pass.');
-  } else if (shape.race_available && shape.race_metric === 'lcp') {
-    bullets.push('Re-test Quality Score after a render-budget pass on the landing template.');
-  } else if (shape.race_available && shape.race_metric === 'ttfb') {
-    bullets.push('Re-test Quality Score after a server / edge-cache pass.');
-  }
-
-  return bullets;
 }
 
 // ─── Closing-section bridge + cards + pills ───────────────────────────
