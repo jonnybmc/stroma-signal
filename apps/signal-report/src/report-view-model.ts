@@ -19,7 +19,6 @@ import type {
 import {
   DEFAULT_NETWORK_THRESHOLDS,
   formatDeviceSignature,
-  formatNetworkBand,
   SIGNAL_CELLULAR_NARRATE_THRESHOLD_PCT,
   SIGNAL_FRESHNESS_UNKNOWN_WARNING,
   SIGNAL_FUNNEL_FCP_POOR_THRESHOLD,
@@ -28,6 +27,7 @@ import {
   SIGNAL_SAVE_DATA_NARRATE_THRESHOLD_PCT
 } from '@stroma-labs/signal-contracts';
 
+import { networkBandForOperator } from './view-model/audience-language.js';
 import { buildAct4ImpactRows } from './view-model/builders/act4-impact.js';
 import { bandWaitDelta, buildEditorialCopy, type ReportEditorialCopy } from './view-model/builders/editorial-copy.js';
 import {
@@ -1473,7 +1473,7 @@ function buildPersonaContrast(aggregate: SignalAggregateV1): ReportPersonaContra
       share: urbanShare,
       tone: 'steady',
       network_tier: TIER_LABELS.urban,
-      network_criteria: formatNetworkBand('urban'),
+      network_criteria: networkBandForOperator('urban'),
       effective_type: bestEffective !== 'Unknown' ? bestEffective : null,
       effective_type_note: bestEffectiveKey ? effectiveTypeNote(bestEffectiveKey) : null,
       downlink_label: bestDownlink,
@@ -1488,7 +1488,7 @@ function buildPersonaContrast(aggregate: SignalAggregateV1): ReportPersonaContra
       save_data: false,
       save_data_share: 0,
       is_empty: urbanShare === 0,
-      empty_message: `No sessions in this window met the urban tier threshold (${formatNetworkBand('urban')}). Every measured session lives outside the best-connected band.`
+      empty_message: `No sessions in this window landed in the best-connected tier (${networkBandForOperator('urban')}). Every measured session sits in a more constrained network band.`
     },
     constrained: {
       label: constrainedShare > 0 ? 'Your most constrained' : 'No constrained cohort',
@@ -1502,8 +1502,8 @@ function buildPersonaContrast(aggregate: SignalAggregateV1): ReportPersonaContra
           : TIER_LABELS.constrained,
       network_criteria:
         nd.constrained >= nd.constrained_moderate
-          ? formatNetworkBand('constrained')
-          : formatNetworkBand('constrained_moderate'),
+          ? networkBandForOperator('constrained')
+          : networkBandForOperator('constrained_moderate'),
       effective_type: constrainedEffective !== 'Unknown' ? constrainedEffective : null,
       effective_type_note: constrainedEffectiveKey ? effectiveTypeNote(constrainedEffectiveKey) : null,
       downlink_label: constrainedDownlink,

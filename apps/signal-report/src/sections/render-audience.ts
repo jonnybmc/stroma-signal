@@ -2,17 +2,13 @@
 // Network spread table, device spread table, persona-pair (best vs
 // constrained), form-factor triplet.
 
-import {
-  formatDeviceSignature,
-  formatNetworkBand,
-  type SignalDeviceTier,
-  type SignalNetworkTier
-} from '@stroma-labs/signal-contracts';
+import type { SignalDeviceTier, SignalNetworkTier } from '@stroma-labs/signal-contracts';
 
 import { renderHeroValue, renderReveal } from '../render-helpers.js';
 import { escapeHtml } from '../render-utils.js';
 import { renderIcon } from '../report-icons.js';
 import type { ReportPersonaProfile, ReportViewModel } from '../report-view-model.js';
+import { deviceSignatureForOperator, networkBandForOperator } from '../view-model/audience-language.js';
 
 const NETWORK_TIER_KEYS: ReadonlySet<string> = new Set(['urban', 'moderate', 'constrained_moderate', 'constrained']);
 const DEVICE_TIER_KEYS: ReadonlySet<string> = new Set(['high', 'mid', 'low']);
@@ -67,8 +63,8 @@ function renderTierTable(vm: ReportViewModel): string {
 }
 
 function criteriaForTier(key: string): string {
-  if (NETWORK_TIER_KEYS.has(key)) return formatNetworkBand(key as SignalNetworkTier);
-  return 'Not classifiable';
+  if (NETWORK_TIER_KEYS.has(key)) return networkBandForOperator(key as SignalNetworkTier);
+  return 'Could not classify (typically Safari or privacy-mode)';
 }
 
 function renderDeviceTable(vm: ReportViewModel): string {
@@ -115,7 +111,7 @@ function renderDeviceTable(vm: ReportViewModel): string {
 }
 
 function deviceCriteriaFor(key: string): string {
-  if (DEVICE_TIER_KEYS.has(key)) return formatDeviceSignature(key as SignalDeviceTier);
+  if (DEVICE_TIER_KEYS.has(key)) return deviceSignatureForOperator(key as SignalDeviceTier);
   return '';
 }
 
