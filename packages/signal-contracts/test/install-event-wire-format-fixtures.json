@@ -274,5 +274,78 @@
       "os_platform": "darwin",
       "outcome": "completed"
     }
+  },
+  {
+    "name": "install_completed · auto_installed=true (Pattern 2 default path)",
+    "payload": {
+      "v": 1,
+      "event_kind": "install_completed",
+      "install_capture_id": "01JJ7K11111AWBXAUTOINSTYES",
+      "event_id": "evt_auto_yes_01",
+      "ts": 1746331400000,
+      "cli_version": "0.1.0-rc.5",
+      "installed_signal_version": "0.1.0-rc.5",
+      "framework": "next-app-router",
+      "framework_version": "16.2.4",
+      "framework_version_source": "installed",
+      "framework_confidence": "high",
+      "framework_version_ahead_of_recipe": false,
+      "sink": "dataLayer",
+      "sample_rate": 1.0,
+      "package_manager": "pnpm",
+      "node_version": "v22.4.0",
+      "os_platform": "darwin",
+      "outcome": "completed",
+      "auto_installed": true
+    }
+  },
+  {
+    "name": "install_completed · auto_installed=false (--no-install opt-out)",
+    "payload": {
+      "v": 1,
+      "event_kind": "install_completed",
+      "install_capture_id": "01JJ7K22222AWBYAUTOINSTNO",
+      "event_id": "evt_auto_no_01",
+      "ts": 1746341500000,
+      "cli_version": "0.1.0-rc.5",
+      "installed_signal_version": null,
+      "framework": "sveltekit",
+      "framework_version": "2.5.0",
+      "framework_version_source": "spec",
+      "framework_confidence": "medium",
+      "framework_version_ahead_of_recipe": false,
+      "sink": "beacon",
+      "sample_rate": 1.0,
+      "package_manager": "pnpm",
+      "node_version": "v22.4.0",
+      "os_platform": "linux",
+      "outcome": "completed",
+      "auto_installed": false
+    }
+  },
+  {
+    "name": "install_error · package_install_failed (Pattern 2 spawn failure)",
+    "payload": {
+      "v": 1,
+      "event_kind": "install_error",
+      "install_capture_id": "01JJ7K33333AWBZPKGFAILED",
+      "event_id": "evt_pkg_fail_01",
+      "ts": 1746351600000,
+      "cli_version": "0.1.0-rc.5",
+      "installed_signal_version": null,
+      "framework": "next-app-router",
+      "framework_version": "16.2.4",
+      "framework_version_source": "installed",
+      "framework_confidence": "high",
+      "framework_version_ahead_of_recipe": false,
+      "sink": "dataLayer",
+      "sample_rate": 1.0,
+      "package_manager": "pnpm",
+      "node_version": "v22.4.0",
+      "os_platform": "darwin",
+      "outcome": "error",
+      "error_category": "package_install_failed",
+      "auto_installed": true
+    }
   }
 ]
