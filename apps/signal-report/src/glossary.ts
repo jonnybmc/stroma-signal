@@ -39,7 +39,7 @@ export const GLOSSARY = {
     long: 'Interaction to Next Paint',
     plain:
       'How quickly the page responds when someone taps or clicks — the lag between input and visible reaction. Over 500ms feels broken.',
-    cmo: 'Slow INP shows up as friction at the moment of intent: the page registered the click but takes long enough to commit the next action that some users disengage before the action lands. Forms feel stalled, CTAs feel mushy.'
+    cmo: 'Slow INP shows up as friction at the moment of intent. The page registered the click; the next action takes long enough to commit that some users disengage before it lands. Forms feel stalled; CTAs feel mushy.'
   },
   ttfb: {
     name: 'TTFB',
