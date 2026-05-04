@@ -103,6 +103,14 @@ Shrinking the audience to fit the experience is not a Signal recommendation. Res
 
 ## How It Works
 
+The fastest path is the install wizard — detects your framework, asks 3-4 questions, prints the framework-correct snippet ready to paste:
+
+```bash
+npx @stroma-labs/signal init
+```
+
+Or do it by hand:
+
 ```bash
 npm install @stroma-labs/signal
 ```

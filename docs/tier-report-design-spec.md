@@ -70,11 +70,13 @@ The report is a five-section narrative artifact.
 
 Editorial masthead.
 
-- Origin hero (the customer's domain).
+- Origin hero (the customer's domain). Font caps at 80px and wraps at the dots so long subdomains never clip the section edge.
 - Sessions counter + measurement window + classified share.
 - A short lede that names what the report makes visible — and where it leaks back into CPC, ROAS, and CAC (terms hyperlink to glossary tooltips).
 - A three-card "At a glance" KPI strip (slower-than-urban share / sessions measured / measurement window).
 - A tier-preview strip that visually previews the audience split before the user scrolls into Audience.
+
+The **sample-confidence band** lives in the sticky scroll-nav (between the brand and the TOC), NOT on the cover masthead — so the disclosure follows the recipient's eye through every section. Renders only when `band !== 'stable'` with two labels: `Early read` (preliminary, sample <100) and `Building sample` (provisional, sample 100–499). Suppressed entirely on `stable` reports. Carries a CSS-driven instant tooltip with viewport-edge clamping; never the native `title` attribute (~500ms hover delay would feel broken on a chip whose purpose is up-front disclosure).
 
 ### Section `audience` (`Act 01`)
 
@@ -87,6 +89,16 @@ It visualises:
 - form-factor split across mobile / tablet / desktop (lives inside the section body, not in a fixed footer)
 - a persona-pair contrast (best-connected vs most-constrained) showing real hardware signals (CPU cores, memory, browser, RTT, save-data share)
 - sample size and classified-share honesty inline
+
+The audience headline is **variant-aware**, picked on the count of classified tiers ≥5% share (excluding `unknown`):
+
+- 0 tiers → `We couldn't sort this audience into network tiers`
+- 1 tier → `Every session here lives in the same network band`
+- 2 tiers → `Your traffic isn't one user. It's two distinct audiences experiencing the same campaign differently.`
+- 3 tiers → `… three different audiences sharing the same campaign.`
+- 4 tiers → `… four different audiences sharing the same campaign.`
+
+The variant logic prevents the headline from over-claiming when the data shape doesn't support it (e.g. a single-band fixture asserting "three audiences" was a real pre-fix bug).
 
 The emotional goal is population awareness. The viewer should feel that the traffic is made of materially different user conditions, not one average.
 
@@ -142,18 +154,20 @@ The section should still feel embodied. The visual and copy should communicate t
 
 The closing section.
 
-It restates what the report has already proven — who is affected, how far apart the experience is, where performance becomes poor — using a "what this evidence can tell you" framing. Section eyebrow names the framing; a small boundary-lede beneath it names what /r measures (post-click experience pressure) and what it does not (revenue, CPA movement, campaign impact). That boundary disclosure lives ONCE here so row-level copy can proceed with confident observation about what the data IS showing.
+It restates what the report has already proven — who is affected, how far apart the experience is, where performance becomes poor — using a `What this evidence shows` framing. Section eyebrow names the framing declaratively (no implied list-of-actions); a small boundary-lede beneath it names what /r measures (post-click experience pressure) and what it does not (revenue, CPA movement, campaign impact). That boundary disclosure lives ONCE here so row-level copy can proceed with confident observation about what the data IS showing.
+
+The Act 4 lede above the ledger is **mood-aware** — `urgent`, `sober`, and `affirming` each carry distinct register so the lede honestly previews the severity of the rows below. Sober mood reads as moderation ("real but moderate … not as a verdict on cause") so an alert-toned row can't be read as overstatement; affirming mood reads as restraint ("the gap is restrained, but every number above still lands on a KPI"); urgent mood reads as direct impact.
 
 The evidence ledger is rendered from `act4_impact_rows` — each row carries a measured `metric_value`, a `metric_label`, a descriptive `what_it_says` (observation only), and a tone-aware `why_it_matters` (directional implication tied to user behaviour, never asserting commercial figures). Rows are emitted only when underlying aggregate evidence supports them (per the act4-impact builder gates). When fewer than two rows qualify, the renderer falls back to flat `act4_summary_points` bullets so the artifact never ships an anaemic one-row ledger.
 
 Tonal discipline (load-bearing, see `feedback_no_self_deprecation_in_artifacts`): the row-level copy never re-apologises ("the report doesn't see X", "outside the scope of this report"). The boundary lives once in the section-lede; rows describe mechanism + user-behaviour consequence with confidence. The principal operator translates user-behaviour observations into KPI implications themselves.
 
-After the ledger, the section closes with a **demand-sampling modal** — a single trigger button (`What would help next?`) opens a native `<dialog>` carrying four customer-lens choices + a sub-pill multi-select for "something else". Editorial register is first-person customer voice — every choice label reads as a need the user might say aloud (`I want to know which of my campaigns this is hitting`, `I just want a fix list for this page — not another diagnostic`, `I want this report on a schedule, not by hand each cycle`). Stroma's voice only appears in the choice body, describing what the choice maps to without promising delivery. Confirmations stay in observation register (`✓ noted — we will be in touch`).
+After the ledger, the section closes with a **demand-sampling modal** — a single trigger button (`What would help next?`) opens a native `<dialog>` carrying four customer-lens choices + a sub-pill multi-select for "something else". Editorial register is first-person customer voice — every choice label reads as a need the user might say aloud (`I want to know which of my campaigns this is hitting`, `I just want a fix list for this page — not another diagnostic`, `I want this report on a schedule, not by hand each cycle`, `Something else — I'll describe below`). Stroma's voice only appears in the choice body, describing what the choice maps to without promising delivery. The optional email field renders for **all four** choices (universally optional — capturing intent in aggregate is the primary purpose; email is the affordance for direct follow-up). Confirmations stay in observation register (`✓ noted — we will be in touch`).
 
 The four top-level choices map 1:1 to existing intent event kinds:
 
 1. **Campaign-attribution layer early access** (`intent_pi_early_access`) — joins substrate × spend × conversions; not yet shipped, free at click; collects optional email follow-up.
-2. **Page diagnostic fix list** (`intent_rapid_fix`) — pure intent capture; user signals they want a prioritised fix list for the highest-pressure page surfaced by the report. No inline redirect, no booking flow — Stroma uses the demand signal to assess whether to build / offer this; email is the opt-in follow-up channel for if/when it ships.
+2. **Page diagnostic fix list** (`intent_rapid_fix`) — pure intent capture; user signals they want a prioritised fix list for the highest-pressure page surfaced by the report. No inline redirect, no booking flow — Stroma uses the demand signal to assess whether to build / offer this; the optional email is the follow-up channel.
 3. **Scheduled monitoring** (`intent_monitoring`) — automated weekly/monthly report regeneration; not yet shipped, free at click; collects optional email + cadence follow-up.
 4. **Something else** (`intent_freeform` × N) — sub-pills capture latent demand for cohorts the modal hasn't named explicitly: multi-page rollout for the same domain, multi-client / portfolio rollout, competitor / market context, and a freeform text field for anything else.
 

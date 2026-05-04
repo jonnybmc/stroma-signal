@@ -10,6 +10,14 @@ A `signal_report_url` of the form `https://signal.stroma.design/r?...` that you 
 
 ## 1. Install the package
 
+The fastest path is the install wizard — detects your framework, asks the configuration questions, and prints the framework-correct snippet ready to paste (covers Next, React Router 7, Remix v2, Nuxt, SvelteKit, Vue, Vite, Angular, vanilla):
+
+```bash
+npx @stroma-labs/signal init
+```
+
+Or by hand:
+
 ```bash
 pnpm add @stroma-labs/signal
 ```
@@ -81,12 +89,13 @@ Both production queries use the canonical window: last 7 complete days, excludin
 
 ## 6. Open the report URL
 
-Paste the URL into a browser. You should land on the hosted four-act artifact at `signal.stroma.design/r?...`:
+Paste the URL into a browser. You should land on the hosted five-section narrative at `signal.stroma.design/r?...`:
 
-1. Act 1 — who your users are (network and device shape)
-2. Act 2 — how far apart their experiences are
-3. Act 3 — where performance crosses poor thresholds
-4. Act 4 — what this costs the business (KPI impact ledger) and the handoff to deeper work
+1. Cover (Act 00) — the masthead, sample size, classified share, and the headline number
+2. Audience (Act 01) — who your users are (network and device shape)
+3. Distance (Act 02) — how far apart their experiences are
+4. Funnel (Act 03) — where performance crosses poor thresholds
+5. Business (Act 04) — where the evidence lands against the KPIs you're accountable for, then a demand-sampling modal for what would help next
 
 If the URL renders as "Invalid report URL", the aggregate failed guard validation. Open the same URL at `/build` instead (change `/r?` to `/build?`) — the builder surfaces the specific guard issue.
 
@@ -112,7 +121,7 @@ Once events have flowed for 5–7 days, walk this list. The point is to feel con
 | **Device tier shape** | Skewed by site type — B2B SaaS sees mostly `mid`/`high`; consumer / mobile-first sees more `low` | All one tier → small sample, give it more days. Across the spread → healthy |
 | **Browser mix** | Should roughly match the browser breakdown in your GA4 reports (within a few percent) | Wildly different → SDK might be sample-rate-gated unevenly. Check `init({ sampleRate })` is what you intended |
 | **TTFB shape (`vitals.ttfb_ms` p75)** | Server-rendered + CDN: **< 500 ms**. SPA on global CDN: **< 200 ms**. SSR with cold backend: 500 ms – 1.5 s | p75 > 2 s sustained → backend / origin investigation, not a Signal bug |
-| **LCP shape (`vitals.lcp_ms` p75)** | Optimised site: **< 2.5 s**. Typical broad audience: **< 4 s**. Heavy media + global audience: 4 s – 6 s | p75 > 6 s sustained → real LCP problem worth a Rapid Fix Plan engagement (see [stroma.design/book](https://www.stroma.design/book)) |
+| **LCP shape (`vitals.lcp_ms` p75)** | Optimised site: **< 2.5 s**. Typical broad audience: **< 4 s**. Heavy media + global audience: 4 s – 6 s | p75 > 6 s sustained → real LCP problem worth a render-budget pass on the landing template; the Business section's closing modal lets you signal demand for a prioritised fix list |
 | **`vitals.navigation_timing.next_hop_protocol` distribution** | Should be ~100% `h2` or `h3` if you're behind a modern CDN (Cloudflare, Fastly, CloudFront) | Material `http/1.1` → check your CDN config; HTTP/1.1 head-of-line blocking is real and measurable |
 | **`vitals.lcp_attribution.culprit_kind` (Chromium audiences only)** | Mix of `headline_text`, `hero_image`, `lcp_image` is normal | Dominated by `unknown` → your LCP element is in a Shadow DOM / cross-origin iframe / something the SDK can't reach |
 
@@ -128,7 +137,7 @@ Once events have flowed for 5–7 days, walk this list. The point is to feel con
 - Open the hosted `/r` URL with one of your operators, walk it together, decide which signal you'd want to act on first
 - Bookmark the URL or pin it in your team's dashboard
 - Schedule the refresh ([production-report-automation.md](./production-report-automation.md)) so the shared URL stays current
-- If the report shows a measurable bleed worth fixing, the [Rapid Fix Plan](https://www.stroma.design/book?service=rapid-fix) is the high-touch path
+- If the report shows a measurable bleed worth fixing, use the closing modal on the Business section to signal what would help most — Stroma uses those demand signals to prioritise what to build next
 
 ## What this path does not include
 

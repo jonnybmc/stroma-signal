@@ -274,7 +274,7 @@ The GA4 dataLayer sink pushes a flattened `perf_tier_report` event with a compac
 
 The GA4 compact subset includes 24 fields: `event_id`, `host`, `url`, `net_tier`, `net_tcp_ms`, `net_tcp_source`, `device_tier`, `device_screen_w`, `lcp_ms`, `fcp_ms`, `ttfb_ms`, `browser`, `navigation_type`, `lcp_load_state`, `lcp_element_type`, `inp_load_state`, `interaction_type`, `input_delay_ms`, `processing_duration_ms`, `presentation_delay_ms`, `lcp_culprit_kind`, `lcp_dominant_subpart`, `inp_dominant_phase`, `third_party_weight_tier` — plus the `event` name itself for 25 total, exactly at GA4's custom-parameter ceiling.
 
-`device_screen_w` unlocks the aggregate-time form-factor split (mobile / tablet / desktop) that the hosted report surfaces in the persistent footer. Breakpoints and rationale in [aggregation-spec.md](./aggregation-spec.md).
+`device_screen_w` unlocks the aggregate-time form-factor split (mobile / tablet / desktop) that the hosted report surfaces inside the Audience section. Breakpoints and rationale in [aggregation-spec.md](./aggregation-spec.md).
 
 Fields deliberately excluded from the GA4 path (warehouse-only): `v`, `ts`, `ref`, `device_cores`, `device_memory_gb`, `device_screen_h`, `cls`, `inp_ms`, `effective_type`, `downlink_mbps`, `rtt_ms`, `save_data`, `connection_type`, `pkg_version`, `lcp_target`, `lcp_resource_url`, `interaction_target`, `interaction_time_ms`.
 

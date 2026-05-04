@@ -72,7 +72,7 @@ Rationale for these thresholds:
 
 The aggregator skips rows where `device_screen_w ≤ 0` (defensive — the SDK always writes a value). When no rows contribute, the field remains `undefined` rather than emitting a zero-sum triple, so legacy URLs decode cleanly.
 
-Drives the Google mobile-page-experience decision: the single most buyer-legible signal on the landing for paid-media / CRO / SEO operators. Surfaces as a dedicated strip in the persistent footer (above the credibility strip) rather than nested in the Actionable Signals section.
+Drives the Google mobile-page-experience decision: the single most buyer-legible signal on the landing for paid-media / CRO / SEO operators. Surfaces as a dedicated strip inside the Audience section (Act 01).
 
 ### Deliberately excluded
 
