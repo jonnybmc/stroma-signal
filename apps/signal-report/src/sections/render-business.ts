@@ -175,7 +175,7 @@ function renderClosingModal(vm: ReportViewModel): string {
           ></textarea>
         </label>
 
-        <label class="closing-modal-email" data-when-choice="pi_early_access monitoring">
+        <label class="closing-modal-email" data-when-choice="pi_early_access rapid_fix monitoring something_else">
           <span class="closing-modal-email-label">${escapeHtml(modal.email_label)}</span>
           <input
             type="email"

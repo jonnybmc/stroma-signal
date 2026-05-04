@@ -1534,10 +1534,14 @@ dialog.closing-modal[open] {
 /* Conditional reveal — hide every element with a [data-when-choice]
    marker by default; reveal only when the dialog's [data-choice]
    matches one of the tokens. Attribute-list `~=` matching means a
-   single `data-when-choice="pi_early_access monitoring"` covers both
-   reveal cases (the email field) without needing :has(). */
+   single `data-when-choice="pi_early_access rapid_fix monitoring
+   something_else"` covers all reveal cases (the email field, which is
+   universally optional) without needing :has(). Sub-form fields
+   (cadence, pills, freeform) use single-token data-when-choice
+   attributes so they only render for their owning choice. */
 .closing-modal [data-when-choice] { display: none; }
 .closing-modal[data-choice="pi_early_access"] [data-when-choice~="pi_early_access"] { display: flex; }
+.closing-modal[data-choice="rapid_fix"]       [data-when-choice~="rapid_fix"]       { display: flex; }
 .closing-modal[data-choice="monitoring"]      [data-when-choice~="monitoring"]      { display: flex; }
 .closing-modal[data-choice="something_else"]  [data-when-choice~="something_else"]  { display: flex; }
 /* Freeform textarea — only when something_else picked AND the
