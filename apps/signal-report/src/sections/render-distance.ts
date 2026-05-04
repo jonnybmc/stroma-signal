@@ -73,7 +73,7 @@ function renderRaceBlock(race: ReportRaceViewModel): string {
   return `
     <div class="figure" style="padding:clamp(24px,3vw,40px);">
       <div class="race-grid">
-        ${renderRacePhone('cyan', `Urban · ${race.metric_label} p75`, urbanSeconds, urbanMs)}
+        ${renderRacePhone('cyan', `Urban · ${race.metric_label}, slowest quarter`, urbanSeconds, urbanMs)}
         ${renderRaceCenter(
           race.wait_delta_ms,
           `${escapeHtml(race.comparison_label)} users wait this much longer than urban, every visit.`,
@@ -82,7 +82,7 @@ function renderRaceBlock(race: ReportRaceViewModel): string {
         )}
         ${renderRacePhone(
           'accent',
-          `${race.comparison_label} · ${race.metric_label} p75`,
+          `${race.comparison_label} · ${race.metric_label}, slowest quarter`,
           comparisonSeconds,
           comparisonMs
         )}
@@ -128,7 +128,7 @@ function renderLcpSubparts(rows: ReportLcpSubpartRow[]): string {
 
   return `
     <div class="figure">
-      <div class="figure-eyebrow">Where the gap lives · LCP subparts</div>
+      <div class="figure-eyebrow">Where the gap lives — between connection, content arriving, and paint</div>
       <div style="display:flex;height:10px;border-radius:999px;overflow:hidden;background:var(--bg-3);margin-top:16px;">${bar}</div>
       <div style="display:grid;grid-template-columns:repeat(${rows.length},1fr);gap:8px;margin-top:18px;">${cells}</div>
     </div>

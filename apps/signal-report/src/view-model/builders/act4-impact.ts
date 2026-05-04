@@ -127,13 +127,13 @@ function pickInpWhyItMatters(phase: 'input_delay' | 'processing' | 'presentation
 function buildInpConversionRow(act3: ReportAct3ViewModel): ReportAct4ImpactRow | null {
   if (act3.poor_session_share == null || act3.poor_session_share < ACT4_INP_GATE_POOR_SHARE_PCT) return null;
   const phase = act3.inp_story?.dominant_phase ?? null;
-  const phaseSuffix = phase ? ` (dominant phase: ${phase.replace('_', ' ')})` : '';
+  const phaseSuffix = phase ? ` (longest delay: ${phase.replace('_', ' ')})` : '';
   return {
     id: 'inp_conversion',
     metric_value: `${act3.poor_session_share}%`,
     metric_label: phase
-      ? `Sessions past the poor-performance threshold · dominant phase ${phase.replace('_', ' ')}`
-      : 'Sessions past the poor-performance threshold',
+      ? `Sessions past the slow-experience threshold · longest delay ${phase.replace('_', ' ')}`
+      : 'Sessions past the slow-experience threshold',
     what_it_says: `${act3.poor_session_share}% of measured sessions crossed a poor-performance threshold${phaseSuffix}.`,
     why_it_matters: pickInpWhyItMatters(phase),
     tone: toneFromPoorShare(act3.poor_session_share)
@@ -155,13 +155,13 @@ function buildScriptRoasRow(race: ReportRaceViewModel, act3: ReportAct3ViewModel
   let tone: ReportAct4ImpactTone;
   if (thirdPartyHits && thirdParty != null && thirdParty.median_share_pct != null) {
     metricValue = `${thirdParty.median_share_pct}%`;
-    metricLabel = 'Third-party script share (median origin)';
-    whatItSays = `Third-party scripts contribute ${thirdParty.median_share_pct}% of pre-LCP weight on the median origin.`;
+    metricLabel = 'Third-party script share (typical page on this domain)';
+    whatItSays = `Third-party scripts make up ${thirdParty.median_share_pct}% of the script weight loading before the main image or text appears, on the typical page sampled.`;
     tone = thirdParty.dominant_tier === 'heavy' ? 'alert' : 'watch';
   } else if (loafHits && loaf != null && loaf.worst_frame_ms_p75 != null) {
     metricValue = `${Math.round(loaf.worst_frame_ms_p75)}ms`;
-    metricLabel = 'LoAF worst-frame p75';
-    whatItSays = `Long animation frames reach ${Math.round(loaf.worst_frame_ms_p75)}ms at p75 — three-quarters of measured frames render faster, but the slow tail crosses the long-frame floor.`;
+    metricLabel = 'Frame stall · slowest quarter of measurements';
+    whatItSays = `On the slowest quarter of measurements, animation frames take ${Math.round(loaf.worst_frame_ms_p75)}ms to render — long enough that interaction with the page feels stalled.`;
     tone = loaf.worst_frame_ms_p75 >= ACT4_LOAF_ALERT_MS ? 'alert' : 'watch';
   } else {
     // Defensive: if third-party fired without a share number, emit the

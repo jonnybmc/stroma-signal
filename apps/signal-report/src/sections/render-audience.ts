@@ -135,8 +135,8 @@ function renderPersonaCard(persona: ReportPersonaProfile, accentVar: string): st
       ? ['Connection class', composeRowValue(persona.effective_type, persona.effective_type_note)]
       : null,
     persona.downlink_label ? ['Bandwidth', composeRowValue(persona.downlink_label, persona.downlink_note)] : null,
-    persona.rtt_label ? ['Round-trip', composeRowValue(persona.rtt_label, persona.rtt_note)] : null,
-    ['CPU', composeRowValue(persona.cores_label, persona.cores_note)],
+    persona.rtt_label ? ['Connection lag', composeRowValue(persona.rtt_label, persona.rtt_note)] : null,
+    ['Processor', composeRowValue(persona.cores_label, persona.cores_note)],
     ['Memory', composeRowValue(persona.memory_label, persona.memory_note)],
     persona.browser ? ['Browser', escapeHtml(persona.browser)] : null,
     persona.save_data && persona.save_data_share > 0
