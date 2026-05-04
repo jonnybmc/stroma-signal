@@ -25,7 +25,7 @@ export const GLOSSARY = {
     long: 'Largest Contentful Paint',
     plain:
       'How long until the biggest thing on your landing page (usually a hero image or headline) actually appears. Google grades it: under 2.5s good, over 4s poor.',
-    cmo: 'Slow LCP is one of the inputs platforms use when scoring landing-page experience — the experience signal that gets baked into auction weighting alongside competitive bids. Meta uses similar signals on placements that link out to your site.'
+    cmo: 'Slow LCP is one of the inputs platforms use when scoring landing-page experience: the experience signal that gets baked into auction weighting alongside competitive bids. Meta uses similar signals on placements that link out to your site.'
   },
   fcp: {
     name: 'FCP',
@@ -39,7 +39,7 @@ export const GLOSSARY = {
     long: 'Interaction to Next Paint',
     plain:
       'How quickly the page responds when someone taps or clicks — the lag between input and visible reaction. Over 500ms feels broken.',
-    cmo: 'Slow INP shows up as friction at the moment of intent — the page registered the click but takes long enough to commit the next action that some users disengage before the action lands. Forms feel stalled, CTAs feel mushy.'
+    cmo: 'Slow INP shows up as friction at the moment of intent: the page registered the click but takes long enough to commit the next action that some users disengage before the action lands. Forms feel stalled, CTAs feel mushy.'
   },
   ttfb: {
     name: 'TTFB',
@@ -78,7 +78,7 @@ export const GLOSSARY = {
     name: 'CAC',
     long: 'Customer Acquisition Cost',
     plain: 'Total spend to acquire one customer.',
-    cmo: 'Disengagement at the click sits upstream of CAC — the click is paid for whether or not the session converts. Anything that slows the moment between paid click and visible page lands somewhere in the customer-acquisition arithmetic.'
+    cmo: 'Disengagement at the click sits upstream of CAC: the click is paid for whether or not the session converts. Anything that slows the moment between paid click and visible page lands somewhere in the customer-acquisition arithmetic.'
   },
   cpc: {
     name: 'CPC',
@@ -90,14 +90,14 @@ export const GLOSSARY = {
     name: 'CPA',
     long: 'Cost per Acquisition',
     plain: 'Total cost to drive one conversion (lead, signup, sale).',
-    cmo: 'CPA sits where CPC and conversion rate meet — anything that moves either input moves CPA, with experience signals upstream of both.'
+    cmo: 'CPA sits where CPC and conversion rate meet: anything that moves either input moves CPA, with experience signals upstream of both.'
   },
   poor: {
     name: 'Poor threshold',
     long: 'Core Web Vitals "poor" boundary',
     plain:
       'The line where Google grades your page as poor: LCP > 4s, INP > 500ms, FCP > 3s. Sessions past this line are the ones the auction penalises.',
-    cmo: 'This is not an internal engineering yardstick — it is the line platforms read when scoring landing-page experience.'
+    cmo: 'This is not an internal engineering yardstick: it is the line platforms read when scoring landing-page experience.'
   },
   classified: {
     name: 'Classified',
