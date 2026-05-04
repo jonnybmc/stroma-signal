@@ -147,8 +147,17 @@ export function bootGlossaryPopovers(root: ParentNode = document): void {
 
   let openEl: HTMLElement | null = null;
   let openPop: HTMLElement | null = null;
+  let closeTimer: ReturnType<typeof setTimeout> | null = null;
+
+  const cancelClose = (): void => {
+    if (closeTimer) {
+      clearTimeout(closeTimer);
+      closeTimer = null;
+    }
+  };
 
   const close = (): void => {
+    cancelClose();
     if (openPop) {
       openPop.remove();
       openPop = null;
@@ -156,7 +165,45 @@ export function bootGlossaryPopovers(root: ParentNode = document): void {
     openEl = null;
   };
 
+  const scheduleClose = (delay: number): void => {
+    cancelClose();
+    closeTimer = setTimeout(() => close(), delay);
+  };
+
+  // Position the popover relative to the viewport. Portaled to body so
+  // no ancestor's overflow / transform / stacking-context can clip it.
+  // Auto-flips above ↔ below when viewport edge intrudes; clamps the
+  // horizontal center so the popover never crosses the viewport edge.
+  // The arrow tracks the trigger center via the --arrow-x custom prop.
+  const positionPopover = (pop: HTMLElement, el: HTMLElement): void => {
+    const trigger = el.getBoundingClientRect();
+    const popRect = pop.getBoundingClientRect();
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const margin = 12;
+    const gap = 10;
+
+    let top = trigger.top - popRect.height - gap;
+    let placement: 'top' | 'bottom' = 'top';
+    if (top < margin && trigger.bottom + popRect.height + gap + margin <= vh) {
+      top = trigger.bottom + gap;
+      placement = 'bottom';
+    } else if (top < margin) {
+      top = Math.max(margin, vh - popRect.height - margin);
+    }
+
+    const triggerCenterX = trigger.left + trigger.width / 2;
+    let left = triggerCenterX - popRect.width / 2;
+    left = Math.max(margin, Math.min(left, vw - popRect.width - margin));
+
+    pop.style.top = `${Math.round(top)}px`;
+    pop.style.left = `${Math.round(left)}px`;
+    pop.dataset.placement = placement;
+    pop.style.setProperty('--arrow-x', `${Math.round(triggerCenterX - left)}px`);
+  };
+
   const open = (el: HTMLElement): void => {
+    cancelClose();
     if (openEl === el) return;
     close();
     const key = el.dataset.term as GlossaryKey | undefined;
@@ -164,7 +211,7 @@ export function bootGlossaryPopovers(root: ParentNode = document): void {
     const def = GLOSSARY[key];
     if (!def) return;
 
-    const pop = document.createElement('span');
+    const pop = document.createElement('div');
     pop.className = 'gloss-pop';
     pop.setAttribute('role', 'tooltip');
     pop.innerHTML = `
@@ -175,16 +222,24 @@ export function bootGlossaryPopovers(root: ParentNode = document): void {
       <div>${escapeHtml(def.plain)}</div>
       <div class="gloss-cmo">${escapeHtml(def.cmo)}</div>
     `;
-    el.append(pop);
+    document.body.append(pop);
+    positionPopover(pop, el);
+
+    // Hover bridge — popover is no longer a child of the trigger, so a
+    // naive mouseleave on trigger would close immediately as the cursor
+    // crosses the gap. Cancel close while the cursor is over the popover.
+    pop.addEventListener('mouseenter', cancelClose);
+    pop.addEventListener('mouseleave', () => scheduleClose(0));
+
     openEl = el;
     openPop = pop;
   };
 
   for (const el of els) {
     el.addEventListener('mouseenter', () => open(el));
-    el.addEventListener('mouseleave', () => close());
+    el.addEventListener('mouseleave', () => scheduleClose(150));
     el.addEventListener('focus', () => open(el));
-    el.addEventListener('blur', () => close());
+    el.addEventListener('blur', () => scheduleClose(150));
     el.addEventListener('click', (e) => {
       e.stopPropagation();
       if (openEl === el) close();
@@ -194,11 +249,19 @@ export function bootGlossaryPopovers(root: ParentNode = document): void {
 
   document.addEventListener('mousedown', (e) => {
     if (!openEl) return;
-    if (!openEl.contains(e.target as Node)) close();
+    const target = e.target as Node;
+    if (openEl.contains(target)) return;
+    if (openPop?.contains(target)) return;
+    close();
   });
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') close();
   });
+  // Close on scroll / resize — the cached coordinates would be stale
+  // and repositioning every frame is overkill for a tooltip the user
+  // can re-summon by hovering again.
+  window.addEventListener('scroll', () => close(), { passive: true, capture: true });
+  window.addEventListener('resize', () => close());
 }
 
 // ─── Scroll-spy nav active state ───────────────────────────────────────

@@ -192,12 +192,15 @@ html, body {
   vertical-align: super;
   font-size: 8px;
 }
+/* Portaled to document.body by bootGlossaryPopovers — `position: fixed`
+ * means no ancestor's overflow / transform / stacking-context can clip
+ * it, and the top-tier z-index keeps it above sibling cards. Coordinates
+ * (top, left, --arrow-x) are set inline by JS via getBoundingClientRect
+ * + viewport-edge clamping. data-placement carries the flip state
+ * (top vs bottom) so the arrow points back at the trigger. */
 .gloss-pop {
-  position: absolute;
-  z-index: 80;
-  bottom: calc(100% + 10px);
-  left: 50%;
-  transform: translateX(-50%);
+  position: fixed;
+  z-index: 9999;
   width: clamp(260px, 28vw, 340px);
   background: var(--bg-1);
   border: 1px solid var(--line-strong);
@@ -214,11 +217,17 @@ html, body {
 .gloss-pop::after {
   content: '';
   position: absolute;
-  top: 100%;
-  left: 50%;
+  left: var(--arrow-x, 50%);
   transform: translateX(-50%);
   border: 6px solid transparent;
+}
+.gloss-pop[data-placement='top']::after {
+  top: 100%;
   border-top-color: var(--bg-1);
+}
+.gloss-pop[data-placement='bottom']::after {
+  bottom: 100%;
+  border-bottom-color: var(--bg-1);
 }
 .gloss-pop .gloss-term {
   display: flex;
@@ -248,14 +257,16 @@ html, body {
   font-size: 11.5px;
 }
 @media (max-width: 600px) {
+  /* On narrow screens the popover anchors to the bottom of the
+   * viewport edge-to-edge — easier to read than tracking a small
+   * inline trigger. !important overrides the inline top/left set
+   * by positionPopover(). */
   .gloss-pop {
-    position: fixed;
-    bottom: 16px;
-    left: 16px;
-    right: 16px;
-    top: auto;
-    transform: none;
-    width: auto;
+    bottom: 16px !important;
+    left: 16px !important;
+    right: 16px !important;
+    top: auto !important;
+    width: auto !important;
   }
   .gloss-pop::after { display: none; }
 }
