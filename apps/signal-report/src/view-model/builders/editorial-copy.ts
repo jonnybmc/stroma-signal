@@ -118,6 +118,18 @@ export interface ReportEditorialCopy {
   // Business
   business_headline_html: string;
   business_section_eyebrow: string;
+  /** Truth-boundary disclosure rendered ONCE beneath the section eyebrow,
+   *  before the impact rows. Names what /r measures and what it does
+   *  not (revenue, CPA movement, campaign impact). Lives here so row-
+   *  level copy can proceed with confident observation without
+   *  re-apologising for the artifact's scope. HTML, not plain text —
+   *  may carry inline emphasis. */
+  business_section_boundary_lede: string;
+  /** Role-flavored question rendered between the boundary statement and
+   *  the modal trigger button. Pre-segments the modal's three meaningful
+   *  choices (campaign exposure / page diagnosis / measurement over
+   *  time) without naming a product. HTML — may carry inline emphasis. */
+  business_role_question_html: string;
   business_aside_lede_html: string;
   business_what_this_enables: string[];
 
@@ -176,9 +188,11 @@ export function buildEditorialCopy(
     funnel_headline_figure_cap: pickFunnelHeadlineFigureCap(shape),
 
     business_headline_html: pickBusinessHeadline(shape),
-    business_section_eyebrow: shape.has_ledger
-      ? 'Where the numbers land in your KPIs'
-      : 'Where the evidence lands in your KPIs',
+    business_section_eyebrow: 'What this evidence can tell you',
+    business_section_boundary_lede:
+      'This report measures post-click experience pressure. It does not measure revenue loss, CPA movement, or campaign impact. Read these signals as evidence of where performance may be distorting outcomes — not proof of commercial loss.',
+    business_role_question_html:
+      'The useful next question depends on your role: <em class="sr-italic-serif">campaign exposure</em>, <em class="sr-italic-serif">page diagnosis</em>, or <em class="sr-italic-serif">measurement over time</em>.',
     business_aside_lede_html: pickBusinessAsideLede(shape),
     business_what_this_enables: pickWhatThisEnables(shape, dominantCulpritKind),
 

@@ -978,7 +978,32 @@ body { overflow-y: auto; overflow-x: hidden; }
   display: grid;
   grid-template-columns: minmax(120px, 140px) minmax(0, 1fr);
   gap: 24px;
-  align-items: center;
+  align-items: start;
+}
+.impact-row-prose {
+  display: flex;
+  flex-direction: column;
+  gap: var(--stack-sm);
+}
+.impact-row-pair {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.impact-row-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+  font-weight: 500;
+}
+.impact-row-body {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--ink-soft);
+  text-wrap: pretty;
 }
 @media (max-width: 900px) {
   .business-grid { grid-template-columns: 1fr; }
@@ -996,6 +1021,41 @@ body { overflow-y: auto; overflow-x: hidden; }
   .impact-row .figure-eyebrow {
     margin-bottom: 0;
   }
+}
+
+/* Section-eyebrow stack: groups the eyebrow heading with the truth-
+   boundary lede that lives once beneath it (Act 4 only currently —
+   the disclosure that names what /r measures and what it doesn't, so
+   row-level copy can proceed with confident observation).  */
+.section-eyebrow-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--stack-xs);
+  margin-bottom: var(--stack-sm);
+}
+.section-boundary-lede {
+  margin: 0;
+  max-width: 60ch;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--ink-mute);
+  text-wrap: pretty;
+}
+
+/* Closing-router role-flavored question — sits between the boundary
+   statement and the modal trigger button. Pre-segments the modal's
+   three meaningful choices without naming a product. */
+.closing-role-question {
+  margin: 0;
+  max-width: 60ch;
+  text-align: center;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--ink-mute);
+  text-wrap: pretty;
+}
+@media (max-width: 720px) {
+  .closing-role-question { text-align: left; }
 }
 
 /* — closing router (single trigger + native <dialog> modal) ──────────

@@ -348,13 +348,16 @@ export interface ReportViewModel {
   act3: ReportAct3ViewModel;
   act4_lede: string;
   act4_summary_points: string[];
-  // KPI impact ledger — Act 4 translation of the proven technical findings
-  // into the language stakeholders own (bounce, conversion, ROAS, audience
-  // reach). Each row is emitted only when the underlying aggregate evidence
-  // is present. When fewer than 2 rows qualify the renderer falls back to
-  // the flat `act4_summary_points` bullets so we never ship an anaemic
-  // 1-row ledger. `impact_sentence_html` already contains the italic-serif
-  // cameo around the KPI word — markup stays declarative.
+  // Evidence ledger — Act 4 translation of the proven technical findings
+  // into a "what it says / why it matters" pair per row. Each row is
+  // emitted only when the underlying aggregate evidence is present. When
+  // fewer than 2 rows qualify the renderer falls back to the flat
+  // `act4_summary_points` bullets so we never ship an anaemic 1-row ledger.
+  // The boundary disclosure ("does not measure revenue / CPA / campaign
+  // impact") lives ONCE in the section-lede above the rows
+  // (vm.editorial.business_section_boundary_lede); row-level copy never
+  // re-apologises — proceeds with confident observation about what the
+  // data IS showing.
   act4_impact_rows: ReportAct4ImpactRow[];
   offer_cards: Array<{ title: string; body: string; href: string; cta: string }>;
   // Editorial copy registry — per-section headlines, ledes, and framing
@@ -372,13 +375,16 @@ export interface ReportAct4ImpactRow {
   id: ReportAct4ImpactRowId;
   metric_value: string;
   metric_label: string;
-  kpi_label: string;
-  impact_sentence_html: string;
+  /** Descriptive restatement of the measured fact — observation only,
+   *  never inference. Renders under a "WHAT IT SAYS" eyebrow. */
+  what_it_says: string;
+  /** Directional implication of the measured fact, mechanistically
+   *  tied to user behaviour. NEVER asserts a commercial figure or
+   *  uses self-deprecating hedges ("the report doesn't see X").
+   *  Tone-aware (varies across alert / watch / steady). Renders
+   *  under a "WHY IT MATTERS" eyebrow. */
+  why_it_matters: string;
   tone: ReportAct4ImpactTone;
-  // Optional glossary anchor — paired with the redesigned `business_impact`
-  // ledger so the renderer can attach the right tooltip term to the row's
-  // KPI cameo. Pure presentation hint; safe to ignore in legacy renders.
-  glossary_key?: 'qs' | 'cpc' | 'cpa' | 'roas' | 'cohort';
 }
 
 const BOUNDARY_STATEMENT =

@@ -137,7 +137,7 @@ describe('editorial copy — funnel section adapts to mode + active stage count 
 });
 
 describe('editorial copy — business section adapts to ledger presence + shape provenance', () => {
-  it('ledger-fallback fixtures (act4_impact_rows < 2) get "Where the evidence lands" not "Every number above"', () => {
+  it('ledger-fallback fixtures (act4_impact_rows < 2) get "Where the evidence lands" headline (not "Every number above")', () => {
     for (const fixture of [
       previewAggregateFixture,
       insufficientRaceDataAggregateFixture,
@@ -151,9 +151,28 @@ describe('editorial copy — business section adapts to ledger presence + shape 
       if (vm.act4_impact_rows.length < 2) {
         expect(vm.editorial.business_headline_html).not.toContain('Every number above');
         expect(vm.editorial.business_headline_html).toContain('Where the evidence lands');
-        expect(vm.editorial.business_section_eyebrow).toBe('Where the evidence lands in your KPIs');
       }
     }
+  });
+
+  it('section eyebrow is the canonical "What this evidence can tell you" framing', () => {
+    for (const fixture of [previewAggregateFixture, fullDepthAggregateFixture, zeroClassifiedAggregateFixture]) {
+      const vm = buildReportViewModel(fixture);
+      expect(vm.editorial.business_section_eyebrow).toBe('What this evidence can tell you');
+    }
+  });
+
+  it('section boundary lede names what the report does NOT measure (lives once, before the rows)', () => {
+    const vm = buildReportViewModel(fullDepthAggregateFixture);
+    expect(vm.editorial.business_section_boundary_lede).toContain('does not measure');
+    expect(vm.editorial.business_section_boundary_lede).toContain('post-click experience');
+  });
+
+  it('role-flavored question pre-segments the modal choices without naming a product', () => {
+    const vm = buildReportViewModel(fullDepthAggregateFixture);
+    expect(vm.editorial.business_role_question_html).toContain('campaign exposure');
+    expect(vm.editorial.business_role_question_html).toContain('page diagnosis');
+    expect(vm.editorial.business_role_question_html).toContain('measurement over time');
   });
 
   it('shape-not-proven fixtures get the "data could and could not say" aside lede', () => {
@@ -271,34 +290,62 @@ describe('editorial copy — Act 4 impact rows pick per-tone (and per-INP-phase)
     }
   });
 
-  it('inp_conversion sentence reflects dominant_phase when known', () => {
+  it('inp_conversion why_it_matters reflects dominant_phase when known', () => {
     const vm = buildReportViewModel(fullDepthAggregateFixture);
     const inpRow = vm.act4_impact_rows.find((r) => r.id === 'inp_conversion');
     const phase = vm.act3.inp_story?.dominant_phase;
     if (inpRow && phase === 'processing') {
-      expect(inpRow.impact_sentence_html).toContain('Heavy click handlers');
+      expect(inpRow.why_it_matters).toContain('click-handler execution');
     }
     if (inpRow && phase === 'presentation_delay') {
-      expect(inpRow.impact_sentence_html).toContain('takes too long to commit the next paint');
+      expect(inpRow.why_it_matters).toContain('between click and the next paint');
     }
   });
 
-  it('script_roas sentence uses "struggle to interact" at watch tier (not "cannot interact")', () => {
+  it('script_roas why_it_matters at watch tier names drag (not stall)', () => {
     // full-depth has third-party `moderate` tier → watch tone
     const vm = buildReportViewModel(fullDepthAggregateFixture);
     const scriptRow = vm.act4_impact_rows.find((r) => r.id === 'script_roas');
     if (scriptRow && scriptRow.tone === 'watch') {
-      expect(scriptRow.impact_sentence_html).toContain('struggle to interact');
-      expect(scriptRow.impact_sentence_html).not.toContain('cannot reliably interact');
+      expect(scriptRow.why_it_matters).toContain('reads as drag');
+      expect(scriptRow.why_it_matters).not.toContain('interactions stall');
     }
   });
 
-  it('network_reach sentence escalates to "majority" at alert tier (>=50% constrained)', () => {
+  it('network_reach why_it_matters escalates to "majority" at alert tier (>=50% constrained)', () => {
     for (const fixture of [strongLcpCoverageAggregateFixture, fullDepthAggregateFixture]) {
       const vm = buildReportViewModel(fixture);
       const reach = vm.act4_impact_rows.find((r) => r.id === 'network_reach');
       if (reach && reach.tone === 'alert') {
-        expect(reach.impact_sentence_html).toContain('majority');
+        expect(reach.why_it_matters).toContain('majority');
+      }
+    }
+  });
+
+  it('Act 4 row prose never contains commercial-figure assertions or self-deprecation hedges', () => {
+    const FORBIDDEN_REGRESS_TOKENS = [
+      'inflated cpa',
+      'leak roas',
+      'leaky roas',
+      'leak campaign efficiency',
+      'same ad spend',
+      'drop conversion',
+      'stall conversion',
+      'suppress conversion',
+      'raise cpc',
+      'lift cpc',
+      'paying more for clicks',
+      "the report doesn't see",
+      'outside the scope of this report',
+      "this report doesn't carry"
+    ];
+    for (const fixture of [fullDepthAggregateFixture, strongLcpCoverageAggregateFixture, soberMoodAggregateFixture]) {
+      const vm = buildReportViewModel(fixture);
+      for (const row of vm.act4_impact_rows) {
+        const combined = `${row.what_it_says} ${row.why_it_matters}`.toLowerCase();
+        for (const forbidden of FORBIDDEN_REGRESS_TOKENS) {
+          expect(combined, `row ${row.id} contains forbidden token "${forbidden}"`).not.toContain(forbidden);
+        }
       }
     }
   });

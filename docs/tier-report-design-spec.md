@@ -31,7 +31,7 @@ The report is a complete, standalone artifact. Its job is to make the experience
 The reader is a Paid-Media / PPC specialist or CMO under pressure from rising CAC, soft ROAS, and AI-driven bid opacity. The register is **operator-empathetic, educational, never prescriptive**:
 
 - Body copy stays diagnostic — it names what is observed.
-- Glossary tooltips translate every Web Vital into Paid-Media language: a `plain` definition + a `cmo` line that explains the KPI consequence (e.g., "Slow LCP is the #1 reason Google lowers your Landing Page Experience score, which raises CPC and shrinks ad reach").
+- Glossary tooltips translate every Web Vital into Paid-Media language: a `plain` definition + a `cmo` line that names the mechanism + user-behaviour consequence in KPI vocabulary, without asserting commercial figures the report cannot measure (e.g., "Slow LCP is one of the inputs platforms use when scoring landing-page experience — the experience signal that gets baked into auction weighting alongside competitive bids"). The KPI vocabulary stays — the principal operator wants it as ammo for internal arguments — but the causal-claim wording is softened and the boundary disclosure lives ONCE in the Act 4 section-lede, never in every glossary entry.
 - Headlines never prescribe (`recommend` / `you should` / `optimize` / `the fix is` are forbidden in headline + lede slots).
 - Action vocabulary stays in the **reroute / reshape / split** family (per `feedback_actionability_discipline`). Exclusionary or bid-down language is forbidden anywhere in the artifact (`exclude`, `avoid`, `bid down`, `lower CPC ceilings`, `the user was on 3G`).
 
@@ -107,7 +107,7 @@ It carries:
 
 - the race-devices block (two phone-frame lanes filling at real wall-clock duration; a wait-delta counter between them tweens to the measured ms gap)
 - an LCP subparts breakdown showing where the gap actually lives (TTFB / load delay / load time / render delay)
-- a Paid-Media impact block ("for paid media, what this delta costs you") translating into Quality Score impact, CPC pressure, and mobile bounce — terms anchored to the glossary
+- a Paid-Media impact block — a single observational sentence per wait-delta band (contained / visible / severe) that names the user-experience consequence at that magnitude. Earlier iterations included hardcoded magnitudes ("CPC pressure +8 to +14%", "mobile bounce +24%"); these were author calibrations, not measurements, and have been removed in favour of confident observational copy that stays inside the report's measurement boundary.
 
 If the landing/footer compresses coverage honesty into one compact comparison number, it must use the weaker measured side of the race rather than the stronger one.
 
@@ -142,9 +142,11 @@ The section should still feel embodied. The visual and copy should communicate t
 
 The closing section.
 
-It restates what the report has already proven — who is affected, how far apart the experience is, where performance becomes poor — and names where each measured number lands in the reader's KPI vocabulary (Quality Score, CPC, CPA, ROAS, Audience Reach).
+It restates what the report has already proven — who is affected, how far apart the experience is, where performance becomes poor — using a "what this evidence can tell you" framing. Section eyebrow names the framing; a small boundary-lede beneath it names what /r measures (post-click experience pressure) and what it does not (revenue, CPA movement, campaign impact). That boundary disclosure lives ONCE here so row-level copy can proceed with confident observation about what the data IS showing.
 
-The KPI ledger is rendered from `act4_impact_rows` — each row carries a measured `metric_value`, a `kpi_label` cameo, an `impact_sentence_html` body, and an optional `glossary_key` anchor. Rows are emitted only when underlying aggregate evidence supports them (per the act4-impact builder gates). When fewer than two rows qualify, the renderer falls back to flat `act4_summary_points` bullets so the artifact never ships an anaemic one-row ledger.
+The evidence ledger is rendered from `act4_impact_rows` — each row carries a measured `metric_value`, a `metric_label`, a descriptive `what_it_says` (observation only), and a tone-aware `why_it_matters` (directional implication tied to user behaviour, never asserting commercial figures). Rows are emitted only when underlying aggregate evidence supports them (per the act4-impact builder gates). When fewer than two rows qualify, the renderer falls back to flat `act4_summary_points` bullets so the artifact never ships an anaemic one-row ledger.
+
+Tonal discipline (load-bearing, see `feedback_no_self_deprecation_in_artifacts`): the row-level copy never re-apologises ("the report doesn't see X", "outside the scope of this report"). The boundary lives once in the section-lede; rows describe mechanism + user-behaviour consequence with confidence. The principal operator translates user-behaviour observations into KPI implications themselves.
 
 After the ledger, the section closes with a **needs-inquiry router** — three co-equal cards + a multi-select demand-signal dropdown, anchored on the boundary statement. Visual restraint is load-bearing: the router uses the same `.figure` token surface as the rest of the section (no accent backgrounds, no button chrome on CTAs, hairline-pill submit buttons, hairline-bottom-only email inputs). Editorial register is needs-inquiry — every card title reads as a natural answer to the bridge question ("See which campaigns this affects.", "Get a fix list for this page.", "Run this report on a schedule."), declarative-imperative, never a packaged offer. Confirmations stay in observation register (`✓ thanks — we will let you know when it ships`, never `You're in!` or `Welcome!`).
 

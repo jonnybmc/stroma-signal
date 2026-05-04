@@ -26,24 +26,18 @@ const ACT4_LOAF_LONG_FRAME_MS = 50;
 const ACT4_IMPACT_MIN_ROWS = 2;
 // Act 4 `inp_conversion` row emission gate. Below ~25% poor-session share
 // the INP impact narrative reads as alarmist next to Act 3's own funnel
-// evidence; above it the share is large enough that the "drop conversion"
-// sentence meets the reader's own observation. Calibration choice (not an
-// empirical CWV threshold).
+// evidence; above it the share is large enough that the evidence
+// concentrates as a pattern rather than a single mechanism.
 const ACT4_INP_GATE_POOR_SHARE_PCT = 25;
 // Act 4 `network_reach` row emission gate. A combined constrained /
 // constrained_moderate share of 30% is the point where "a real share"
-// stops being a hedge and starts being load-bearing for the
-// network_reach KPI claim. Calibration choice.
+// stops being a hedge and starts being load-bearing.
 const ACT4_NETWORK_GATE_CONSTRAINED_PCT = 30;
 // Tone escalation for the `script_roas` row when LoAF worst-frame p75
 // crosses into territory that will feel like a stall on mid-tier
 // devices. 150ms is 3× the W3C long-frame floor and the point above
 // which qualitative session logs commonly report "the page froze".
 const ACT4_LOAF_ALERT_MS = 150;
-
-function wrapKpiCameo(sentence: string, kpiCameo: string): string {
-  return sentence.replace(kpiCameo, `<em class="sr-italic-serif">${kpiCameo}</em>`);
-}
 
 // Presentation-calibration tone bands for the `lcp_bounce` row. Not CWV
 // thresholds — the CWV LCP "poor" line is 4000ms absolute; these bands
@@ -60,7 +54,7 @@ function toneFromWaitDeltaMs(deltaMs: number | null): ReportAct4ImpactTone {
 // Presentation-calibration tone bands for the `inp_conversion` row.
 // Operates on the share of sessions whose slowest measured phase
 // crosses a CWV poor threshold (FCP / LCP / INP). 50% ≈ majority-bad;
-// 15% ≈ a minority large enough to own a named KPI story.
+// 15% ≈ a minority large enough to own a named impact story.
 function toneFromPoorShare(share: number): ReportAct4ImpactTone {
   if (share >= 50) return 'alert';
   if (share >= 15) return 'watch';
@@ -70,7 +64,7 @@ function toneFromPoorShare(share: number): ReportAct4ImpactTone {
 // Presentation-calibration tone bands for the `network_reach` row.
 // Operates on the combined constrained + constrained_moderate share.
 // 50% ≈ the urban assumption is strictly wrong; 30% ≈ load-bearing
-// enough to name the audience-reach KPI claim.
+// enough to name as a cohort divergence.
 function toneFromConstrainedShare(share: number): ReportAct4ImpactTone {
   if (share >= 50) return 'alert';
   if (share >= 30) return 'watch';
@@ -82,18 +76,20 @@ function toneFromConstrainedShare(share: number): ReportAct4ImpactTone {
 // emission per concern means a future tweak to one row touches one
 // function instead of scrolling through a 100-line imperative push
 // loop.
+//
+// Tonal discipline (see `feedback_no_self_deprecation_in_artifacts`):
+// the boundary disclosure ("does not measure revenue / CPA / campaign
+// impact") lives ONCE in the section-lede above these rows. Row-level
+// copy never re-apologises — proceeds with confident observation about
+// what the data IS showing, mechanistically tied to user behaviour.
 
-// Tone-aware impact-sentence variants. The metric_value already conveys
-// magnitude; the prose should scale with it instead of asserting one
-// alarm-toned headline at every severity. Discipline: never prescribe;
-// only describe the consequence the measured delta lands on.
-const LCP_BOUNCE_SENTENCES: Record<ReportAct4ImpactTone, string> = {
+const LCP_BOUNCE_WHY_MATTERS: Record<ReportAct4ImpactTone, string> = {
   alert:
-    'Google and Meta raise CPC on slow landing pages. At this delta, you are paying more for clicks that never become sessions.',
+    'The same page is reaching different cohorts at different times — the cleanest measured gap in the report. At this delta, landing-page experience scoring is the kind of signal platforms factor into auction weighting.',
   watch:
-    'Google and Meta lift CPC on slower landing pages. The delta here is enough to start showing up in auction prices.',
+    'The same page is reaching different cohorts at different times. The gap is large enough to register against the assumption that all traffic experiences the page identically.',
   steady:
-    'The wait delta here is small. CPC pressure from landing-page experience is present but not the dominant cost driver in this window.'
+    'A measurable but modest difference between cohorts. The page is broadly arriving at similar times across audiences.'
 };
 
 function buildLcpBounceRow(race: ReportRaceViewModel): ReportAct4ImpactRow | null {
@@ -103,45 +99,44 @@ function buildLcpBounceRow(race: ReportRaceViewModel): ReportAct4ImpactRow | nul
     id: 'lcp_bounce',
     metric_value: race.wait_delta_seconds,
     metric_label: `LCP wait delta · ${race.comparison_label} vs urban`,
-    kpi_label: 'Bounce Rate · Ad Quality Score',
-    impact_sentence_html: wrapKpiCameo(LCP_BOUNCE_SENTENCES[tone], 'CPC'),
-    tone,
-    glossary_key: 'cpc'
+    what_it_says: `${race.comparison_label} users waited ${race.wait_delta_seconds} longer than urban users for the main page experience to arrive.`,
+    why_it_matters: LCP_BOUNCE_WHY_MATTERS[tone],
+    tone
   };
 }
 
-// Per-phase INP-conversion sentences. Mushy-buttons framing only fits
-// `input_delay`; `processing` is heavy click-handlers; `presentation_delay`
-// is render-commit lag (the page accepts the click but the next paint is
-// late). Picking the wrong sentence misattributes mechanism.
-function pickInpConversionSentence(phase: 'input_delay' | 'processing' | 'presentation_delay' | null): string {
+// Per-phase INP-conversion "why it matters" sentences. Each names the
+// mechanism the dominant phase implies, then describes the user-
+// behaviour consequence. No conversion / CPA claims; the principal
+// operator translates user-behaviour to KPI themselves.
+function pickInpWhyItMatters(phase: 'input_delay' | 'processing' | 'presentation_delay' | null): string {
   if (phase === 'processing') {
-    return 'Heavy click handlers at the point of intent stall conversion. Same ad spend, fewer leads, inflated CPA.';
+    return 'The largest delay appears in click-handler execution. The page accepts the click; the next paint takes long enough that interaction stalls at the moment of intent.';
   }
   if (phase === 'presentation_delay') {
-    return 'The page accepts the click, but takes too long to commit the next paint. Users assume nothing happened and leave. Same ad spend, fewer leads, inflated CPA.';
+    return 'The largest delay appears between click and the next paint. The page is acting, but slowly enough that a share of users disengage before the action registers visually.';
   }
   if (phase === 'input_delay') {
-    return 'Mushy buttons at the point of intent drop conversion. Same ad spend, fewer leads, inflated CPA.';
+    return "The largest delay appears between input and the page's first response. Buttons feel mushy at the moment of intent — the friction is real even when the page completes the action moments later.";
   }
   // No dominant phase confidently named — fall back to a non-mechanism
   // framing that still earns the row's space.
-  return 'A measurable share of sessions cross the interaction-poor threshold. The mechanism is not single-cause here, but it shows up at the bottom of the funnel as inflated CPA.';
+  return 'Interaction-poor sessions concentrate enough to read as a pattern, even when no single mechanism dominates the cause.';
 }
 
 function buildInpConversionRow(act3: ReportAct3ViewModel): ReportAct4ImpactRow | null {
   if (act3.poor_session_share == null || act3.poor_session_share < ACT4_INP_GATE_POOR_SHARE_PCT) return null;
   const phase = act3.inp_story?.dominant_phase ?? null;
+  const phaseSuffix = phase ? ` (dominant phase: ${phase.replace('_', ' ')})` : '';
   return {
     id: 'inp_conversion',
     metric_value: `${act3.poor_session_share}%`,
     metric_label: phase
       ? `Sessions past the poor-performance threshold · dominant phase ${phase.replace('_', ' ')}`
       : 'Sessions past the poor-performance threshold',
-    kpi_label: 'Conversion Rate · Cost Per Acquisition',
-    impact_sentence_html: wrapKpiCameo(pickInpConversionSentence(phase), 'CPA'),
-    tone: toneFromPoorShare(act3.poor_session_share),
-    glossary_key: 'cpa'
+    what_it_says: `${act3.poor_session_share}% of measured sessions crossed a poor-performance threshold${phaseSuffix}.`,
+    why_it_matters: pickInpWhyItMatters(phase),
+    tone: toneFromPoorShare(act3.poor_session_share)
   };
 }
 
@@ -156,14 +151,17 @@ function buildScriptRoasRow(race: ReportRaceViewModel, act3: ReportAct3ViewModel
 
   let metricValue: string;
   let metricLabel: string;
+  let whatItSays: string;
   let tone: ReportAct4ImpactTone;
   if (thirdPartyHits && thirdParty != null && thirdParty.median_share_pct != null) {
     metricValue = `${thirdParty.median_share_pct}%`;
     metricLabel = 'Third-party script share (median origin)';
+    whatItSays = `Third-party scripts contribute ${thirdParty.median_share_pct}% of pre-LCP weight on the median origin.`;
     tone = thirdParty.dominant_tier === 'heavy' ? 'alert' : 'watch';
   } else if (loafHits && loaf != null && loaf.worst_frame_ms_p75 != null) {
     metricValue = `${Math.round(loaf.worst_frame_ms_p75)}ms`;
     metricLabel = 'LoAF worst-frame p75';
+    whatItSays = `Long animation frames reach ${Math.round(loaf.worst_frame_ms_p75)}ms at p75 — three-quarters of measured frames render faster, but the slow tail crosses the long-frame floor.`;
     tone = loaf.worst_frame_ms_p75 >= ACT4_LOAF_ALERT_MS ? 'alert' : 'watch';
   } else {
     // Defensive: if third-party fired without a share number, emit the
@@ -171,25 +169,25 @@ function buildScriptRoasRow(race: ReportRaceViewModel, act3: ReportAct3ViewModel
     // row reads honestly instead of "undefined%".
     metricValue = thirdParty?.dominant_tier === 'heavy' ? 'Heavy' : 'Moderate';
     metricLabel = 'Third-party script load tier';
+    whatItSays = `Third-party script load is in the ${metricValue.toLowerCase()} tier on the measured pages.`;
     tone = thirdParty?.dominant_tier === 'heavy' ? 'alert' : 'watch';
   }
 
-  // "Cannot interact" is correct only at heavy / loaf-alert. At watch tier
-  // (moderate third-party share, sub-150ms LoAF) it's hyperbole — users
-  // can interact, just slowly.
-  const sentence =
+  // "Stall in the moments after" is correct only at heavy / loaf-alert.
+  // At watch tier (moderate third-party share, sub-150ms LoAF) it's
+  // hyperbole — drag is real but doesn't categorically stall.
+  const whyItMatters =
     tone === 'alert'
-      ? 'Mobile-first audiences cannot reliably interact with a script-heavy page. Top-of-funnel reach without bottom-of-funnel ROAS.'
-      : 'Mobile-first audiences struggle to interact with a script-heavy page. Top-of-funnel reach with leaky bottom-of-funnel ROAS.';
+      ? 'On script-heavy pages, mobile-first audiences experience the worst of this — the top of the experience funnel arrives, but interactions stall in the moments after.'
+      : 'Script weight at this level reads as drag at the moment of interaction — perceptible on mid-tier devices, particularly on weaker network paths.';
 
   return {
     id: 'script_roas',
     metric_value: metricValue,
     metric_label: metricLabel,
-    kpi_label: 'Mobile ROAS · Audience Reach',
-    impact_sentence_html: wrapKpiCameo(sentence, 'ROAS'),
-    tone,
-    glossary_key: 'roas'
+    what_it_says: whatItSays,
+    why_it_matters: whyItMatters,
+    tone
   };
 }
 
@@ -198,30 +196,28 @@ function buildNetworkReachRow(aggregate: SignalAggregateV1): ReportAct4ImpactRow
     aggregate.network_distribution.constrained_moderate + aggregate.network_distribution.constrained;
   if (constrainedShare < ACT4_NETWORK_GATE_CONSTRAINED_PCT) return null;
   const tone = toneFromConstrainedShare(constrainedShare);
-  // At alert tier (>=50%) the framing earns "majority"; at watch tier
+  // At alert tier (>=50%) "majority" earns its weight; at watch tier
   // (>=30%) "real share" stays accurate.
-  const sentence =
+  const whyItMatters =
     tone === 'alert'
-      ? 'A majority of your audience lives on constrained networks. Campaigns calibrated for urban speed leak Campaign Efficiency at scale here.'
-      : 'A real share of your audience lives on constrained networks. Campaigns calibrated for urban speed leak Campaign Efficiency here.';
+      ? 'Decisions calibrated for urban-speed conditions miss the experience a majority of the audience actually gets.'
+      : "If teams only judge the page from fast office networks, they'll miss the experience a real share of the audience gets.";
   return {
     id: 'network_reach',
     metric_value: `${constrainedShare}%`,
     metric_label: 'Audience on constrained or worse networks',
-    kpi_label: 'Audience Reach · Campaign Efficiency',
-    impact_sentence_html: wrapKpiCameo(sentence, 'Campaign Efficiency'),
-    tone,
-    glossary_key: 'cohort'
+    what_it_says: `${constrainedShare}% of the audience arrived in constrained or weaker network conditions.`,
+    why_it_matters: whyItMatters,
+    tone
   };
 }
 
-// Deduced narrative bridges. Every `metric_value` / `metric_label`
+// Orchestrator. Every `metric_value` / `metric_label` / `what_it_says`
 // reads from a real measured field on `aggregate`, `race`, or `act3`.
-// The `impact_sentence_html` strings are author-written prose tying
-// those measured numbers to the stakeholder's KPI vocabulary
-// (CPC, CPA, ROAS, Campaign Efficiency). No numeric claim originates
-// in these sentences — they are editorial commentary on numbers the
-// reader has already seen earlier in the deck.
+// `why_it_matters` is editorial commentary on those measured numbers,
+// disciplined to user-behaviour observation (never commercial-figure
+// assertion). The boundary disclosure lives ONCE in the section-lede
+// above these rows — see editorial-copy.ts business_section_boundary_lede.
 export function buildAct4ImpactRows(
   aggregate: SignalAggregateV1,
   race: ReportRaceViewModel,

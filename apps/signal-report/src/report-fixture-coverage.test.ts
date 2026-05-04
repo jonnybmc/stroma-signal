@@ -140,13 +140,13 @@ describe('fixture coverage — every scenario renders without null/undefined/NaN
   }
 });
 
-describe('cross-fixture invariants: lcp_bounce glossary anchor matches its cameo', () => {
-  it('every fixture emitting lcp_bounce row anchors to "cpc" (matches the italicized CPC cameo)', () => {
+describe('cross-fixture invariants: every act4 row populates both halves of the what-it-says / why-it-matters pair', () => {
+  it('every emitted act4 impact row has non-empty what_it_says + why_it_matters', () => {
     for (const fx of signalReportScenarioFixtures) {
       const vm = buildReportViewModel(fx.aggregate);
-      const lcpRow = vm.act4_impact_rows.find((r) => r.id === 'lcp_bounce');
-      if (lcpRow) {
-        expect(lcpRow.glossary_key, `${fx.id}: lcp_bounce glossary_key drift`).toBe('cpc');
+      for (const row of vm.act4_impact_rows) {
+        expect(row.what_it_says.length, `${fx.id}: row ${row.id} missing what_it_says`).toBeGreaterThan(0);
+        expect(row.why_it_matters.length, `${fx.id}: row ${row.id} missing why_it_matters`).toBeGreaterThan(0);
       }
     }
   });

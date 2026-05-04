@@ -13,15 +13,15 @@
 // - Confirmation copy stays in observation register (✓ noted, not
 //   Thanks! / You're in!).
 
-import { renderHeroValue, renderReveal, renderTerm } from '../render-helpers.js';
+import { renderHeroValue, renderReveal } from '../render-helpers.js';
 import { escapeHtml } from '../render-utils.js';
 import type { ReportAct4ImpactRow, ReportViewModel } from '../report-view-model.js';
 
 function renderImpactRow(row: ReportAct4ImpactRow): string {
-  const kpiLabels = row.kpi_label
-    .split(' · ')
-    .map((k) => k.trim())
-    .filter(Boolean);
+  // Two-paragraph layout: WHAT IT SAYS (descriptive observation) +
+  // WHY IT MATTERS (directional implication, no commercial figures).
+  // Eyebrows are mono-uppercase to make the structural distinction
+  // visible — the boundary discipline reads off the markup.
   return `
     <div class="figure impact-row">
       <div>
@@ -30,13 +30,15 @@ function renderImpactRow(row: ReportAct4ImpactRow): string {
           row.metric_label
         )}</div>
       </div>
-      <div>
-        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">
-          ${kpiLabels.map((k) => `<span class="kpi-pill">${escapeHtml(k)}</span>`).join('')}
+      <div class="impact-row-prose">
+        <div class="impact-row-pair">
+          <div class="impact-row-eyebrow">What it says</div>
+          <p class="impact-row-body">${escapeHtml(row.what_it_says)}</p>
         </div>
-        <p style="margin:0;font-size:14px;color:var(--ink-soft);line-height:1.55;text-wrap:pretty;">${row.impact_sentence_html}${
-          row.glossary_key ? ` ${renderTerm(row.glossary_key, '↗')}` : ''
-        }</p>
+        <div class="impact-row-pair">
+          <div class="impact-row-eyebrow">Why it matters</div>
+          <p class="impact-row-body">${escapeHtml(row.why_it_matters)}</p>
+        </div>
       </div>
     </div>
   `;
@@ -55,18 +57,22 @@ function renderSummaryFallback(points: string[]): string {
 }
 
 function renderClosingTrigger(vm: ReportViewModel): string {
-  // Single discreet text-link trigger that opens the dialog. The
-  // boundary statement above sets the truth frame; this trigger is the
-  // only interactive surface in the closing section. No card chrome,
-  // no per-option visual weight — restraint is the point.
+  // Closing-router stack:
+  //   1. Boundary statement — the report-level truth frame.
+  //   2. Role-flavored question — pre-segments the modal's three
+  //      meaningful choices (campaign exposure / page diagnosis /
+  //      measurement over time) without naming a product.
+  //   3. Single discreet trigger button — opens the dialog.
+  // No card chrome, no per-option visual weight — restraint is the point.
   const modal = vm.editorial.business_closing_modal;
   const bridgeSuffix = vm.editorial.business_closing_bridge_html ? ` ${vm.editorial.business_closing_bridge_html}` : '';
   return `
     <div class="closing-router">
       ${renderReveal(`<p class="closing-bridge">${escapeHtml(vm.boundary_statement)}${bridgeSuffix}</p>`)}
+      ${renderReveal(`<p class="closing-role-question">${vm.editorial.business_role_question_html}</p>`, { delay: 60 })}
       ${renderReveal(
         `<button type="button" class="closing-trigger" data-closing-modal-open aria-haspopup="dialog" aria-controls="closing-modal">${escapeHtml(modal.trigger_label)} →</button>`,
-        { delay: 80 }
+        { delay: 120 }
       )}
       ${renderClosingModal(vm)}
     </div>
@@ -213,7 +219,12 @@ export function renderBusinessSection(vm: ReportViewModel): string {
         </div>
 
         <div class="block">
-          ${renderReveal(`<h3 class="section-eyebrow">${escapeHtml(vm.editorial.business_section_eyebrow)}</h3>`)}
+          ${renderReveal(
+            `<div class="section-eyebrow-stack">
+              <h3 class="section-eyebrow">${escapeHtml(vm.editorial.business_section_eyebrow)}</h3>
+              <p class="section-boundary-lede">${vm.editorial.business_section_boundary_lede}</p>
+            </div>`
+          )}
           ${
             useLedger
               ? vm.act4_impact_rows

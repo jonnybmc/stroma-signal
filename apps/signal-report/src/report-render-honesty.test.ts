@@ -100,7 +100,29 @@ const FORBIDDEN_BUSINESS_SECTION_SALES_TOKENS: string[] = [
   'limited time',
   'limited offer',
   'special offer',
-  'exclusive access'
+  'exclusive access',
+  // Commercial-claim over-reach (Act 4 reframe — the report measures
+  // post-click experience, not commercial outcomes; row-level copy
+  // never asserts CPC / CPA / ROAS / conversion movement).
+  'you are paying more',
+  'inflated cpa',
+  'leak roas',
+  'leaky roas',
+  'leak campaign efficiency',
+  'same ad spend',
+  'drop conversion',
+  'stall conversion',
+  'suppress conversion',
+  'raise cpc',
+  'lift cpc',
+  'shrinks ad reach',
+  // Self-deprecation hedges (per feedback_no_self_deprecation_in_artifacts —
+  // the boundary disclosure lives ONCE in the section-lede; row-level
+  // copy proceeds with confident observation, never re-apologises).
+  "the report doesn't see",
+  'outside the scope of this report',
+  "this report doesn't carry",
+  'depends on context the report cannot measure'
 ];
 
 const FORBIDDEN_BUSINESS_SECTION_CELEBRATION_TOKENS: string[] = [

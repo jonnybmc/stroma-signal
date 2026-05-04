@@ -239,17 +239,18 @@ describe('report view model', () => {
         expect(row.metric_value).not.toContain('undefined');
         expect(row.metric_label).not.toContain('NaN');
         expect(row.metric_label).not.toContain('undefined');
-        expect(row.kpi_label).not.toContain('NaN');
-        expect(row.kpi_label).not.toContain('undefined');
-        expect(row.impact_sentence_html).not.toContain('NaN');
-        expect(row.impact_sentence_html).not.toContain('undefined');
-        expect(row.impact_sentence_html).toContain('<em class="sr-italic-serif">');
+        expect(row.what_it_says).not.toContain('NaN');
+        expect(row.what_it_says).not.toContain('undefined');
+        expect(row.what_it_says.length).toBeGreaterThan(0);
+        expect(row.why_it_matters).not.toContain('NaN');
+        expect(row.why_it_matters).not.toContain('undefined');
+        expect(row.why_it_matters.length).toBeGreaterThan(0);
         expect(['alert', 'watch', 'steady']).toContain(row.tone);
       }
     }
   });
 
-  it('emits the full KPI impact ledger on the full-depth fixture', () => {
+  it('emits all four impact rows on the full-depth fixture (lcp_bounce / inp_conversion / script_roas / network_reach)', () => {
     const viewModel = buildReportViewModel(fullDepthAggregateFixture);
     const ids = viewModel.act4_impact_rows.map((row) => row.id);
 
@@ -258,11 +259,12 @@ describe('report view model', () => {
     expect(ids).toContain('script_roas');
     expect(ids).toContain('network_reach');
 
-    const kpis = viewModel.act4_impact_rows.map((row) => row.kpi_label);
-    expect(kpis).toContain('Bounce Rate · Ad Quality Score');
-    expect(kpis).toContain('Conversion Rate · Cost Per Acquisition');
-    expect(kpis).toContain('Mobile ROAS · Audience Reach');
-    expect(kpis).toContain('Audience Reach · Campaign Efficiency');
+    // Each row must carry both halves of the "what it says / why it matters"
+    // pair populated — the boundary discipline reads off the markup.
+    for (const row of viewModel.act4_impact_rows) {
+      expect(row.what_it_says.length).toBeGreaterThan(0);
+      expect(row.why_it_matters.length).toBeGreaterThan(0);
+    }
   });
 
   it('only emits the script_roas row when third-party pressure is moderate+ OR a long LoAF frame is measured', () => {
@@ -465,8 +467,10 @@ describe('report view model', () => {
       for (const row of viewModel.act4_impact_rows) {
         expect(row.metric_value).not.toContain('NaN');
         expect(row.metric_value).not.toContain('undefined');
-        expect(row.impact_sentence_html).not.toContain('NaN');
-        expect(row.impact_sentence_html).not.toContain('undefined');
+        expect(row.what_it_says).not.toContain('NaN');
+        expect(row.what_it_says).not.toContain('undefined');
+        expect(row.why_it_matters).not.toContain('NaN');
+        expect(row.why_it_matters).not.toContain('undefined');
       }
 
       // Mood tier is valid
