@@ -1286,20 +1286,16 @@ dialog.closing-modal[open] {
   outline: none;
   border-color: var(--accent);
 }
-.closing-modal-email input[aria-invalid="true"] {
-  border-color: var(--red, #b8362c);
-}
-.closing-modal-error {
+.closing-modal-email-caption {
   display: inline-block;
   margin-top: 4px;
   font-family: var(--font-sans);
-  font-size: 12px;
+  font-size: 11.5px;
   letter-spacing: 0;
   text-transform: none;
-  color: var(--red, #b8362c);
+  color: var(--ink-mute);
   line-height: 1.4;
 }
-.closing-modal-error[hidden] { display: none; }
 
 .closing-modal-actions {
   display: flex;

@@ -204,8 +204,6 @@ interface ModalElements {
   dismiss: HTMLButtonElement | null;
   confirmation: HTMLElement | null;
   submit: HTMLButtonElement | null;
-  emailInput: HTMLInputElement | null;
-  emailError: HTMLElement | null;
 }
 
 function findModalElements(): ModalElements | null {
@@ -219,42 +217,59 @@ function findModalElements(): ModalElements | null {
     form,
     dismiss: form.querySelector<HTMLButtonElement>('[data-closing-modal-dismiss]'),
     confirmation: form.querySelector<HTMLElement>('[data-closing-modal-confirmation]'),
-    submit: form.querySelector<HTMLButtonElement>('[data-closing-modal-submit]'),
-    emailInput: form.querySelector<HTMLInputElement>('input[type="email"][name="email"]'),
-    emailError: form.querySelector<HTMLElement>('[data-closing-modal-email-error]')
+    submit: form.querySelector<HTMLButtonElement>('[data-closing-modal-submit]')
   };
 }
 
-/** Permissive email shape check — same heuristic the prior card-form
- *  handler used (non-empty + contains "@"). The browser's `type="email"`
- *  validator catches most malformed inputs at the field level; this
- *  is the belt-and-braces guard at submit time. */
-function looksLikeEmail(value: string | undefined): boolean {
-  return typeof value === 'string' && value.length > 0 && value.includes('@');
+/** Per-browser persistence of "this share-token already received an
+ *  intent submission from this browser" so revisits (the same operator
+ *  re-opening the report later) don't see the trigger. Sharing a
+ *  report URL still works as expected: a new browser/device has fresh
+ *  storage and sees the modal independently — every distinct viewer's
+ *  signal is captured. */
+const INTENT_SUBMITTED_KEY_PREFIX = 'stroma:intent:';
+
+function intentSubmittedKey(shareToken: string | null): string | null {
+  if (!shareToken || shareToken.length === 0) return null;
+  return `${INTENT_SUBMITTED_KEY_PREFIX}${shareToken}`;
 }
 
-/** True when the chosen path requires an email per the wire contract's
- *  historical convention (PI Early Access + Monitoring collected email;
- *  Rapid Fix + Something Else did not). Plan-locked decision. */
-function pathRequiresEmail(choice: ClosingModalChoice | null): boolean {
-  return choice === 'pi_early_access' || choice === 'monitoring';
+function hasAlreadySubmitted(shareToken: string | null): boolean {
+  const key = intentSubmittedKey(shareToken);
+  if (!key) return false;
+  try {
+    return localStorage.getItem(key) !== null;
+  } catch {
+    // Safari private mode / disabled storage — fail-open (modal shows).
+    return false;
+  }
+}
+
+function markAsSubmitted(shareToken: string | null): void {
+  const key = intentSubmittedKey(shareToken);
+  if (!key) return;
+  try {
+    localStorage.setItem(key, String(Date.now()));
+  } catch {
+    // Storage quota / disabled — silent no-op. Worst case: modal shows
+    // again on next visit, user submits twice. Acceptable.
+  }
 }
 
 function attachModalHandler(ctx: ResolvedReportContext): void {
   const els = findModalElements();
   if (!els) return;
-  const { trigger, dialog, form, dismiss, confirmation, submit, emailInput, emailError } = els;
+  const { trigger, dialog, form, dismiss, confirmation, submit } = els;
 
-  function clearEmailError(): void {
-    if (emailInput) emailInput.removeAttribute('aria-invalid');
-    if (emailError) emailError.hidden = true;
-  }
-  function showEmailError(): void {
-    if (emailInput) {
-      emailInput.setAttribute('aria-invalid', 'true');
-      emailInput.focus();
-    }
-    if (emailError) emailError.hidden = false;
+  // Per-browser memory: if this share-token already saw a submit from
+  // this browser, hide the trigger entirely. Sharing a report still
+  // works — different browsers / devices have fresh storage and see
+  // the modal independently. Keeps the report clean as a static
+  // artifact for revisits.
+  if (hasAlreadySubmitted(ctx.share_token)) {
+    trigger.hidden = true;
+    dialog.hidden = true;
+    return;
   }
 
   // Open via trigger (or via the keyboard-driven `Enter` on the trigger).
@@ -276,36 +291,26 @@ function attachModalHandler(ctx: ResolvedReportContext): void {
     if (e.target === dialog) dialog.close();
   });
 
-  // Radio change drives CSS reveal via [data-choice] attribute. Also
-  // clears any stale email-error styling from a prior submit attempt.
+  // Radio change drives CSS reveal via [data-choice] attribute.
   form.addEventListener('change', (e) => {
     const target = e.target;
     if (!(target instanceof HTMLInputElement)) return;
     if (target.name === 'choice') {
       dialog.dataset.choice = target.value;
-      clearEmailError();
     }
     if (target.name === 'pill' && target.value === 'something_else') {
       dialog.dataset.pillSomethingElse = target.checked ? 'true' : '';
     }
-    if (target.name === 'email') clearEmailError();
   });
 
   form.addEventListener('submit', (e) => {
     e.preventDefault();
     if (form.dataset.state === 'logged') return;
 
-    const state = readFormState(form);
-
-    // Email enforcement for paths that require it (PI / Monitoring).
-    // Rapid Fix + Something Else accept empty email per plan-locked
-    // decision (matches the prior three-card behaviour exactly).
-    if (pathRequiresEmail(state.choice) && !looksLikeEmail(state.email)) {
-      showEmailError();
-      return;
-    }
-
-    const events = buildEventsFromForm(state, ctx);
+    // Email is OPTIONAL on every path — submitting without it counts
+    // the demand signal in aggregate (which is what the modal exists
+    // for); the email is the affordance for "follow up directly".
+    const events = buildEventsFromForm(readFormState(form), ctx);
     if (events.length === 0) {
       // No valid choice (browser-native `required` on the first radio
       // catches this) or "something else" with no pill checked. Focus
@@ -324,6 +329,7 @@ function attachModalHandler(ctx: ResolvedReportContext): void {
     form.dataset.state = 'logged';
     if (submit) submit.disabled = true;
     if (confirmation) confirmation.hidden = false;
+    markAsSubmitted(ctx.share_token);
 
     // Rapid Fix path — navigate to the booking page after sendIntent
     // returns. sendBeacon is spec-bound to hold the request open across

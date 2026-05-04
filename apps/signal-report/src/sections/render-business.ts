@@ -170,7 +170,7 @@ function renderClosingModal(vm: ReportViewModel): string {
         </label>
 
         <label class="closing-modal-email" data-when-choice="pi_early_access monitoring">
-          <span>${escapeHtml(modal.email_label)}</span>
+          <span class="closing-modal-email-label">${escapeHtml(modal.email_label)}</span>
           <input
             type="email"
             name="email"
@@ -178,15 +178,12 @@ function renderClosingModal(vm: ReportViewModel): string {
             autocomplete="email"
             inputmode="email"
             placeholder="${escapeHtml(modal.email_placeholder)}"
-            aria-describedby="closing-modal-email-error"
+            aria-describedby="closing-modal-email-caption"
           >
           <span
-            id="closing-modal-email-error"
-            class="closing-modal-error"
-            role="alert"
-            data-closing-modal-email-error
-            hidden
-          >${escapeHtml(modal.email_error_text)}</span>
+            id="closing-modal-email-caption"
+            class="closing-modal-email-caption"
+          >${escapeHtml(modal.email_caption)}</span>
         </label>
 
         <div class="closing-modal-actions">

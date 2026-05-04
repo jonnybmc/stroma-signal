@@ -72,10 +72,10 @@ export interface ReportClosingModal {
   freeform_placeholder: string;
   email_label: string;
   email_placeholder: string;
-  /** Inline error message shown beside the email field when submit is
-   *  attempted on a path that requires email (PI / Monitoring) but
-   *  the field is empty or malformed. Announced via role="alert". */
-  email_error_text: string;
+  /** Helper caption shown beneath the email input. Email is optional
+   *  on every path — the caption tells the user what skipping it means
+   *  so they don't assume it's silently required. */
+  email_caption: string;
   submit_label: string;
   confirmation_text: string;
   dismiss_label: string;
@@ -491,9 +491,9 @@ function pickClosingModal(shape: EditorialDataShape): ReportClosingModal {
     pills_legend: 'Which kinds?',
     freeform_label: 'tell us more',
     freeform_placeholder: 'What would actually help? (200 chars max)',
-    email_label: 'your email',
+    email_label: 'your email — optional',
     email_placeholder: 'you@company.com',
-    email_error_text: 'add a valid email so we can follow up',
+    email_caption: 'if you want us to follow up directly',
     submit_label: 'send',
     confirmation_text: '✓ noted — we will be in touch',
     dismiss_label: 'close'
