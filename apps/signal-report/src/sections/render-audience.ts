@@ -29,14 +29,21 @@ function renderTierTable(vm: ReportViewModel): string {
   const rows = vm.act1_tiers
     .map((t) => {
       const color = TIER_COLOR_VAR[t.key] ?? 'var(--tier-unknown)';
+      const sharePct = Math.round(t.share);
+      const sessions = Math.round((t.share / 100) * vm.sample_size);
       return `
         <tr>
           <td class="td-name" data-label="Tier"><span class="rule" style="background:${color};"></span><span class="label">${escapeHtml(
             t.label
           )}</span></td>
           <td class="td-criteria mono" data-label="Criteria">${escapeHtml(criteriaForTier(t.key))}</td>
-          <td class="td-sessions" data-label="Sessions">${Math.round((t.share / 100) * vm.sample_size)}</td>
-          <td class="td-share" data-label="Share">${Math.round(t.share)}%</td>
+          <td class="td-sessions" data-label="Sessions">${sessions}</td>
+          <td class="td-share" data-label="Share">
+            <span class="td-share-track">
+              <span class="td-share-fill" style="width:${sharePct}%;background:${color};"></span>
+            </span>
+            <span class="td-share-value">${sharePct}%</span>
+          </td>
         </tr>
       `;
     })
@@ -67,14 +74,24 @@ function criteriaForTier(key: string): string {
 function renderDeviceTable(vm: ReportViewModel): string {
   const rows = vm.act1_device_tiers
     .map((d) => {
+      const sharePct = Math.round(d.share);
+      const sessions = Math.round((d.share / 100) * vm.sample_size);
+      // Devices don't carry a project-semantic colour the way network tiers do.
+      // Use --ink-soft for the bar so the visual still reads but stays neutral
+      // — the categorical signal here is the row label, not a hue.
       return `
         <tr>
           <td class="td-name" data-label="Device"><span class="rule" style="background:var(--ink-faint);"></span><span class="label">${escapeHtml(
             d.label
           )}</span></td>
           <td class="td-criteria mono" data-label="Criteria">${escapeHtml(deviceCriteriaFor(d.key))}</td>
-          <td class="td-sessions" data-label="Sessions">${Math.round((d.share / 100) * vm.sample_size)}</td>
-          <td class="td-share" data-label="Share">${Math.round(d.share)}%</td>
+          <td class="td-sessions" data-label="Sessions">${sessions}</td>
+          <td class="td-share" data-label="Share">
+            <span class="td-share-track">
+              <span class="td-share-fill" style="width:${sharePct}%;background:var(--ink-soft);"></span>
+            </span>
+            <span class="td-share-value">${sharePct}%</span>
+          </td>
         </tr>
       `;
     })

@@ -511,10 +511,19 @@ body { overflow-y: auto; overflow-x: hidden; }
 
 /* — table-like data row — semantic <table> with grid layout via display:contents
    on table parts. Native tabular semantics for screen readers + grid layout
-   for visual control. */
+   for visual control.
+   Premium-data-tool register (per feedback_data_viz_patterns):
+   - tighter row rhythm than the prior brochure-density default
+   - in-cell horizontal bar in the share column (LogRocket / Quantum Metric
+     signature) — eye scans relative magnitudes instantly
+   - stronger top + bottom edges on the table; softer interior separators
+   - hover row tint at low alpha so an interactive table reads as one
+     without going dashboard-chrome */
 .data-table {
   display: grid;
-  grid-template-columns: 1.4fr 1.6fr 1fr 0.6fr;
+  /* SHARE column widened for the bar+value pair; criteria column trimmed
+     since the cellular-band strings don't need the prior 1.6fr. */
+  grid-template-columns: 1.3fr 1.4fr 0.7fr 1.1fr;
   gap: 0;
   border-collapse: collapse;
   border-top: 2px solid var(--line-table-header);
@@ -527,8 +536,8 @@ body { overflow-y: auto; overflow-x: hidden; }
 }
 .data-table th,
 .data-table td {
-  padding: 14px 0;
-  border-bottom: 1px solid var(--line-table);
+  padding: 9px 12px 9px 0;
+  border-bottom: 1px solid color-mix(in oklab, var(--line-table) 55%, transparent);
   font-size: 13.5px;
   text-align: left;
 }
@@ -538,7 +547,7 @@ body { overflow-y: auto; overflow-x: hidden; }
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--ink-soft);
-  padding: 10px 0;
+  padding: 10px 12px 10px 0;
   font-weight: 600;
   border-bottom: 1.5px solid var(--line-table-header);
 }
@@ -549,11 +558,35 @@ body { overflow-y: auto; overflow-x: hidden; }
   color: var(--ink-soft);
 }
 .data-table td.td-share {
-  text-align: right;
+  display: flex;
+  align-items: center;
+  gap: 10px;
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
   color: var(--ink);
-  font-weight: 500;
+}
+.data-table td.td-share .td-share-track {
+  position: relative;
+  flex: 1;
+  height: 6px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--ink) 6%, transparent);
+  overflow: hidden;
+  min-width: 40px;
+}
+.data-table td.td-share .td-share-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  /* Width set inline as `width:N%` on the element. */
+}
+.data-table td.td-share .td-share-value {
+  flex-shrink: 0;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--ink);
+  min-width: 38px;
+  text-align: right;
 }
 .data-table td.td-sessions {
   font-family: var(--font-mono);
@@ -567,7 +600,7 @@ body { overflow-y: auto; overflow-x: hidden; }
   gap: 12px;
 }
 .data-table td.td-name .rule {
-  width: 4px;
+  width: 5px;
   border-radius: 2px;
   flex-shrink: 0;
 }
@@ -575,6 +608,11 @@ body { overflow-y: auto; overflow-x: hidden; }
   align-self: center;
   color: var(--ink);
   font-weight: 500;
+}
+/* Subtle hover tint — reads as interactive without dashboard chrome.
+   Uses display:contents on tr so we tint each cell instead. */
+.data-table tbody tr:hover td {
+  background: color-mix(in oklab, var(--accent) 4%, transparent);
 }
 /* Drop the bottom border on the final row so the table reads as a clean
  * self-contained block, not as a fragment. */
@@ -671,7 +709,14 @@ body { overflow-y: auto; overflow-x: hidden; }
   }
 
   .data-table td.td-share {
-    text-align: left;
+    /* On narrow screens the bar+value pair stays inline (display:flex
+       set in the desktop block) but takes the full row width below the
+       data-label header. */
+    align-items: center;
+    gap: 10px;
+  }
+  .data-table td.td-share .td-share-track {
+    min-width: 0;
   }
 }
 
