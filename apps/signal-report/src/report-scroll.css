@@ -669,9 +669,15 @@ body { overflow-y: auto; overflow-x: hidden; }
 }
 
 @media (max-width: 720px) {
+  /* On mobile the table collapses into a vertical list of card-like
+   * tier rows. Each row gets its own bounded container (background +
+   * border + radius + gentle shadow) so tiers read as discrete
+   * entities — fixes the "blur" where stacked rows separated only by
+   * a hairline rule blended into a wall of text. Mirrors the
+   * persona-card chrome elsewhere in the report. */
   .data-table {
     display: block;
-    border-top: 1.5px solid var(--line-table-header);
+    border-top: 0;
   }
 
   .data-table thead {
@@ -687,13 +693,16 @@ body { overflow-y: auto; overflow-x: hidden; }
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(84px, auto);
     gap: 10px 16px;
-    padding: 14px 0;
-    border-bottom: 1px solid var(--line-table);
+    padding: 16px;
+    background: var(--bg-1);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--r-2);
+    box-shadow: var(--sh-1);
   }
 
   .data-table tbody tr:last-child {
-    border-bottom-width: 1.5px;
-    border-bottom-color: var(--line-table-header);
+    /* Cards are self-bounded — no special last-row treatment. */
+    border-color: var(--line-strong);
   }
 
   .data-table th,
