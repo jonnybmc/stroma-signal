@@ -633,6 +633,62 @@ describe('H1 — abort + error telemetry with stage tracking', () => {
     expect(errorEvent?.error_category).toBe('snippet_render_failed');
   });
 
+  it('install_framework_picked fires BEFORE auto-install spawn (so install failures still record framework)', async () => {
+    // Regression lock — earlier the framework_picked enqueue lived
+    // AFTER the install branch, which meant a failed install (throw
+    // from the install path) skipped the framework_picked event
+    // entirely. Stats around "which framework had the most install
+    // failures?" couldn't correlate. Now framework_picked fires
+    // immediately after the prompts resolve, before the install spawn.
+    const dir = makeTmpProject({ name: 'fw-before-install', dependencies: { next: '^16.2.4' } });
+    const { mkdirSync } = await import('node:fs');
+    mkdirSync(join(dir, 'app'));
+
+    const events: Array<{ event_kind: string; framework?: string }> = [];
+    const fetch = async (_url: string | URL | Request, init?: RequestInit): Promise<Response> => {
+      const body = init?.body ? JSON.parse(init.body as string) : null;
+      if (body) events.push(body);
+      return new Response(null, { status: 201 });
+    };
+
+    const stdout = captureWrites();
+    const stderr = captureWrites();
+    await expect(
+      run(
+        {
+          cwd: dir,
+          yes: true,
+          json: true,
+          noTelemetry: false,
+          verbose: false,
+          noInstall: false,
+          skipInstallCheck: false,
+          help: false,
+          version: false,
+          sink: 'dataLayer'
+        },
+        {
+          stdout: stdout.stream,
+          stderr: stderr.stream,
+          isInteractive: () => false,
+          telemetryDecisionOverride: { kind: 'enabled', reason: 'persisted_config' },
+          fetch,
+          telemetryEndpoint: 'http://127.0.0.1:1/install',
+          runInstallSignal: async () => ({ ok: false, exitCode: 1, stderr: 'simulated PM failure' })
+        }
+      )
+    ).rejects.toThrow(/Install failed/);
+
+    const fwIndex = events.findIndex((e) => e.event_kind === 'install_framework_picked');
+    const errIndex = events.findIndex((e) => e.event_kind === 'install_error');
+    expect(fwIndex).toBeGreaterThanOrEqual(0);
+    expect(errIndex).toBeGreaterThanOrEqual(0);
+    expect(fwIndex).toBeLessThan(errIndex);
+    // The framework_picked event must carry the resolved framework so
+    // downstream stats can group install failures by framework.
+    expect(events[fwIndex]?.framework).toBe('next-app-router');
+  });
+
   it('telemetry disabled → NO install_error fires (no emit when queue is no-op)', async () => {
     const dir = makeTmpProject({ name: 'render-fail-no-tel', dependencies: { next: '^16.2.4' } });
     const { mkdirSync } = await import('node:fs');

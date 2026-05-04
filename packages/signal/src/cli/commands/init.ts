@@ -785,6 +785,18 @@ export async function run(args: InitArgs, deps: RunDeps = {}): Promise<{ exitCod
       }
     }
 
+    // ── framework_picked telemetry — fire BEFORE the install spawn ──
+    // so a downstream install failure still has a corresponding
+    // framework_picked event in the database. Otherwise stats around
+    // "which framework had the most install failures?" cannot
+    // correlate. The recipe-currency-pressure flag is computed here
+    // because it depends only on the detected framework version vs.
+    // the recipe's verified-against version.
+    const recipeKey = chosenFramework === 'unknown' ? null : (chosenFramework as keyof typeof recipeCurrency.recipes);
+    const recipeMeta = recipeKey ? recipeCurrency.recipes[recipeKey] : null;
+    chosenFrameworkAhead = recipeMeta ? compareMajor(detected.versionSpec, recipeMeta.verified_against_version) : false;
+    telemetry.enqueue(buildSnapshotEvent('install_framework_picked'));
+
     // ── Install check ──────────────────────────────────────────────
     // Uses the dep SPEC (mergedDeps) — separate concern from
     // `installedVersion` (which reads node_modules for telemetry).
@@ -869,14 +881,6 @@ export async function run(args: InitArgs, deps: RunDeps = {}): Promise<{ exitCod
     }
     const rendered = renderSnippet(spec, { sampleRate, beaconEndpoint });
     const nextSteps = buildNextSteps(sink);
-
-    // Telemetry: framework_picked event with the resolved sink + sample
-    // rate. Carries the recipe-currency-pressure flag (true when detected
-    // framework version major > recipe's verified.against_version major).
-    const recipeKey = chosenFramework === 'unknown' ? null : (chosenFramework as keyof typeof recipeCurrency.recipes);
-    const recipeMeta = recipeKey ? recipeCurrency.recipes[recipeKey] : null;
-    chosenFrameworkAhead = recipeMeta ? compareMajor(detected.versionSpec, recipeMeta.verified_against_version) : false;
-    telemetry.enqueue(buildSnapshotEvent('install_framework_picked'));
 
     // The install_command surfaced in JSON / prelude. Null when:
     //   - the dep was already declared (no install ever needed), or

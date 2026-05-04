@@ -196,6 +196,22 @@ async function numberedListSelect<T extends string>(
 const ANSI_CURSOR_UP_N = (n: number): string => `\x1b[${n}A`;
 const ANSI_CLEAR_LINE = '\x1b[2K';
 const ANSI_CURSOR_TO_COL_1 = '\r';
+const ANSI_ERASE_TO_END_OF_SCREEN = '\x1b[0J';
+// Strip ANSI escape sequences so we can measure visible text length.
+// Built via String.fromCharCode so the literal ESC byte (0x1b) never
+// appears in source — biome's noControlCharactersInRegex rule trips
+// on the byte regardless of escape notation in source.
+const ANSI_PATTERN = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*[A-Za-z]`, 'g');
+function stripAnsi(s: string): string {
+  return s.replace(ANSI_PATTERN, '');
+}
+// Compute how many terminal ROWS a line of text occupies once wrapped
+// to the given column width. Returns at least 1 even for empty lines
+// because the trailing newline still moves the cursor down a row.
+function wrappedRows(visibleLine: string, termCols: number): number {
+  const cols = Math.max(1, termCols);
+  return Math.max(1, Math.ceil(Math.max(1, visibleLine.length) / cols));
+}
 
 function arrowKeySelect<T extends string>(
   question: string,
@@ -217,23 +233,39 @@ function arrowKeySelect<T extends string>(
     const stdinAsTty = stream as unknown as { isTTY?: boolean; setRawMode?: (mode: boolean) => unknown };
     if (stdinAsTty.setRawMode) stdinAsTty.setRawMode(true);
 
+    // Track the number of TERMINAL ROWS the previous render occupied
+    // (incl. wrapped rows for long descriptions). Each redraw moves
+    // the cursor up by exactly that many rows + erases everything
+    // from cursor to end of screen, so re-renders overwrite cleanly
+    // regardless of wrap behaviour. Falls back to choices.length+1
+    // when the output stream doesn't expose a width.
+    let lastRenderedRows = 0;
+    const getTermCols = (): number => {
+      const out = output as unknown as { columns?: number };
+      return out.columns && out.columns > 0 ? out.columns : 80;
+    };
+
     const renderOptions = (initial: boolean): void => {
-      if (!initial) {
-        // Move cursor up by (choices.length + 1 hint line) to overwrite
-        // the rendered option block in place.
-        output.write(ANSI_CURSOR_UP_N(choices.length + 1));
+      if (!initial && lastRenderedRows > 0) {
+        output.write(ANSI_CURSOR_UP_N(lastRenderedRows));
+        output.write(ANSI_ERASE_TO_END_OF_SCREEN);
       }
+      const termCols = getTermCols();
+      let rowsThisRender = 0;
       for (let i = 0; i < choices.length; i += 1) {
         const ch = choices[i]!;
         const isHi = i === highlighted;
         const marker = isHi ? c.brand('●') : c.dim('○');
         const label = isHi ? c.bold(ch.label) : ch.label;
         const hint = ch.hint ? ` ${c.dim(`— ${ch.hint}`)}` : '';
-        output.write(`${ANSI_CLEAR_LINE}${ANSI_CURSOR_TO_COL_1}  ${marker} ${label}${hint}\n`);
+        const line = `  ${marker} ${label}${hint}`;
+        rowsThisRender += wrappedRows(stripAnsi(line), termCols);
+        output.write(`${ANSI_CLEAR_LINE}${ANSI_CURSOR_TO_COL_1}${line}\n`);
       }
-      output.write(
-        `${ANSI_CLEAR_LINE}${ANSI_CURSOR_TO_COL_1}  ${c.dim('↑/↓ to navigate · Enter to confirm · Esc to cancel')}\n`
-      );
+      const hintLine = `  ${c.dim('↑/↓ to navigate · Enter to confirm · Esc to cancel')}`;
+      rowsThisRender += wrappedRows(stripAnsi(hintLine), termCols);
+      output.write(`${ANSI_CLEAR_LINE}${ANSI_CURSOR_TO_COL_1}${hintLine}\n`);
+      lastRenderedRows = rowsThisRender;
     };
 
     const cleanup = (): void => {
