@@ -33,7 +33,10 @@ test('proof-of-life flow flushes one payload into the collector and dataLayer', 
   // attributes. Cover hero now carries the origin in an h1.display.
   await expect(page.locator('#cover h1')).toContainText('localhost:4173');
   await expect(page.locator('#funnel')).toBeVisible();
-  await expect(page.locator('#business')).toContainText('Rapid Fix Plan');
+  // Closing CTA — "Rapid Fix Plan" copy moved into the closing-modal
+  // (hidden until the trigger button is clicked). The visible anchor
+  // in the business section is the modal-trigger button label.
+  await expect(page.locator('#business')).toContainText('What would help next?');
 });
 
 test('multi-page spike flow preserves collector truth and preview url semantics', async ({ page, request }) => {
@@ -118,8 +121,10 @@ test('strong fixture renders all five sections of the scroll narrative', async (
   for (const id of ['cover', 'audience', 'distance', 'funnel', 'business']) {
     await expect(page.locator(`section#${id}`)).toBeAttached();
   }
-  // Closing section names the canonical CTA.
-  await expect(page.locator('#business')).toContainText('Rapid Fix Plan');
+  // Closing CTA — "Rapid Fix Plan" copy moved into the closing-modal
+  // (hidden until the trigger button is clicked). The visible anchor
+  // in the business section is the modal-trigger button label.
+  await expect(page.locator('#business')).toContainText('What would help next?');
   // Funnel section names the third-stage label so the redesign keeps the
   // FCP/LCP/INP progression visible.
   await expect(page.locator('#funnel')).toContainText('Interaction becomes ready');
