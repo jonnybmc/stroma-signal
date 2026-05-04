@@ -446,7 +446,7 @@ describe('report view model', () => {
       // No undefined strings in text fields
       expect(viewModel.domain).not.toContain('undefined');
       expect(viewModel.hero_lede).not.toContain('undefined');
-      expect(viewModel.act1_intro).not.toContain('undefined');
+      expect(viewModel.editorial.act4_lede).not.toContain('undefined');
       expect(viewModel.act3.narrative_line).not.toContain('undefined');
       expect(viewModel.act3.threshold_basis).not.toContain('undefined');
 

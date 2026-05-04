@@ -214,7 +214,7 @@ export function renderBusinessSection(vm: ReportViewModel): string {
           <div class="act-intro-stack">
             ${renderReveal(`<div id="business-eyebrow" class="act-intro-eyebrow"><span class="dot"></span>Act 04 · KPI translation</div>`)}
             ${renderReveal(vm.editorial.business_headline_html, { delay: 120 })}
-            ${renderReveal(`<p class="act-intro-lede">${escapeHtml(vm.act4_lede)}</p>`, { delay: 240 })}
+            ${renderReveal(`<p class="act-intro-lede">${escapeHtml(vm.editorial.act4_lede)}</p>`, { delay: 240 })}
           </div>
         </div>
 

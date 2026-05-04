@@ -336,7 +336,6 @@ export interface ReportViewModel {
   evidence_items: ReportEvidenceItem[];
   credibility_strip: ReportCredibilityStripViewModel;
   form_factor: ReportFormFactorViewModel | null;
-  act1_intro: string;
   act1_tiers: ReportTierVisual[];
   act1_device_tiers: ReportDeviceTierVisual[];
   persona_contrast: ReportPersonaContrast;
@@ -346,7 +345,6 @@ export interface ReportViewModel {
   actionable_signals: ReportActionableSignalsViewModel;
   race: ReportRaceViewModel;
   act3: ReportAct3ViewModel;
-  act4_lede: string;
   act4_summary_points: string[];
   // Evidence ledger — Act 4 translation of the proven technical findings
   // into a "what it says / why it matters" pair per row. Each row is
@@ -1140,7 +1138,7 @@ function buildEvidenceItems(
 function buildHeroCopy(
   aggregate: SignalAggregateV1,
   mood: ReportMoodTier
-): Pick<ReportViewModel, 'hero_kicker' | 'hero_title' | 'hero_lede' | 'act1_intro' | 'act4_lede'> {
+): Pick<ReportViewModel, 'hero_kicker' | 'hero_title' | 'hero_lede'> {
   const title = aggregate.domain;
 
   if (mood === 'urgent') {
@@ -1148,11 +1146,7 @@ function buildHeroCopy(
       hero_kicker: 'Measured proof from real traffic',
       hero_title: title,
       hero_lede:
-        'A real share of the traffic you send here lands in a slower world. This report turns that hidden post-click reality into something visible, temporal, and difficult to dismiss.',
-      act1_intro:
-        'These are not average users. They are materially different infrastructure realities that a real share of your traffic already lands on.',
-      act4_lede:
-        'Every number above meets a KPI someone on your team is accountable for. This is where the measured gap shows up in the business.'
+        'A real share of the traffic you send here lands in a slower world. This report turns that hidden post-click reality into something visible, temporal, and difficult to dismiss.'
     };
   }
 
@@ -1161,11 +1155,7 @@ function buildHeroCopy(
       hero_kicker: 'Measured proof from real traffic',
       hero_title: title,
       hero_lede:
-        'The measured story is more controlled here. Traffic still lands into different conditions across tiers, but most sessions stay on the safer side of the thresholds that matter.',
-      act1_intro:
-        'Your traffic still lands into different conditions. The difference is that this report shows the experience holding together across more of them.',
-      act4_lede:
-        'The gap is restrained, but every number above still meets a KPI someone on your team is accountable for. This is where it shows up.'
+        'The measured story is more controlled here. Traffic still lands into different conditions across tiers, but most sessions stay on the safer side of the thresholds that matter.'
     };
   }
 
@@ -1173,11 +1163,7 @@ function buildHeroCopy(
     hero_kicker: 'Measured proof from real traffic',
     hero_title: title,
     hero_lede:
-      'The post-click reality is real, but it sits in the middle ground: meaningful enough to feel, not yet severe enough to scream. That still deserves attention.',
-    act1_intro:
-      'These clusters show the real conditions your traffic lands on, not the calmer average implied by a single lab run.',
-    act4_lede:
-      'Every number above meets a KPI someone on your team is accountable for. This is where the measured gap shows up in the business.'
+      'The post-click reality is real, but it sits in the middle ground: meaningful enough to feel, not yet severe enough to scream. That still deserves attention.'
   };
 }
 
@@ -1754,7 +1740,6 @@ export function buildReportViewModel(aggregate: SignalAggregateV1): ReportViewMo
     evidence_items: buildEvidenceItems(aggregate, race, act3, mood),
     credibility_strip: buildCredibilityStrip(aggregate, race),
     form_factor: buildFormFactor(aggregate),
-    act1_intro: heroCopy.act1_intro,
     act1_tiers: tiers,
     act1_device_tiers: deviceTiers,
     persona_contrast: personaContrast,
@@ -1762,7 +1747,6 @@ export function buildReportViewModel(aggregate: SignalAggregateV1): ReportViewMo
     actionable_signals: buildActionableSignals(aggregate),
     race,
     act3,
-    act4_lede: heroCopy.act4_lede,
     act4_summary_points: buildAct4SummaryPoints(aggregate, race, act3),
     act4_impact_rows: impactRows,
     offer_cards: buildOfferCards(),

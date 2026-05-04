@@ -117,6 +117,11 @@ export interface ReportEditorialCopy {
 
   // Business
   business_headline_html: string;
+  /** Act 4 lede — mood-aware. Was previously identical for urgent and
+   *  sober (mood wiring decorative); now urgent / sober / affirming
+   *  carry distinct register so the lede honestly previews the
+   *  severity of the rows below. */
+  act4_lede: string;
   business_section_eyebrow: string;
   /** Truth-boundary disclosure rendered ONCE beneath the section eyebrow,
    *  before the impact rows. Names what /r measures and what it does
@@ -188,6 +193,7 @@ export function buildEditorialCopy(
     funnel_headline_figure_cap: pickFunnelHeadlineFigureCap(shape),
 
     business_headline_html: pickBusinessHeadline(shape),
+    act4_lede: pickAct4Lede(shape),
     business_section_eyebrow: 'What this evidence can tell you',
     business_section_boundary_lede:
       'This report measures post-click experience pressure. It does not measure revenue loss, CPA movement, or campaign impact. Read these signals as evidence of where performance may be distorting outcomes — not proof of commercial loss.',
@@ -412,6 +418,16 @@ function pickBusinessHeadline(shape: EditorialDataShape): string {
   return `<h2 class="section-title">Every number above lands on a <span class="brand-text">KPI you're accountable for.</span></h2>`;
 }
 
+function pickAct4Lede(shape: EditorialDataShape): string {
+  if (shape.mood === 'affirming') {
+    return 'The gap is restrained, but every number above still meets a KPI someone on your team is accountable for. This is where it shows up.';
+  }
+  if (shape.mood === 'sober') {
+    return 'The gap here is real but moderate. Every number above still lands on a KPI someone on your team is accountable for — read this section as where it falls, not as a verdict on cause.';
+  }
+  return 'Every number above meets a KPI someone on your team is accountable for. This is where the measured gap shows up in the business.';
+}
+
 function pickBusinessAsideLede(shape: EditorialDataShape): string {
   if (!shape.shape_proven) {
     return 'This report shows what the data could and could not say. Root cause, business exposure in your own currency, and a fix order need a richer sample to defend.';
@@ -427,7 +443,7 @@ function pickWhatThisEnables(shape: EditorialDataShape, dominantCulpritKind: str
   }
 
   // "Reshape" framing per actionability discipline — never "exclude" the cohort.
-  if (shape.populated_tier_count >= 2 && !shape.constrained_persona_empty) {
+  if (shape.classified_tier_count >= 2 && !shape.constrained_persona_empty) {
     bullets.push('Reshape the constrained-cohort landing path — a lighter route, not an excluded audience.');
   }
 

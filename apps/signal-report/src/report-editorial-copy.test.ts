@@ -187,6 +187,23 @@ describe('editorial copy — business section adapts to ledger presence + shape 
     expect(vm.editorial.business_aside_lede_html).toContain('shape');
   });
 
+  it('act4_lede is mood-aware — urgent / sober / affirming each carry distinct register', () => {
+    // Was previously identical for urgent and sober (mood wiring decorative).
+    const urgentVm = buildReportViewModel(strongLcpCoverageAggregateFixture);
+    const soberVm = buildReportViewModel(soberMoodAggregateFixture);
+    const affirmingVm = buildReportViewModel(affirmingAggregateFixture);
+
+    expect(urgentVm.editorial.act4_lede).toContain('measured gap shows up in the business');
+    expect(soberVm.editorial.act4_lede).toContain('real but moderate');
+    expect(soberVm.editorial.act4_lede).toContain('not as a verdict on cause');
+    expect(affirmingVm.editorial.act4_lede).toContain('gap is restrained');
+
+    // All three must differ from each other.
+    expect(urgentVm.editorial.act4_lede).not.toBe(soberVm.editorial.act4_lede);
+    expect(soberVm.editorial.act4_lede).not.toBe(affirmingVm.editorial.act4_lede);
+    expect(urgentVm.editorial.act4_lede).not.toBe(affirmingVm.editorial.act4_lede);
+  });
+
   it('what-this-enables bullets always include the QBR baseline', () => {
     for (const fixture of [previewAggregateFixture, fullDepthAggregateFixture, zeroClassifiedAggregateFixture]) {
       const vm = buildReportViewModel(fixture);
@@ -200,6 +217,17 @@ describe('editorial copy — business section adapts to ledger presence + shape 
       const bullets = vm.editorial.business_what_this_enables.join(' ').toLowerCase();
       expect(bullets).not.toContain('constrained-cohort landing path');
     }
+  });
+
+  it('what-this-enables INCLUDES the "reshape constrained cohort" bullet on multi-tier fixtures with non-empty constrained persona', () => {
+    // Regression lock — the bullet was previously dead code for every
+    // fixture (picker referenced `populated_tier_count`, a field that
+    // doesn't exist on EditorialDataShape). Now firing on full-depth
+    // (4 classified tiers, populated constrained cohort).
+    const vm = buildReportViewModel(fullDepthAggregateFixture);
+    expect(vm.persona_contrast.constrained.is_empty).toBe(false);
+    const bullets = vm.editorial.business_what_this_enables.join(' ').toLowerCase();
+    expect(bullets).toContain('reshape the constrained-cohort landing path');
   });
 
   it('what-this-enables hero-image bullet only fires when dominant culprit is hero_image', () => {
