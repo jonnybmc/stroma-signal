@@ -31,8 +31,6 @@ import {
   type SignalReportInteractionV1
 } from '@stroma-labs/signal-contracts';
 
-const RAPID_FIX_REDIRECT = 'https://www.stroma.design/book?service=rapid-fix';
-
 export type ClosingModalChoice = 'pi_early_access' | 'rapid_fix' | 'monitoring' | 'something_else';
 
 export interface ResolvedReportContext {
@@ -330,14 +328,6 @@ function attachModalHandler(ctx: ResolvedReportContext): void {
     if (submit) submit.disabled = true;
     if (confirmation) confirmation.hidden = false;
     markAsSubmitted(ctx.share_token);
-
-    // Rapid Fix path — navigate to the booking page after sendIntent
-    // returns. sendBeacon is spec-bound to hold the request open across
-    // navigation, so the event flushes cleanly.
-    const choice = events[0]?.event_kind;
-    if (choice === 'intent_rapid_fix') {
-      window.location.assign(RAPID_FIX_REDIRECT);
-    }
   });
 }
 

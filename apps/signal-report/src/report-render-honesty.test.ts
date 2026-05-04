@@ -39,6 +39,12 @@ const FORBIDDEN_WHOLEDOC: string[] = [
   'lower CPC ceilings',
   'lower bids',
   'bid lower',
+  // Closing-modal redirect-implied phrasing — the modal is pure
+  // demand-sampling, no booking flow, no follow-up promise. These
+  // phrases must never reappear in the rendered modal body.
+  'booked through stroma',
+  "we'll come back",
+  'we will come back',
   // Engineering-shorthand jargon that has no anchor for the paid-media /
   // CMO / PPC / martech reader. Per the persona discipline:
   // recognisable industry terms (LCP, FCP, INP, CWV, CPC, ROAS, CAC,

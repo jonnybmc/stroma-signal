@@ -421,18 +421,18 @@ function pickClosingBridge(): string {
 }
 
 function pickClosingModal(shape: EditorialDataShape): ReportClosingModal {
-  // Choice bodies tonally extend the bridge question "What would help
-  // most from here?" — read as natural answers a thoughtful operator
-  // would give themselves. Imperative declarative, no questions, no
-  // celebration register, no exclusion / "upgrade to" / "premium" copy
-  // (render-honesty enforced).
+  // Choice labels are first-person customer voice — needs the user
+  // would say aloud ("I want X"), not Stroma offerings. Bodies stay
+  // in Stroma's voice but only DESCRIBE the choice; never promise
+  // delivery (no "we'll send", "we'll book", "we'll come back" —
+  // email is the opt-in channel for if/when the option ships).
   const piBody =
     shape.mood === 'affirming'
-      ? 'A campaign-attribution layer would map specific ad campaigns to the gap surfaced here. Not built yet — collecting interest first.'
-      : 'This report shows the gap; it does not tell you which campaigns or audiences are most exposed to it. We are collecting interest in a campaign-attribution layer that would.';
+      ? 'The current report surfaces the experience gap across cohorts. A campaign-attribution layer would tie that gap to specific campaigns and placements — where the spend lands in slower conditions.'
+      : 'The current report proves the experience gap exists. A campaign-attribution layer would name the campaigns the gap is costing.';
   const rapidBody = shape.has_ledger
-    ? 'A short, prioritised fix list for the highest-pressure page surfaced above. Booked through stroma.design.'
-    : 'A short, prioritised fix list for a single high-value page. Booked through stroma.design.';
+    ? 'A short, prioritised fix list for the highest-pressure page surfaced above. For when the diagnosis is enough and you want the next steps in priority order.'
+    : 'A short, prioritised fix list for a single high-value page. For when the diagnosis is enough and you want the next steps in priority order.';
 
   return {
     trigger_label: 'What would help next?',
@@ -442,23 +442,23 @@ function pickClosingModal(shape: EditorialDataShape): ReportClosingModal {
     choices: [
       {
         value: 'pi_early_access',
-        label: 'Show me which campaigns this affects',
+        label: 'I want to know which of my campaigns this is hitting',
         body: piBody
       },
       {
         value: 'rapid_fix',
-        label: 'Get a fix list for this page',
+        label: 'I just want a fix list for this page — not another diagnostic',
         body: rapidBody
       },
       {
         value: 'monitoring',
-        label: 'Run this report on a schedule',
-        body: 'Re-running the BigQuery query by hand is fine for a one-off, less fine as a regular read. Scheduled delivery weekly or monthly as the data refreshes.'
+        label: 'I want this report on a schedule, not by hand each cycle',
+        body: 'Re-running the BigQuery query by hand is fine for a one-off, less fine as a regular read. Scheduled delivery, weekly or monthly, as the data refreshes.'
       },
       {
         value: 'something_else',
-        label: 'Something else',
-        body: 'Pick any of the options that apply, or describe what would help.'
+        label: "Something else — I'll describe below",
+        body: 'Pick any of the options below that apply, or write what would help.'
       }
     ],
     cadence_legend: 'How often?',
@@ -479,15 +479,27 @@ function pickClosingModal(shape: EditorialDataShape): ReportClosingModal {
 }
 
 function pickClosingPills(): ReportClosingPill[] {
+  // Sub-pill labels — first-person customer voice, mirrors the
+  // top-level choice register. The pill_id values stay (snapshot-
+  // engine CHECK constraint holds them in place); only the label
+  // copy changes.
   return [
-    { pill_id: 'multi_page', label: 'same report for another page on this domain', collects_freeform_text: false },
-    { pill_id: 'multi_client_portfolio', label: 'multi-client / portfolio rollout', collects_freeform_text: false },
     {
-      pill_id: 'competitor_context',
-      label: 'competitor / market context for this report',
+      pill_id: 'multi_page',
+      label: 'I want this across more than one page',
       collects_freeform_text: false
     },
-    { pill_id: 'something_else', label: 'something else', collects_freeform_text: true }
+    {
+      pill_id: 'multi_client_portfolio',
+      label: 'I want this across my entire client portfolio and their campaigns',
+      collects_freeform_text: false
+    },
+    {
+      pill_id: 'competitor_context',
+      label: 'I want competitor / market context to compare against',
+      collects_freeform_text: false
+    },
+    { pill_id: 'something_else', label: "Something else — I'll describe", collects_freeform_text: true }
   ];
 }
 
