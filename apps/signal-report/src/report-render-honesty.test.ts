@@ -51,7 +51,41 @@ const FORBIDDEN_WHOLEDOC: string[] = [
   'long-frame floor',
   'median origin',
   'dominant phase',
-  'LoAF worst-frame'
+  'LoAF worst-frame',
+  // UK-English regression guards — Stroma editorial register is UK
+  // English (optimise / optimisation, behaviour, colour, fibre, centre,
+  // etc.). CSS property names and JS API identifiers are exempt because
+  // they're language tokens, not prose; the guards only fire on
+  // rendered body copy. Add to this list when a new American spelling
+  // sneaks in via a future edit.
+  'optimize',
+  'optimization',
+  'optimized',
+  'optimizing',
+  'analyze',
+  'analyzed',
+  'organization',
+  'organize',
+  'recognize',
+  'minimize',
+  'maximize',
+  'realize',
+  'customize',
+  'utilize',
+  'prioritize',
+  'standardize',
+  'characterize',
+  'categorize',
+  'fiber-cable', // catch "fiber" without false-positive on glossary "Fiber"-style proper-noun cases
+  'flavor',
+  'rumor',
+  'savior',
+  'aluminum',
+  'traveler',
+  'neighbor',
+  // "different than" is the most common non-UK syntax leak (UK uses
+  // "different from"). Catch the literal phrase.
+  'different than'
 ];
 
 // Headline + lede forbidden tokens — prescription verbs that read as
