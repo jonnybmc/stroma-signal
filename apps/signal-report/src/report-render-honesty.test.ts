@@ -38,7 +38,20 @@ const FORBIDDEN_WHOLEDOC: string[] = [
   'bid down',
   'lower CPC ceilings',
   'lower bids',
-  'bid lower'
+  'bid lower',
+  // Engineering-shorthand jargon that has no anchor for the paid-media /
+  // CMO / PPC / martech reader. Per the persona discipline:
+  // recognisable industry terms (LCP, FCP, INP, CWV, CPC, ROAS, CAC,
+  // CPA, TTFB) stay — they live behind glossary popovers — but layer-4
+  // networking shorthand and engineering-only stat / spec vocab gets
+  // replaced with operator-language equivalents in body copy.
+  // Glossary tooltips themselves are excluded by extractBodyCopy() —
+  // these guards only fire on body prose.
+  'pre-LCP weight',
+  'long-frame floor',
+  'median origin',
+  'dominant phase',
+  'LoAF worst-frame'
 ];
 
 // Headline + lede forbidden tokens — prescription verbs that read as
