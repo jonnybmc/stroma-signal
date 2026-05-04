@@ -373,6 +373,7 @@ describe('signal contracts', () => {
 
   it('ships scenario fixtures that cover the intended report fallbacks and edge cases', () => {
     expect(signalReportScenarioFixtures.map((fixture) => fixture.id)).toEqual([
+      'sa-insurance-month-one',
       'preview',
       'mixed-lifecycle',
       'strong-lcp',
