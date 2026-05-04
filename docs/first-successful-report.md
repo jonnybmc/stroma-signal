@@ -10,19 +10,13 @@ A `signal_report_url` of the form `https://signal.stroma.design/r?...` that you 
 
 ## 1. Install the package
 
-The fastest path is the install wizard — detects your framework, asks the configuration questions, and prints the framework-correct snippet ready to paste (covers Next, React Router 7, Remix v2, Nuxt, SvelteKit, Vue, Vite, Angular, vanilla):
+One command — the wizard detects your framework, asks the configuration questions, auto-installs `@stroma-labs/signal` via your project's package manager, then prints the framework-correct snippet for you to paste (covers Next, React Router 7, Remix v2, Nuxt, SvelteKit, Vue, Vite, Angular, vanilla):
 
 ```bash
 npx @stroma-labs/signal init
 ```
 
-Or by hand:
-
-```bash
-pnpm add @stroma-labs/signal
-```
-
-The package is ESM-only and has no runtime dependencies. Published subpaths are listed in [public-api-v0.1.md](./public-api-v0.1.md).
+The package is ESM-only and has no runtime dependencies. Published subpaths are listed in [public-api-v0.1.md](./public-api-v0.1.md). For CI / inspection contexts where you want to skip auto-install, pass `--no-install` and the wizard prints the install command at the top of its output instead.
 
 ## 2. Choose one sink and initialise client-side
 

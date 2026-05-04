@@ -103,17 +103,13 @@ Shrinking the audience to fit the experience is not a Signal recommendation. Res
 
 ## How It Works
 
-The fastest path is the install wizard — detects your framework, asks 3-4 questions, prints the framework-correct snippet ready to paste:
+One command — the wizard detects your framework, asks 3-4 questions, auto-installs `@stroma-labs/signal` via your project's package manager, and prints the framework-correct snippet for you to paste:
 
 ```bash
 npx @stroma-labs/signal init
 ```
 
-Or do it by hand:
-
-```bash
-npm install @stroma-labs/signal
-```
+The snippet looks like this (the wizard tailors it per framework × sink):
 
 ```javascript
 import { init, createBeaconSink } from '@stroma-labs/signal';

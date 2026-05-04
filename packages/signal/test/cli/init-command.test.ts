@@ -259,7 +259,7 @@ describe('run() — JSON mode (deterministic)', () => {
     expect(json.files.find((f: { path: string }) => f.path === 'app/SignalClient.tsx')).toBeDefined();
   });
 
-  it('reports step_zero_install_command when SDK not in deps', async () => {
+  it('--no-install + SDK not in deps → install_command surfaced as the manual command', async () => {
     const dir = makeTmpProject({ name: 'smoke', dependencies: { vue: '^3.4.0' } });
     const stdout = captureWrites();
     const stderr = captureWrites();
@@ -270,6 +270,7 @@ describe('run() — JSON mode (deterministic)', () => {
         json: true,
         noTelemetry: true,
         verbose: false,
+        noInstall: true,
         skipInstallCheck: false,
         help: false,
         version: false,
@@ -280,10 +281,83 @@ describe('run() — JSON mode (deterministic)', () => {
     expect(result.exitCode).toBe(0);
     const json = JSON.parse(stdout.captured());
     // Command varies by detected package manager (npm install / pnpm add / yarn add / bun add).
-    expect(json.step_zero_install_command).toMatch(/(install|add)\s+@stroma-labs\/signal/);
+    // Pinned to the running CLI version so wizard/runtime versions can't drift.
+    expect(json.install_command).toMatch(/(install|add)\s+@stroma-labs\/signal@/);
+    // Deprecated alias still populated for one rc cycle.
+    expect(json.step_zero_install_command).toBe(json.install_command);
+    expect(json.auto_installed).toBe(false);
   });
 
-  it('returns null step_zero when SDK already in deps', async () => {
+  it('auto-install (default Pattern 2) → spawns install via DI, install_command null on success', async () => {
+    const dir = makeTmpProject({ name: 'smoke', dependencies: { vue: '^3.4.0' } });
+    const stdout = captureWrites();
+    const stderr = captureWrites();
+    let spawnedSpec: string | null = null;
+    let spawnedCwd: string | null = null;
+    const result = await run(
+      {
+        cwd: dir,
+        yes: true,
+        json: true,
+        noTelemetry: true,
+        verbose: false,
+        noInstall: false,
+        skipInstallCheck: false,
+        help: false,
+        version: false,
+        sink: 'dataLayer'
+      },
+      {
+        stdout: stdout.stream,
+        stderr: stderr.stream,
+        isInteractive: () => false,
+        runInstallSignal: async (opts) => {
+          spawnedSpec = opts.spec;
+          spawnedCwd = opts.cwd;
+          return { ok: true };
+        }
+      }
+    );
+    expect(result.exitCode).toBe(0);
+    const json = JSON.parse(stdout.captured());
+    expect(spawnedSpec).toMatch(/^@stroma-labs\/signal@/);
+    expect(spawnedCwd).toBe(dir);
+    expect(json.auto_installed).toBe(true);
+    // After successful install, install_command should be null (the
+    // user doesn't need to run anything by hand).
+    expect(json.install_command).toBeNull();
+    expect(json.step_zero_install_command).toBeNull();
+  });
+
+  it('auto-install failure → exits non-zero, install_error telemetry with package_install_failed', async () => {
+    const dir = makeTmpProject({ name: 'smoke', dependencies: { vue: '^3.4.0' } });
+    const stdout = captureWrites();
+    const stderr = captureWrites();
+    await expect(
+      run(
+        {
+          cwd: dir,
+          yes: true,
+          json: true,
+          noTelemetry: true,
+          verbose: false,
+          noInstall: false,
+          skipInstallCheck: false,
+          help: false,
+          version: false,
+          sink: 'dataLayer'
+        },
+        {
+          stdout: stdout.stream,
+          stderr: stderr.stream,
+          isInteractive: () => false,
+          runInstallSignal: async () => ({ ok: false, exitCode: 1, stderr: 'simulated PM failure' })
+        }
+      )
+    ).rejects.toThrow(/Install failed/);
+  });
+
+  it('returns null install_command when SDK already in deps (no install ran)', async () => {
     const dir = makeTmpProject({
       name: 'smoke',
       dependencies: { vue: '^3.4.0', '@stroma-labs/signal': '^0.1.0' }
@@ -306,7 +380,11 @@ describe('run() — JSON mode (deterministic)', () => {
     );
     expect(result.exitCode).toBe(0);
     const json = JSON.parse(stdout.captured());
+    expect(json.install_command).toBeNull();
     expect(json.step_zero_install_command).toBeNull();
+    // Dep was already there, no install action taken — auto_installed
+    // should be false (we did not auto-install).
+    expect(json.auto_installed).toBe(false);
   });
 
   it('honours --sample-rate override in JSON output', async () => {

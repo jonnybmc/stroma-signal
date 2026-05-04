@@ -18,6 +18,33 @@ Bump the exact pin example whenever a new `-rc.N` is cut so onboarders default t
 
 ## [Unreleased]
 
+### Changed — `signal init` Pattern 2 redesign (one-shot install + snippet)
+
+The wizard now auto-installs `@stroma-labs/signal` as a project dep and prints the framework-correct snippet in **one wizard run** — no more "Step 0: install + re-run" friction. Snippets stay print-only (the wizard never writes source files); only `package.json` + `node_modules` are mutated, via the project's package manager, in the resolved package directory.
+
+Six launch-grade safeguards baked into the redesign:
+
+- **Project-PM detection split (B1)** — `detectPackageManager` now returns BOTH `runner_pm` (UA-based, telemetry-only) AND `project_pm` (lockfile-based, drives all install actions). Under `npx ...`, the user-agent says `npm` regardless of project — without this split, a user running the wizard in a pnpm/yarn/bun project would have gotten a stray `package-lock.json`. Lockfile wins for actions; UA is informational only.
+- **Pinned exact-version install (H3)** — install spec is `@stroma-labs/signal@${CLI_VERSION}`, not unpinned. Locks the wizard's snippets to the exact runtime version installed; no rc-skew nightmares.
+- **Spawn cwd is `pkgResult.dir` (H2)** — install runs in the resolved package root (via `readPackageJson`'s walk-up), NOT `args.cwd`. Critical in monorepos and nested `src/` layouts.
+- **`installed_signal_version` re-read after install (M1)** — telemetry + JSON output reflect the on-disk version after install completes, not the pre-install null.
+- **`package_install_failed` error category (H1)** — new top-level enum value end-to-end (`signal-contracts` + snapshot-engine validator + Turso CHECK constraint + stats). Spawn failures now categorise actionably instead of falling into `'unknown'`.
+- **Additive snapshot-engine migration (B3)** — `auto_installed` column added to `install_events` via an additive `ALTER TABLE` wrapped in duplicate-column-tolerance, so existing prod DBs (where the `CREATE TABLE IF NOT EXISTS` short-circuits) actually pick up the new column.
+
+New flag + JSON shape changes:
+
+- **`--no-install`** — opt out of auto-install. Wizard prints the install command at the top of the snippet output instead. CI / inspection contexts.
+- **`--skip-install-check`** is now a deprecated alias of `--no-install`. Emits a stderr deprecation warning when used directly. Removed in the next rc.
+- **JSON output**: `step_zero_install_command` deprecated → renamed to `install_command`. Old field retained as alias for one rc cycle. Two new fields: `auto_installed: boolean` and `installed_signal_version: string | null` (re-read after install).
+- **Telemetry**: `SignalInstallEventV1` gains optional `auto_installed: boolean` (cross-repo lockstep with snapshot-engine `feature/signal-install-telemetry@e898803`).
+
+What did NOT change:
+
+- The wizard still ONLY prints snippets — it never creates or modifies source files (`SignalClient.tsx`, `layout.tsx`, etc.). The "wizard prints, never writes" discipline applies to source code; `package.json`/`node_modules` mutations are a different category that every modern scaffolder handles transparently.
+- Wire format compatible with rc.4 — the new `auto_installed` field is optional everywhere; legacy clients without it continue to work.
+
+Tests: 3637 → 3656 (+19 new across `init-command.test.ts`, `package-manager.test.ts`, new `run-install.test.ts`, contracts `install-event.test.ts`, contracts wire-format-drift fixtures, snapshot-engine validators / repository / new migrations test).
+
 ### Changed — Pre-launch fix pass for the `signal init` wizard (PR #53 review remediation)
 
 A 14-finding technical review of the wizard branch surfaced privacy-promise, packaging, and telemetry-honesty issues that would not have made the launch bar. This pass closes them as a single shippable PR; details by severity:

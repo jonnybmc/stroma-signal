@@ -89,29 +89,61 @@ describe('detectPackageManagerFromLockfile', () => {
   });
 });
 
-describe('detectPackageManager (full priority chain)', () => {
-  it('user_agent wins when set', () => {
-    const dir = makeTmpProject({ 'package-lock.json': '{}' });
+describe('detectPackageManager (project_pm vs runner_pm split)', () => {
+  it('lockfile wins for project_pm even when UA disagrees (npx-poisoning case)', () => {
+    // The critical case: user runs `npx @stroma-labs/signal init` inside
+    // a pnpm project. UA says npm (npx is npm-driven), lockfile says
+    // pnpm. project_pm MUST be pnpm so auto-install does not write a
+    // stray package-lock.json into a pnpm project.
+    const dir = makeTmpProject({ 'pnpm-lock.yaml': "lockfileVersion: '9.0'\n" });
+    const result = detectPackageManager({
+      cwd: dir,
+      env: { npm_config_user_agent: 'npm/10.0 node/v22' }
+    });
+    expect(result.runner_pm).toBe('npm');
+    expect(result.project_pm).toBe('pnpm');
+    expect(result.pm).toBe('pnpm');
+    expect(result.detectedFrom).toBe('lockfile');
+  });
+
+  it('runner_pm matches UA exactly even when lockfile disagrees', () => {
+    const dir = makeTmpProject({ 'yarn.lock': '# yarn\n' });
     const result = detectPackageManager({
       cwd: dir,
       env: { npm_config_user_agent: 'pnpm/10.0 node/v22' }
     });
-    expect(result.pm).toBe('pnpm');
-    expect(result.detectedFrom).toBe('npm_config_user_agent');
-  });
-
-  it('falls back to lockfile when user_agent absent', () => {
-    const dir = makeTmpProject({ 'yarn.lock': '# yarn\n' });
-    const result = detectPackageManager({ cwd: dir, env: {} });
+    expect(result.runner_pm).toBe('pnpm');
+    expect(result.project_pm).toBe('yarn');
     expect(result.pm).toBe('yarn');
-    expect(result.detectedFrom).toBe('lockfile');
   });
 
-  it('returns unknown when neither signal present', () => {
+  it('falls back to runner_pm when no lockfile present (fresh project)', () => {
+    const dir = makeTmpProject({});
+    const result = detectPackageManager({
+      cwd: dir,
+      env: { npm_config_user_agent: 'pnpm/10.0 node/v22' }
+    });
+    // Edge case: walk-up may hit a host-machine lockfile. Accept
+    // either runner_pm-fallback OR a lockfile resolution; just verify
+    // project_pm and pm agree.
+    expect(result.project_pm).toBe(result.pm);
+    if (result.detectedFrom === 'runner_pm_fallback') {
+      expect(result.project_pm).toBe('pnpm');
+      expect(result.runner_pm).toBe('pnpm');
+    }
+  });
+
+  it('defaults project_pm to npm when nothing detected (truly unknown)', () => {
     const dir = makeTmpProject({});
     const result = detectPackageManager({ cwd: dir, env: {} });
-    // May still find a lockfile walking up the tree on the host
-    // machine — accept either.
+    // Walk-up may still find a host-machine lockfile. If genuinely
+    // unknown, the fallback shape is project_pm: 'npm' so an action
+    // can still proceed.
+    if (result.detectedFrom === 'fallback') {
+      expect(result.runner_pm).toBe('unknown');
+      expect(result.project_pm).toBe('npm');
+      expect(result.pm).toBe('npm');
+    }
     expect(['unknown', 'npm', 'pnpm', 'yarn', 'bun']).toContain(result.pm);
   });
 });
