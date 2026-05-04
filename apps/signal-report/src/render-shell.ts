@@ -20,7 +20,36 @@ export const SECTION_ORDER = [
 
 export type SectionId = (typeof SECTION_ORDER)[number]['id'];
 
-function renderTopNav(): string {
+/** Persistent disclaimer shown in the sticky nav when the underlying
+ *  sample hasn't crossed the stable threshold. Lives in the nav (not
+ *  the cover) so it stays visible as the recipient scrolls every
+ *  section — the truth-boundary signal on a thin report should follow
+ *  the eye, not sit only on the masthead.
+ *
+ *  Returns '' when band === 'stable' so the nav stays clean for
+ *  reports with sufficient evidence. */
+function renderSampleBandNote(vm: ReportViewModel): string {
+  if (vm.band === 'stable') return '';
+  const headline = vm.band === 'preliminary' ? 'Preliminary read' : 'Provisional read';
+  const sessions = `${vm.sample_size.toLocaleString('en-US')} session${vm.sample_size === 1 ? '' : 's'}`;
+  const guidance =
+    vm.band === 'preliminary'
+      ? `${headline} · sample of ${sessions}. Ranges and percentiles stabilise around 100+ events; consider waiting for more traffic before sharing externally.`
+      : `${headline} · sample of ${sessions}. Direction is reliable but tier-level percentiles continue to firm up past 500 events.`;
+  return `
+    <div
+      class="scroll-nav-note"
+      role="note"
+      aria-label="Sample-confidence note: ${escapeHtml(guidance)}"
+      title="${escapeHtml(guidance)}"
+    >
+      <span class="scroll-nav-note-dot" aria-hidden="true"></span>
+      <span class="scroll-nav-note-label">${escapeHtml(headline)} · ${escapeHtml(sessions)}</span>
+    </div>
+  `;
+}
+
+function renderTopNav(viewModel: ReportViewModel): string {
   const items = SECTION_ORDER.map(
     (s) => `
       <a href="#${s.id}" data-spy-link="${s.id}" data-active="${s.id === 'cover' ? 'true' : 'false'}">
@@ -35,6 +64,7 @@ function renderTopNav(): string {
         <img class="scroll-nav-brand-logo" src="${REPORT_BRAND.wordmarkUrl}" alt="${escapeHtml(REPORT_BRAND.alt)}" />
         <span class="scroll-nav-brand-by">by Stroma</span>
       </a>
+      ${renderSampleBandNote(viewModel)}
       <div class="scroll-nav-toc">${items}</div>
     </nav>
   `.trim();
@@ -55,7 +85,7 @@ function renderFooter(viewModel: ReportViewModel): string {
 export function renderReportShell(viewModel: ReportViewModel): string {
   return `
     <div class="scroll-report" data-theme="light">
-      ${renderTopNav()}
+      ${renderTopNav(viewModel)}
       <main>
         ${renderCoverSection(viewModel)}
         ${renderAudienceSection(viewModel)}

@@ -40,37 +40,11 @@ function tierLegendItem(t: { key: string; label: string }): string {
   `;
 }
 
-/**
- * Sample-confidence signal — discreet chip in the cover section's
- * top-right, just under the sticky nav. Out of document flow
- * (`position: absolute`) so it never pushes the act-intro down, and
- * z-indexed below the nav so it cannot clip into the nav chrome.
- *
- * Headline + sample count are visible inline; the full body
- * (interpretation guidance) lives in a native `title` tooltip so
- * recipients who care can dwell to read it, but it never competes
- * with the cover hero for attention. Returns '' when band === 'stable'.
- */
-function renderSampleBandBanner(vm: ReportViewModel): string {
-  if (vm.band === 'stable') return '';
-  const headline = vm.band === 'preliminary' ? 'Preliminary read' : 'Provisional read';
-  const body =
-    vm.band === 'preliminary'
-      ? `Sample of ${vm.sample_size.toLocaleString('en-US')} session${vm.sample_size === 1 ? '' : 's'} measured. Ranges and percentiles stabilise around 100+ events; consider waiting for more traffic before sharing externally.`
-      : `Sample of ${vm.sample_size.toLocaleString('en-US')} sessions measured. Direction is reliable but tier-level percentiles continue to firm up past 500 events.`;
-  const chipLabel = `${headline} · ${vm.sample_size.toLocaleString('en-US')} session${vm.sample_size === 1 ? '' : 's'}`;
-  return `
-    <div
-      role="note"
-      aria-label="Sample-confidence note: ${escapeHtml(body)}"
-      title="${escapeHtml(body)}"
-      class="sample-confidence-chip"
-    >
-      <span class="sample-confidence-dot" aria-hidden="true"></span>
-      <span class="sample-confidence-label">${escapeHtml(chipLabel)}</span>
-    </div>
-  `;
-}
+// The sample-confidence note used to render here as an absolutely-
+// positioned chip in the cover top-right. It now lives in the sticky
+// nav (render-shell.ts → renderSampleBandNote) so the disclaimer
+// follows the recipient's eye through every section, not just the
+// masthead.
 
 export function renderCoverSection(vm: ReportViewModel): string {
   const tiers = vm.act1_tiers.map((t) => ({
@@ -83,7 +57,6 @@ export function renderCoverSection(vm: ReportViewModel): string {
   return `
     <section id="cover" class="section" data-tone="paper" aria-labelledby="cover-heading">
       <div class="section-inner">
-        ${renderSampleBandBanner(vm)}
         <div class="act-intro">
           <div class="act-intro-stack">
             ${renderReveal(
