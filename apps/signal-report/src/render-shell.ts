@@ -30,18 +30,19 @@ export type SectionId = (typeof SECTION_ORDER)[number]['id'];
  *  reports with sufficient evidence. */
 function renderSampleBandNote(vm: ReportViewModel): string {
   if (vm.band === 'stable') return '';
-  const headline = vm.band === 'preliminary' ? 'Preliminary read' : 'Provisional read';
+  const headline = vm.band === 'preliminary' ? 'Early read' : 'Firming up';
   const sessions = `${vm.sample_size.toLocaleString('en-US')} session${vm.sample_size === 1 ? '' : 's'}`;
   const guidance =
     vm.band === 'preliminary'
-      ? `${headline} · sample of ${sessions}. Ranges and percentiles stabilise around 100+ events; consider waiting for more traffic before sharing externally.`
-      : `${headline} · sample of ${sessions}. Direction is reliable but tier-level percentiles continue to firm up past 500 events.`;
+      ? `Only ${sessions} so far. The patterns are visible but the numbers are still settling — usually steadies past a few hundred sessions. Worth waiting before sharing externally.`
+      : `${sessions} in. The direction here is trustworthy; the exact figures will tighten as more traffic comes through.`;
   return `
     <div
       class="scroll-nav-note"
       role="note"
+      tabindex="0"
       aria-label="Sample-confidence note: ${escapeHtml(guidance)}"
-      title="${escapeHtml(guidance)}"
+      data-tooltip="${escapeHtml(guidance)}"
     >
       <span class="scroll-nav-note-dot" aria-hidden="true"></span>
       <span class="scroll-nav-note-label">${escapeHtml(headline)} · ${escapeHtml(sessions)}</span>

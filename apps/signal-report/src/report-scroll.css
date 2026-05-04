@@ -296,6 +296,7 @@ body { overflow-y: auto; overflow-x: hidden; }
    screens; full text available via native title tooltip + aria-label.
    Only renders when band !== 'stable' (renderer returns ''). */
 .scroll-nav-note {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -307,11 +308,11 @@ body { overflow-y: auto; overflow-x: hidden; }
   font-size: 10.5px;
   letter-spacing: 0.06em;
   color: var(--ink-soft);
-  cursor: help;
-  max-width: clamp(180px, 28vw, 320px);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  cursor: default;
+  outline: none;
+}
+.scroll-nav-note:focus-visible {
+  box-shadow: 0 0 0 2px var(--accent);
 }
 .scroll-nav-note-dot {
   display: inline-block;
@@ -322,8 +323,60 @@ body { overflow-y: auto; overflow-x: hidden; }
   flex-shrink: 0;
 }
 .scroll-nav-note-label {
+  max-width: clamp(180px, 28vw, 320px);
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+/* Instant tooltip — renders as a CSS pseudo to avoid the ~500ms
+   browser-imposed delay on the native title attribute. Shows on
+   hover and on keyboard focus. */
+.scroll-nav-note::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%) translateY(-4px);
+  width: max-content;
+  max-width: min(320px, calc(100vw - 32px));
+  padding: 10px 14px;
+  background: var(--ink);
+  color: var(--bg-1);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  letter-spacing: 0;
+  line-height: 1.5;
+  white-space: normal;
+  text-align: left;
+  text-transform: none;
+  border-radius: 8px;
+  box-shadow: var(--sh-2);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 120ms ease, transform 120ms ease;
+  z-index: 1000;
+}
+.scroll-nav-note::before {
+  content: '';
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 50%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-bottom-color: var(--ink);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 120ms ease;
+  z-index: 1001;
+}
+.scroll-nav-note:hover::after,
+.scroll-nav-note:focus-visible::after {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+.scroll-nav-note:hover::before,
+.scroll-nav-note:focus-visible::before {
+  opacity: 1;
 }
 
 .scroll-nav-toc {
@@ -354,13 +407,15 @@ body { overflow-y: auto; overflow-x: hidden; }
 @media (max-width: 800px) {
   .scroll-nav { padding: 10px 16px; gap: 8px; }
   .scroll-nav-toc { gap: 10px; }
-  /* Narrow screens: shrink the band note's max-width and drop the
-     letter-spacing so it stays readable beside the brand. */
+  /* Narrow screens: shrink the band note label's max-width and drop
+     the letter-spacing so it stays readable beside the brand. */
   .scroll-nav-note {
-    max-width: clamp(120px, 36vw, 200px);
     padding: 4px 10px;
     font-size: 10px;
     letter-spacing: 0.04em;
+  }
+  .scroll-nav-note-label {
+    max-width: clamp(120px, 36vw, 200px);
   }
   .scroll-nav-toc a span:not(.toc-num) { display: none; }
   .scroll-nav-toc a .toc-num {

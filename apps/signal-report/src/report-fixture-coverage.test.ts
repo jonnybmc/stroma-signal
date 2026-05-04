@@ -41,18 +41,21 @@ describe('fixture coverage — every scenario renders without null/undefined/NaN
         expect(html, `${fx.id} missing boundary statement`).toContain(vm.boundary_statement);
       });
 
-      // Sample-band banner (P2-credibility): the cover surfaces a
-      // brand-olive note above the masthead when band !== 'stable'.
-      // Fixture-driven sanity check: render contains the headline iff
-      // band is preliminary/provisional, suppressed entirely when stable.
-      it('renders the sample-band banner only when band !== stable', () => {
+      // Sample-band note (P2-credibility): the sticky scroll-nav
+      // surfaces a persistent disclaimer chip when band !== 'stable'
+      // (lives in the nav so it follows the recipient's eye through
+      // every section). Fixture-driven sanity check: render contains
+      // the headline iff band is preliminary/provisional, suppressed
+      // entirely when stable.
+      it('renders the sample-band note only when band !== stable', () => {
         if (vm.band === 'preliminary') {
-          expect(html, `${fx.id} (band=preliminary) missing banner headline`).toContain('Preliminary read');
+          expect(html, `${fx.id} (band=preliminary) missing band note`).toContain('Early read');
         } else if (vm.band === 'provisional') {
-          expect(html, `${fx.id} (band=provisional) missing banner headline`).toContain('Provisional read');
+          expect(html, `${fx.id} (band=provisional) missing band note`).toContain('Firming up');
         } else {
-          expect(html, `${fx.id} (band=stable) leaks banner headline`).not.toContain('Preliminary read');
-          expect(html, `${fx.id} (band=stable) leaks banner headline`).not.toContain('Provisional read');
+          expect(html, `${fx.id} (band=stable) leaks band note`).not.toContain('Early read');
+          expect(html, `${fx.id} (band=stable) leaks band note`).not.toContain('Firming up');
+          expect(html, `${fx.id} (band=stable) leaks band note container`).not.toContain('scroll-nav-note');
         }
       });
 
