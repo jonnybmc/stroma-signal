@@ -1456,6 +1456,239 @@ export const zeroClassifiedAggregateFixture: SignalAggregateV1 = aggregateSignal
   Date.UTC(2026, 3, 22, 10, 30, 0)
 );
 
+/* --------------------------------------------------------------------------
+ * SA insurance — Month 1 capture (Stage-7 sales-demo fixture)
+ *
+ * Goal: a true-to-life aggregate the GTM team can hand to a real prospect
+ * BEFORE they install the plugin. Frames Signal as something the operator
+ * could realistically expect after one month of capture on a single
+ * quote-flow landing page.
+ *
+ * Audience model — top-tier SA short-term insurer, car-quote landing
+ * (/quote/car/start). One-month capture window (period_days = 30).
+ *   Urban Chrome (CBD / suburb / fibre + LTE, premium devices)  1,800 sessions
+ *   Urban Safari (iPhone-13+ on LTE, premium-LSM cohort)          720 sessions
+ *   Suburban moderate (mid-tier Galaxy / Xiaomi on LTE)         2,400 sessions
+ *   Peri-urban edge (constrained-moderate, edge LTE / 3G)       1,200 sessions
+ *   Township budget (constrained, 3G with Save-Data on)           480 sessions
+ *                                                              -------------
+ *                                                                6,600 sessions
+ *
+ * Sample size lands well above the 500-event stable threshold so the
+ * sticky-nav band note is suppressed (no caveat chip). period_days = 30
+ * derives naturally from the 30-day spread of event timestamps. domain
+ * is overridden at event level so the aggregate carries an SA-subdomain
+ * masthead instead of the test default.
+ *
+ * Insurance-vertical patterns baked in:
+ *   - Heavy third-party share (GTM, GA, Hotjar, Quantcast, ad pixels,
+ *     chat widgets, finance retargeting tags) — so the third-party
+ *     story renders the operator-visible cause.
+ *   - LCP element_render_delay dominant on mid/lower tiers — script-
+ *     blocked hero render is the typical insurance-page failure mode.
+ *   - INP processing dominant on every tier — quote-calculator buttons
+ *     execute heavy validation handlers at the moment of intent.
+ *   - LoAF script-led; worst-frame ms widens with cohort weakness.
+ *   - LCP culprit hero_image dominant — insurance pages lead with a
+ *     trust-signalling hero image (family / car / advisor portrait).
+ * -------------------------------------------------------------------------- */
+export const saInsuranceMonthOneAggregateFixture: SignalAggregateV1 = (() => {
+  const SA_HOST = 'getquote.indemnitysa.co.za';
+  const PERIOD_START = Date.UTC(2026, 3, 4, 0, 0, 0); // 2026-04-04 00:00 UTC
+  const PERIOD_SPAN_MS = 30 * 86_400_000;
+  const generated_at = Date.UTC(2026, 4, 3, 18, 30, 0); // 2026-05-03 18:30 UTC
+
+  const seriesEvents = [
+    // Urban Chrome — CBD/suburb LTE/fibre, high-end Android + premium
+    // iPhone (Chrome iOS), mostly-desktop screen mix with WFH laptops
+    // + a healthy office-hours mobile slice. Step values are sub-1ms so
+    // the linear ramp produces realistic p75 values for a 1800-event
+    // cohort instead of a 14-second tail.
+    ...createSeries({
+      prefix: 'sa_urban_chrome',
+      tier: 'urban',
+      count: 1_800,
+      startTs: PERIOD_START,
+      path: '/quote/car/start',
+      browser: 'chrome',
+      deviceTier: 'high',
+      deviceCores: 8,
+      deviceMemoryGb: 8,
+      screenMix: [1920, 1440, 1366, 1280, 768, 390, 414],
+      effectiveType: '4g',
+      downlinkMbps: 18.5,
+      rttMs: 32,
+      saveData: false,
+      lcpBase: 1_820,
+      lcpStep: 0.45,
+      fcpBase: 920,
+      fcpStep: 0.21,
+      ttfbBase: 165,
+      ttfbStep: 6.5,
+      inpBase: 145,
+      inpStep: 9,
+      enrichment: {
+        lcpSubpartMix: { resource_load_time: 4, element_render_delay: 3, resource_load_delay: 2, ttfb: 1 },
+        culpritMix: { hero_image: 6, headline_text: 2, banner_image: 1, unknown: 1 },
+        inpPhaseMix: { processing: 5, presentation: 3, input_delay: 2 },
+        thirdPartyTierMix: { moderate: 5, heavy: 3, light: 2 },
+        thirdPartyMedianOriginCount: 8,
+        loafCauseMix: { script: 6, layout: 2, style: 1, paint: 1 },
+        loafWorstMsBase: 110,
+        loafWorstMsStep: 4,
+        visibilityHiddenShare: 0.05
+      }
+    }),
+    // Urban Safari — iPhone-13+ on LTE, premium-LSM iOS slice. Safari
+    // suppresses LCP/INP at capture, so this cohort feeds FCP/TTFB only
+    // and pushes the race-metric selection toward the right denominator.
+    ...createSeries({
+      prefix: 'sa_urban_safari',
+      tier: 'urban',
+      count: 720,
+      startTs: PERIOD_START,
+      path: '/quote/car/start',
+      browser: 'safari',
+      deviceTier: 'high',
+      deviceCores: 6,
+      screenMix: [390, 414, 390, 1024, 414],
+      fcpBase: 880,
+      fcpStep: 0.41,
+      ttfbBase: 158,
+      ttfbStep: 5
+    }),
+    // Suburban moderate — biggest cohort. Mid-range Galaxy A / Xiaomi
+    // Redmi on suburban LTE; overwhelmingly mobile screens. Insurance
+    // buyers in this segment are the volume of the funnel.
+    ...createSeries({
+      prefix: 'sa_moderate_chrome',
+      tier: 'moderate',
+      count: 2_400,
+      startTs: PERIOD_START,
+      path: '/quote/car/start',
+      browser: 'chrome',
+      deviceTier: 'mid',
+      deviceCores: 6,
+      deviceMemoryGb: 4,
+      screenMix: [390, 414, 390, 412, 360, 768],
+      effectiveType: '4g',
+      downlinkMbps: 7.2,
+      rttMs: 110,
+      saveData: false,
+      lcpBase: 3_180,
+      lcpStep: 0.73,
+      fcpBase: 1_480,
+      fcpStep: 0.31,
+      ttfbBase: 245,
+      ttfbStep: 8,
+      inpBase: 220,
+      inpStep: 12,
+      enrichment: {
+        lcpSubpartMix: { element_render_delay: 5, resource_load_time: 3, resource_load_delay: 1, ttfb: 1 },
+        culpritMix: { hero_image: 6, banner_image: 2, product_image: 1, unknown: 1 },
+        inpPhaseMix: { processing: 6, presentation: 2, input_delay: 2 },
+        thirdPartyTierMix: { moderate: 4, heavy: 4, light: 2 },
+        thirdPartyMedianOriginCount: 9,
+        loafCauseMix: { script: 7, layout: 2, style: 1 },
+        loafWorstMsBase: 180,
+        loafWorstMsStep: 6,
+        visibilityHiddenShare: 0.05
+      }
+    }),
+    // Peri-urban constrained-moderate — edge LTE / 3G fallback.
+    // Galaxy A2x / entry Tecno / Hisense on weaker network paths; some
+    // Save-Data via the cohort enrichment (left false here so the data-
+    // saver mix surfaces honestly only on the tier below).
+    ...createSeries({
+      prefix: 'sa_cm_chrome',
+      tier: 'constrained_moderate',
+      count: 1_200,
+      startTs: PERIOD_START,
+      path: '/quote/car/start',
+      browser: 'chrome',
+      deviceTier: 'low',
+      deviceCores: 4,
+      deviceMemoryGb: 2,
+      screenMix: [390, 412, 414, 360, 390],
+      effectiveType: '3g',
+      downlinkMbps: 1.6,
+      rttMs: 320,
+      saveData: false,
+      lcpBase: 5_640,
+      lcpStep: 0.96,
+      fcpBase: 2_780,
+      fcpStep: 0.47,
+      ttfbBase: 410,
+      ttfbStep: 13,
+      inpBase: 480,
+      inpStep: 17,
+      enrichment: {
+        lcpSubpartMix: { element_render_delay: 6, resource_load_time: 2, resource_load_delay: 1, ttfb: 1 },
+        culpritMix: { hero_image: 7, banner_image: 2, product_image: 1 },
+        inpPhaseMix: { processing: 7, input_delay: 2, presentation: 1 },
+        thirdPartyTierMix: { heavy: 5, moderate: 3, light: 2 },
+        thirdPartyMedianOriginCount: 10,
+        loafCauseMix: { script: 8, layout: 1, style: 1 },
+        loafWorstMsBase: 260,
+        loafWorstMsStep: 9,
+        visibilityHiddenShare: 0.06
+      }
+    }),
+    // Township budget — constrained tier on 3G with Save-Data ON.
+    // Itel / entry Tecno / older Galaxy J. The cohort that operators
+    // routinely under-weight; the report surfaces it as a measured share
+    // rather than letting it disappear into the average.
+    ...createSeries({
+      prefix: 'sa_constrained_chrome',
+      tier: 'constrained',
+      count: 480,
+      startTs: PERIOD_START,
+      path: '/quote/car/start',
+      browser: 'chrome',
+      deviceTier: 'low',
+      deviceCores: 2,
+      deviceMemoryGb: 1,
+      screenMix: [360, 390, 412, 360],
+      effectiveType: '3g',
+      downlinkMbps: 0.7,
+      rttMs: 580,
+      saveData: true,
+      lcpBase: 9_120,
+      lcpStep: 3.85,
+      fcpBase: 4_280,
+      fcpStep: 1.45,
+      ttfbBase: 620,
+      ttfbStep: 20,
+      inpBase: 720,
+      inpStep: 25,
+      enrichment: {
+        lcpSubpartMix: { element_render_delay: 6, resource_load_time: 2, resource_load_delay: 1, ttfb: 1 },
+        culpritMix: { hero_image: 7, banner_image: 2, product_image: 1 },
+        inpPhaseMix: { processing: 7, input_delay: 2, presentation: 1 },
+        thirdPartyTierMix: { heavy: 6, moderate: 3, light: 1 },
+        thirdPartyMedianOriginCount: 11,
+        loafCauseMix: { script: 8, layout: 1, style: 1 },
+        loafWorstMsBase: 380,
+        loafWorstMsStep: 13,
+        visibilityHiddenShare: 0.07
+      }
+    })
+  ];
+
+  // Override host on every event so the aggregate.domain renders as the
+  // SA insurance subdomain. Spread timestamps evenly across the 30-day
+  // window so aggregateSignalEvents derives period_days = 30 cleanly
+  // from (latest - earliest) / 86_400_000.
+  const denom = Math.max(1, seriesEvents.length - 1);
+  const events = seriesEvents.map((event, idx) => ({
+    ...event,
+    host: SA_HOST,
+    ts: PERIOD_START + Math.round((idx / denom) * PERIOD_SPAN_MS)
+  }));
+
+  return aggregateSignalEvents(events, 'production', generated_at);
+})();
+
 // Legacy-style aggregate — no experience_funnel. Built from strongLcp
 // (which has valid vitals + classified cohorts) and stripped of the
 // funnel block via structured clone to simulate a report URL decoded from
@@ -1485,6 +1718,13 @@ export interface SignalReportScenarioFixture {
 }
 
 export const signalReportScenarioFixtures: SignalReportScenarioFixture[] = [
+  {
+    id: 'sa-insurance-month-one',
+    label: 'SA insurance — Month 1 capture (sales demo)',
+    description:
+      'True-to-life Stage-7 prospect demo: top-tier SA short-term insurer, /quote/car/start landing, ~6,600 sessions over 30 days. Realistic SA cohort split (urban LTE → township 3G) with insurance-vertical patterns: heavy third-party load, hero-image LCP culprit, processing-phase INP friction at the quote calculator.',
+    aggregate: saInsuranceMonthOneAggregateFixture
+  },
   {
     id: 'preview',
     label: 'Preview sanity check',

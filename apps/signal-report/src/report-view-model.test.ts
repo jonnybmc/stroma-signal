@@ -24,7 +24,6 @@ describe('report view model', () => {
     expect(viewModel.act3.active_stage_keys).toEqual(['fcp', 'lcp', 'inp']);
     expect(viewModel.act3.stages.map((stage) => stage.key)).toEqual(['fcp', 'lcp', 'inp']);
     expect(viewModel.mood_tier).toBe('urgent');
-    expect(viewModel.offer_cards.map((card) => card.title)).toEqual(['Rapid Fix Plan']);
   });
 
   it('drops to a reduced measured funnel when INP coverage is too weak', () => {
@@ -89,29 +88,6 @@ describe('report view model', () => {
     for (const device of empties) {
       expect(device.narrative).toMatch(/No sessions/);
     }
-  });
-
-  it('builds actionable signal cells each naming the product-team decision they unlock', () => {
-    const viewModel = buildReportViewModel(strongLcpCoverageAggregateFixture);
-    const cells = viewModel.actionable_signals.cells;
-
-    expect(cells.length).toBeGreaterThan(0);
-    // Every cell carries a concrete product-team decision string — no cell
-    // is allowed to leak through without naming the action it unlocks.
-    for (const cell of cells) {
-      expect(cell.decision.length).toBeGreaterThan(10);
-      expect(cell.label.length).toBeGreaterThan(0);
-      expect(cell.value.length).toBeGreaterThan(0);
-    }
-    // CPU cores and Browser cells are always present because the underlying
-    // fields are universally captured (hardwareConcurrency + UA parsing).
-    // Form-factor cell leads when present — derived from device_screen_w
-    // which is universally captured on every event.
-    const cellKeys = cells.map((cell) => cell.key);
-    expect(cellKeys).toContain('form-factor');
-    expect(cellKeys[0]).toBe('form-factor');
-    expect(cellKeys).toContain('js-budget');
-    expect(cellKeys).toContain('testing-matrix');
   });
 
   it('builds the persistent credibility strip with all five measured fields', () => {
@@ -239,17 +215,18 @@ describe('report view model', () => {
         expect(row.metric_value).not.toContain('undefined');
         expect(row.metric_label).not.toContain('NaN');
         expect(row.metric_label).not.toContain('undefined');
-        expect(row.kpi_label).not.toContain('NaN');
-        expect(row.kpi_label).not.toContain('undefined');
-        expect(row.impact_sentence_html).not.toContain('NaN');
-        expect(row.impact_sentence_html).not.toContain('undefined');
-        expect(row.impact_sentence_html).toContain('<em class="sr-italic-serif">');
+        expect(row.what_it_says).not.toContain('NaN');
+        expect(row.what_it_says).not.toContain('undefined');
+        expect(row.what_it_says.length).toBeGreaterThan(0);
+        expect(row.why_it_matters).not.toContain('NaN');
+        expect(row.why_it_matters).not.toContain('undefined');
+        expect(row.why_it_matters.length).toBeGreaterThan(0);
         expect(['alert', 'watch', 'steady']).toContain(row.tone);
       }
     }
   });
 
-  it('emits the full KPI impact ledger on the full-depth fixture', () => {
+  it('emits all four impact rows on the full-depth fixture (lcp_bounce / inp_conversion / script_roas / network_reach)', () => {
     const viewModel = buildReportViewModel(fullDepthAggregateFixture);
     const ids = viewModel.act4_impact_rows.map((row) => row.id);
 
@@ -258,11 +235,12 @@ describe('report view model', () => {
     expect(ids).toContain('script_roas');
     expect(ids).toContain('network_reach');
 
-    const kpis = viewModel.act4_impact_rows.map((row) => row.kpi_label);
-    expect(kpis).toContain('Bounce Rate · Ad Quality Score');
-    expect(kpis).toContain('Conversion Rate · Cost Per Acquisition');
-    expect(kpis).toContain('Mobile ROAS · Audience Reach');
-    expect(kpis).toContain('Audience Reach · Campaign Efficiency');
+    // Each row must carry both halves of the "what it says / why it matters"
+    // pair populated — the boundary discipline reads off the markup.
+    for (const row of viewModel.act4_impact_rows) {
+      expect(row.what_it_says.length).toBeGreaterThan(0);
+      expect(row.why_it_matters.length).toBeGreaterThan(0);
+    }
   });
 
   it('only emits the script_roas row when third-party pressure is moderate+ OR a long LoAF frame is measured', () => {
@@ -293,27 +271,6 @@ describe('report view model', () => {
     // carry observed evidence.
     if (viewModel.act4_impact_rows.length === 0) {
       expect(viewModel.act4_summary_points.length).toBeGreaterThan(0);
-    }
-  });
-
-  it('builds evidence items with all required provenance fields', () => {
-    const viewModel = buildReportViewModel(strongLcpCoverageAggregateFixture);
-    const labels = viewModel.evidence_items.map((item) => item.label);
-
-    expect(labels).toContain('Sample');
-    expect(labels).toContain('Window');
-    expect(labels).toContain('Comparison tier');
-    expect(labels).toContain('Race metric');
-    expect(labels).toContain('Fallback honesty');
-    expect(labels).toContain('Threshold basis');
-    expect(labels).toContain('Poor-session share');
-    expect(labels).toContain('Measured funnel coverage');
-
-    for (const item of viewModel.evidence_items) {
-      expect(item.value).not.toBe('');
-      expect(item.value).not.toContain('undefined');
-      expect(item.value).not.toContain('NaN');
-      expect(['neutral', 'steady', 'watch', 'alert']).toContain(item.tone);
     }
   });
 
@@ -414,6 +371,21 @@ describe('report view model', () => {
     expect(viewModel.warnings).toContain('Act 2 cannot render a comparable race with the current data.');
   });
 
+  it('surfaces sample-confidence band on the view model derived from sample_size', () => {
+    // Above-stable URL → band: 'stable'
+    const stableUrl =
+      'https://signal.stroma.design/r?rv=1&mode=production&d=test.local&nt=50,30,15,5,0&dt=34,33,33&lu=0&lt=0&fu=0&ft=0&tu=0&tt=0&ulc=0&ufc=0&utc=0&clc=0&cfc=0&ctc=0&s=750&p=7&nc=100&nu=0&nr=10&lc=80&ct=none&rm=none&rr=insufficient_comparable_data&ga=1776072000000';
+    expect(buildReportViewModel(decodeSignalReportUrl(stableUrl)).band).toBe('stable');
+
+    // Provisional URL → band: 'provisional' (back-filled from sample_size)
+    const provisionalUrl = stableUrl.replace('&s=750', '&s=200');
+    expect(buildReportViewModel(decodeSignalReportUrl(provisionalUrl)).band).toBe('provisional');
+
+    // Preliminary URL → band: 'preliminary' (back-filled from sample_size)
+    const preliminaryUrl = stableUrl.replace('&s=750', '&s=50');
+    expect(buildReportViewModel(decodeSignalReportUrl(preliminaryUrl)).band).toBe('preliminary');
+  });
+
   it('builds a complete view model from every scenario fixture without crash or NaN', () => {
     for (const fixture of signalReportScenarioFixtures) {
       const viewModel = buildReportViewModel(fixture.aggregate);
@@ -429,16 +401,9 @@ describe('report view model', () => {
       // No undefined strings in text fields
       expect(viewModel.domain).not.toContain('undefined');
       expect(viewModel.hero_lede).not.toContain('undefined');
-      expect(viewModel.act1_intro).not.toContain('undefined');
+      expect(viewModel.editorial.act4_lede).not.toContain('undefined');
       expect(viewModel.act3.narrative_line).not.toContain('undefined');
       expect(viewModel.act3.threshold_basis).not.toContain('undefined');
-
-      // Evidence items all valid
-      for (const item of viewModel.evidence_items) {
-        expect(item.value).not.toBe('');
-        expect(item.value).not.toContain('NaN');
-        expect(item.value).not.toContain('undefined');
-      }
 
       // Act 4 summary points clean
       for (const point of viewModel.act4_summary_points) {
@@ -450,8 +415,10 @@ describe('report view model', () => {
       for (const row of viewModel.act4_impact_rows) {
         expect(row.metric_value).not.toContain('NaN');
         expect(row.metric_value).not.toContain('undefined');
-        expect(row.impact_sentence_html).not.toContain('NaN');
-        expect(row.impact_sentence_html).not.toContain('undefined');
+        expect(row.what_it_says).not.toContain('NaN');
+        expect(row.what_it_says).not.toContain('undefined');
+        expect(row.why_it_matters).not.toContain('NaN');
+        expect(row.why_it_matters).not.toContain('undefined');
       }
 
       // Mood tier is valid

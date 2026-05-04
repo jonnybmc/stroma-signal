@@ -33,17 +33,37 @@ test('proof-of-life flow flushes one payload into the collector and dataLayer', 
   // attributes. Cover hero now carries the origin in an h1.display.
   await expect(page.locator('#cover h1')).toContainText('localhost:4173');
   await expect(page.locator('#funnel')).toBeVisible();
-  await expect(page.locator('#business')).toContainText('Rapid Fix Plan');
+  // Closing CTA — "Rapid Fix Plan" copy moved into the closing-modal
+  // (hidden until the trigger button is clicked). The visible anchor
+  // in the business section is the modal-trigger button label.
+  await expect(page.locator('#business')).toContainText('What would help next?');
 });
 
 test('multi-page spike flow preserves collector truth and preview url semantics', async ({ page, request }) => {
   await request.post('http://localhost:4173/api/reset');
   await page.goto('http://localhost:4173/');
   await page.getByRole('button', { name: 'Flush this page load now' }).click();
+  // Wait for the first event to actually land on the collector before
+  // navigating — otherwise on a slow CI runner the flush can race with
+  // the link-click and the FIRST event count never reaches 1.
+  await expect.poll(async () => (await readCollectorEvents(request)).length).toBe(1);
+
   await page.getByRole('link', { name: 'Visit second route' }).click();
+  // After navigation the SDK needs a moment for PerformanceObserver to
+  // fire FCP / LCP on the new page before the queue has anything to
+  // send. waitForLoadState('load') + two animation frames covers the
+  // typical post-load paint timeline; polling later guards against any
+  // residual CI variance.
+  await page.waitForLoadState('load');
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+      })
+  );
   await page.getByRole('button', { name: 'Flush this page load now' }).click();
 
-  await expect.poll(async () => (await readCollectorEvents(request)).length).toBe(2);
+  await expect.poll(async () => (await readCollectorEvents(request)).length, { timeout: 10_000 }).toBe(2);
   const payload = (await readCollectorEvents(request)) as Array<{ url?: string }>;
 
   expect(payload).toHaveLength(2);
@@ -118,8 +138,10 @@ test('strong fixture renders all five sections of the scroll narrative', async (
   for (const id of ['cover', 'audience', 'distance', 'funnel', 'business']) {
     await expect(page.locator(`section#${id}`)).toBeAttached();
   }
-  // Closing section names the canonical CTA.
-  await expect(page.locator('#business')).toContainText('Rapid Fix Plan');
+  // Closing CTA — "Rapid Fix Plan" copy moved into the closing-modal
+  // (hidden until the trigger button is clicked). The visible anchor
+  // in the business section is the modal-trigger button label.
+  await expect(page.locator('#business')).toContainText('What would help next?');
   // Funnel section names the third-stage label so the redesign keeps the
   // FCP/LCP/INP progression visible.
   await expect(page.locator('#funnel')).toContainText('Interaction becomes ready');

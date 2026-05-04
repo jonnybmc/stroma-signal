@@ -2,17 +2,13 @@
 // Network spread table, device spread table, persona-pair (best vs
 // constrained), form-factor triplet.
 
-import {
-  formatDeviceSignature,
-  formatNetworkBand,
-  type SignalDeviceTier,
-  type SignalNetworkTier
-} from '@stroma-labs/signal-contracts';
+import type { SignalDeviceTier, SignalNetworkTier } from '@stroma-labs/signal-contracts';
 
 import { renderHeroValue, renderReveal } from '../render-helpers.js';
 import { escapeHtml } from '../render-utils.js';
 import { renderIcon } from '../report-icons.js';
 import type { ReportPersonaProfile, ReportViewModel } from '../report-view-model.js';
+import { deviceSignatureForOperator, networkBandForOperator } from '../view-model/audience-language.js';
 
 const NETWORK_TIER_KEYS: ReadonlySet<string> = new Set(['urban', 'moderate', 'constrained_moderate', 'constrained']);
 const DEVICE_TIER_KEYS: ReadonlySet<string> = new Set(['high', 'mid', 'low']);
@@ -29,14 +25,21 @@ function renderTierTable(vm: ReportViewModel): string {
   const rows = vm.act1_tiers
     .map((t) => {
       const color = TIER_COLOR_VAR[t.key] ?? 'var(--tier-unknown)';
+      const sharePct = Math.round(t.share);
+      const sessions = Math.round((t.share / 100) * vm.sample_size);
       return `
         <tr>
-          <td class="td-name"><span class="rule" style="background:${color};"></span><span class="label">${escapeHtml(
+          <td class="td-name" data-label="Tier"><span class="rule" style="background:${color};"></span><span class="label">${escapeHtml(
             t.label
           )}</span></td>
-          <td class="td-criteria mono">${escapeHtml(criteriaForTier(t.key))}</td>
-          <td class="td-sessions">${Math.round((t.share / 100) * vm.sample_size)}</td>
-          <td class="td-share">${Math.round(t.share)}%</td>
+          <td class="td-criteria mono" data-label="Criteria">${escapeHtml(criteriaForTier(t.key))}</td>
+          <td class="td-sessions" data-label="Sessions">${sessions}</td>
+          <td class="td-share" data-label="Share">
+            <span class="td-share-track">
+              <span class="td-share-fill" style="width:${sharePct}%;background:${color};"></span>
+            </span>
+            <span class="td-share-value">${sharePct}%</span>
+          </td>
         </tr>
       `;
     })
@@ -60,21 +63,31 @@ function renderTierTable(vm: ReportViewModel): string {
 }
 
 function criteriaForTier(key: string): string {
-  if (NETWORK_TIER_KEYS.has(key)) return formatNetworkBand(key as SignalNetworkTier);
-  return 'Not classifiable';
+  if (NETWORK_TIER_KEYS.has(key)) return networkBandForOperator(key as SignalNetworkTier);
+  return 'Could not classify (typically Safari or privacy-mode)';
 }
 
 function renderDeviceTable(vm: ReportViewModel): string {
   const rows = vm.act1_device_tiers
     .map((d) => {
+      const sharePct = Math.round(d.share);
+      const sessions = Math.round((d.share / 100) * vm.sample_size);
+      // Devices don't carry a project-semantic colour the way network tiers do.
+      // Use --ink-soft for the bar so the visual still reads but stays neutral
+      // — the categorical signal here is the row label, not a hue.
       return `
         <tr>
-          <td class="td-name"><span class="rule" style="background:var(--ink-faint);"></span><span class="label">${escapeHtml(
+          <td class="td-name" data-label="Device"><span class="rule" style="background:var(--ink-faint);"></span><span class="label">${escapeHtml(
             d.label
           )}</span></td>
-          <td class="td-criteria mono">${escapeHtml(deviceCriteriaFor(d.key))}</td>
-          <td class="td-sessions">${Math.round((d.share / 100) * vm.sample_size)}</td>
-          <td class="td-share">${Math.round(d.share)}%</td>
+          <td class="td-criteria mono" data-label="Criteria">${escapeHtml(deviceCriteriaFor(d.key))}</td>
+          <td class="td-sessions" data-label="Sessions">${sessions}</td>
+          <td class="td-share" data-label="Share">
+            <span class="td-share-track">
+              <span class="td-share-fill" style="width:${sharePct}%;background:var(--ink-soft);"></span>
+            </span>
+            <span class="td-share-value">${sharePct}%</span>
+          </td>
         </tr>
       `;
     })
@@ -98,7 +111,7 @@ function renderDeviceTable(vm: ReportViewModel): string {
 }
 
 function deviceCriteriaFor(key: string): string {
-  if (DEVICE_TIER_KEYS.has(key)) return formatDeviceSignature(key as SignalDeviceTier);
+  if (DEVICE_TIER_KEYS.has(key)) return deviceSignatureForOperator(key as SignalDeviceTier);
   return '';
 }
 
@@ -122,8 +135,8 @@ function renderPersonaCard(persona: ReportPersonaProfile, accentVar: string): st
       ? ['Connection class', composeRowValue(persona.effective_type, persona.effective_type_note)]
       : null,
     persona.downlink_label ? ['Bandwidth', composeRowValue(persona.downlink_label, persona.downlink_note)] : null,
-    persona.rtt_label ? ['Round-trip', composeRowValue(persona.rtt_label, persona.rtt_note)] : null,
-    ['CPU', composeRowValue(persona.cores_label, persona.cores_note)],
+    persona.rtt_label ? ['Connection lag', composeRowValue(persona.rtt_label, persona.rtt_note)] : null,
+    ['Processor', composeRowValue(persona.cores_label, persona.cores_note)],
     ['Memory', composeRowValue(persona.memory_label, persona.memory_note)],
     persona.browser ? ['Browser', escapeHtml(persona.browser)] : null,
     persona.save_data && persona.save_data_share > 0
@@ -221,7 +234,7 @@ export function renderAudienceSection(vm: ReportViewModel): string {
   return `
     <section id="audience" class="section" data-tone="cream" aria-labelledby="audience-eyebrow">
       <div class="section-inner">
-        <div class="act-intro" style="padding-block:0;">
+        <div class="act-intro">
           <div class="act-intro-stack">
             ${renderReveal(`<div id="audience-eyebrow" class="act-intro-eyebrow"><span class="dot"></span>Act 01 · Audience shape</div>`)}
             ${renderReveal(vm.editorial.audience_headline_html, { delay: 120 })}

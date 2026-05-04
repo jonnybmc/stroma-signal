@@ -49,8 +49,8 @@ export function renderCoverSection(vm: ReportViewModel): string {
   const slowerThanUrbanShare = 1 - (vm.act1_tiers.find((t) => t.key === 'urban')?.share ?? 0) / 100;
 
   return `
-    <section id="cover" class="section" data-tone="paper" aria-labelledby="cover-heading" style="padding-block:0;">
-      <div class="section-inner" style="gap:var(--stack-2xl);">
+    <section id="cover" class="section" data-tone="paper" aria-labelledby="cover-heading">
+      <div class="section-inner">
         <div class="act-intro">
           <div class="act-intro-stack">
             ${renderReveal(
@@ -60,7 +60,7 @@ export function renderCoverSection(vm: ReportViewModel): string {
               </div>`
             )}
             ${renderReveal(
-              `<h1 id="cover-heading" class="display" style="margin:0;font-size:clamp(56px,8vw + 16px,132px);font-weight:400;letter-spacing:-0.045em;line-height:0.94;">${escapeHtml(
+              `<h1 id="cover-heading" class="display" style="margin:0;font-size:clamp(36px,4.4vw + 14px,80px);font-weight:400;letter-spacing:-0.035em;line-height:1.02;overflow-wrap:anywhere;word-break:break-word;hyphens:none;">${escapeHtml(
                 vm.hero_title
               )}</h1>`,
               { delay: 120 }
@@ -79,13 +79,7 @@ export function renderCoverSection(vm: ReportViewModel): string {
           </div>
         </div>
 
-        <div class="block" style="gap:var(--stack-md);">
-          ${renderReveal(
-            `<div class="block-header">
-              <h3 class="section-eyebrow">At a glance</h3>
-              <p class="section-lede">${escapeHtml(vm.editorial.cover_at_a_glance_lede)}</p>
-            </div>`
-          )}
+        <div class="block" style="gap:var(--stack-sm);">
           <div class="grid-3">
             ${renderReveal(
               `<div class="figure">
@@ -129,18 +123,17 @@ export function renderCoverSection(vm: ReportViewModel): string {
         </div>
 
         ${renderReveal(
-          `<div>
-            <h3 class="section-eyebrow" style="margin-bottom:12px;">How the audience splits, at a glance</h3>
-            <div style="display:flex;height:36px;border-radius:var(--r-2);overflow:hidden;border:1px solid var(--line);">
+          `<div class="cover-tier-strip">
+            <div class="cover-tier-strip-eyebrow">Audience split · by network tier</div>
+            <div class="cover-tier-strip-bar">
               ${tiers.map(tierStripSegment).join('')}
             </div>
-            <div style="display:flex;margin-top:10px;gap:16px;flex-wrap:wrap;font-size:10px;">
+            <div class="cover-tier-strip-legend">
               ${tiers.map(tierLegendItem).join('')}
             </div>
           </div>`
         )}
       </div>
-      <div style="height:var(--section-py);"></div>
     </section>
   `.trim();
 }

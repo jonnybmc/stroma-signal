@@ -313,6 +313,10 @@ export function explainSignalAggregateIssues(value: unknown): string[] {
     issues.push('Expected "warnings" to be an array of strings.');
   }
 
+  if (value.band !== 'preliminary' && value.band !== 'provisional' && value.band !== 'stable') {
+    issues.push('Expected "band" to be one of "preliminary" | "provisional" | "stable".');
+  }
+
   // Semantic range validation — percentages must be 0–100, counts non-negative
   if (isNumber(value.sample_size) && value.sample_size < 0) {
     issues.push('Expected "sample_size" to be non-negative.');

@@ -24,7 +24,8 @@ describe('spa-ssr-caveats.md alignment with runtime.ts', () => {
     const FRAMEWORK_GUARDS: Array<{ framework: string; mechanism: string }> = [
       { framework: 'Next.js (App Router)', mechanism: "`'use client'` directive" },
       { framework: 'Next.js (Pages Router)', mechanism: "`typeof window !== 'undefined'`" },
-      { framework: 'Remix / React Router v7', mechanism: '`useEffect` + dynamic `import()`' },
+      { framework: 'React Router v7 (framework mode)', mechanism: '`entry.client.tsx`' },
+      { framework: 'Remix v2 (legacy)', mechanism: '`entry.client.tsx`' },
       { framework: 'Nuxt 3', mechanism: '`.client.ts` plugin suffix' },
       { framework: 'Angular Universal', mechanism: '`isPlatformBrowser(platformId)`' },
       { framework: 'SvelteKit', mechanism: "`import { browser } from '$app/environment'`" }

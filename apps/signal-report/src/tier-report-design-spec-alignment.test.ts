@@ -78,22 +78,6 @@ describe('tier-report-design-spec.md alignment with report-view-model + canonica
     });
   });
 
-  describe('CTA boundary: Rapid Fix Plan is named in both doc and renderer', () => {
-    const CTA_NAME = 'Rapid Fix Plan';
-
-    it(`spec names "${CTA_NAME}" as the single closing-section CTA`, () => {
-      expect(doc).toContain(CTA_NAME);
-    });
-
-    it('renderer emits exactly one offer card titled with the canonical CTA name', () => {
-      const vm = buildReportViewModel(strongLcpCoverageAggregateFixture);
-      expect(vm.offer_cards).toHaveLength(1);
-      const offer = vm.offer_cards[0];
-      expect(offer).toBeDefined();
-      expect(offer?.title).toBe(CTA_NAME);
-    });
-  });
-
   describe('Required Data Capabilities reference the canonical contract', () => {
     const REQUIRED_FIELDS = [
       'comparison_tier',
@@ -211,8 +195,8 @@ describe('tier-report-design-spec.md alignment with report-view-model + canonica
     });
   });
 
-  describe('Typography: Signifier pairing (Fraunces + Schibsted Grotesk + JetBrains Mono)', () => {
-    for (const family of ['Fraunces', 'Schibsted Grotesk', 'JetBrains Mono']) {
+  describe('Typography: Instrument pairing (Space Grotesk + Inter Tight + Instrument Serif)', () => {
+    for (const family of ['Space Grotesk', 'Inter Tight', 'Instrument Serif']) {
       it(`spec names canonical font family "${family}"`, () => {
         expect(doc).toContain(family);
       });

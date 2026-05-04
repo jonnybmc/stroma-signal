@@ -38,6 +38,9 @@
   "type": "module",
   "main": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
+  "bin": {
+    "signal": "./dist/cli.mjs"
+  },
   "sideEffects": false,
   "exports": {
     ".": {
@@ -66,8 +69,9 @@
     "dist/**/*.mjs"
   ],
   "scripts": {
-    "build": "rollup -c rollup.config.mjs",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
+    "build": "pnpm clean && rollup -c rollup.config.mjs && chmod +x dist/cli.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.cli.json --noEmit",
     "prepublishOnly": "pnpm -C ../.. build && pnpm -C ../.. check:release"
   },
   "devDependencies": {

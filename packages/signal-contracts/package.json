@@ -3,10 +3,15 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "sideEffects": false,
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./install-event": {
+      "types": "./dist/install-event.d.ts",
+      "import": "./dist/install-event.js"
     }
   },
   "main": "./dist/index.js",

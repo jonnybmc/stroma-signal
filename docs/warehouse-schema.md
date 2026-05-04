@@ -80,6 +80,7 @@ Do not rename the canonical metric fields if you want to keep the provided aggre
 Notes:
 
 - Default Signal URL-builder templates exclude `navigation_type = restore`, `navigation_type = prerender`, and `context_visibility_hidden_at_load = true` before computing coverage and percentiles. The excluded background-tab count is preserved separately via the `rs` (raw pre-filter sample size) and `xb` (excluded background sessions) report-URL params so the credibility strip can narrate the exclusion transparently. Invariant: `raw_sample_size === sample_size + excluded_background_sessions`.
+- Every URL-builder template emits a `b=<band>` parameter (`preliminary` | `provisional` | `stable`) computed inline from `sample_size` (thresholds: 100, 500). The hosted `/r` cover renders a confidence-band note above the masthead when `b !== stable` so a thin report can't masquerade as a stable read. Pre-band URLs (older snapshots) still decode cleanly — the codec back-fills the band from `s=` (sample_size) when `b=` is absent.
 - Treat target/resource fields as diagnostic hints, not stable identifiers.
 - Keep raw event-table access limited to the smallest group that needs it; the table can contain operationally sensitive path/referrer/resource context even though Signal is not a user-identity system.
 - Apply warehouse retention and deletion policies intentionally, especially for `path`, `referrer`, `lcp_resource_url`, `lcp_target`, and `interaction_target`.

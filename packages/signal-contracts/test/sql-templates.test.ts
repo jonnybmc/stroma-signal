@@ -68,6 +68,13 @@ function expectSharedUrlContract(sql: string): void {
   expect(sql).toContain("'&clc='");
   expect(sql).toContain("'&cfc='");
   expect(sql).toContain("'&ctc='");
+  // Sample-confidence band — every URL builder must emit this so the
+  // /r cover can render the preliminary/provisional banner without
+  // recomputing thresholds. See SIGNAL_SAMPLE_BAND_* in types.ts.
+  expect(sql).toContain("'&b='");
+  expect(sql).toContain('report_band');
+  expect(sql).toContain("WHEN COUNT(*) < 100 THEN 'preliminary'");
+  expect(sql).toContain("WHEN COUNT(*) < 500 THEN 'provisional'");
   expect(sql).toContain('comparison_tier');
   expect(sql).toContain('selected_metric_urban_coverage');
   expect(sql).toContain('selected_metric_comparison_coverage');

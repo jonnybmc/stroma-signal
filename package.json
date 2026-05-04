@@ -26,6 +26,8 @@
     "check:boundaries": "node scripts/check-boundaries.mjs",
     "check:exports": "node scripts/check-package-exports.mjs",
     "check:release": "node scripts/check-release-readiness.mjs",
+    "test:cli:pack": "node scripts/pack-and-test-cli.mjs",
+    "test:cli:snippet-compile": "vitest run packages/signal/test/cli/snippet-compile.test.ts",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "format": "biome format --write .",
@@ -38,6 +40,7 @@
   "devDependencies": {
     "@biomejs/biome": "^2.4.10",
     "@playwright/test": "^1.53.0",
+    "@rollup/plugin-json": "^6.1.0",
     "@rollup/plugin-node-resolve": "^16.0.1",
     "@rollup/plugin-terser": "^0.4.4",
     "@rollup/plugin-typescript": "^12.1.4",

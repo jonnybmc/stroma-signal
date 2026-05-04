@@ -1,4 +1,4 @@
-import { deriveSignalAggregateWarnings } from './aggregation.js';
+import { deriveSampleBand, deriveSignalAggregateWarnings } from './aggregation.js';
 import { explainSignalAggregateIssues, isSignalAggregateV1 } from './guards.js';
 import type {
   SignalAggregateV1,
@@ -24,6 +24,7 @@ import type {
   SignalRaceFallbackReason,
   SignalRaceMetric,
   SignalReportUrlResult,
+  SignalSampleBand,
   SignalThirdPartyStory,
   SignalThirdPartyTier,
   SignalTierMetricSummary
@@ -491,6 +492,9 @@ function encodeAggregate(aggregate: SignalAggregateV1): URLSearchParams {
   params.set('s', String(aggregate.sample_size));
   params.set('p', String(aggregate.period_days));
   params.set('ga', String(aggregate.generated_at));
+  // Sample-confidence band — drives the /r cover's preliminary banner.
+  // Always emitted so the renderer never has to recompute thresholds.
+  params.set('b', aggregate.band);
 
   // Distributions
   encodeNetworkDistribution(params, aggregate.network_distribution);
@@ -1002,7 +1006,12 @@ export function decodeSignalReportUrl(value: string | URL): SignalAggregateV1 {
     context_story: readOptionalContextStory(params),
     navigation_timing_story: readOptionalNavigationTimingStory(params),
     top_page_path: params.get('v'),
-    warnings
+    warnings,
+    // Sample-confidence band — read from URL when present; back-fill
+    // from sample_size when absent so older URLs (pre-band param)
+    // still decode cleanly. Threshold logic lives in deriveSampleBand()
+    // so back-fill and live aggregates resolve identically.
+    band: readSampleBandParam(params, sampleSize)
   };
 
   const issues = explainSignalAggregateIssues(aggregate);
@@ -1011,4 +1020,10 @@ export function decodeSignalReportUrl(value: string | URL): SignalAggregateV1 {
   }
 
   return aggregate;
+}
+
+function readSampleBandParam(params: URLSearchParams, sampleSize: number): SignalSampleBand {
+  const raw = params.get('b');
+  if (raw === 'preliminary' || raw === 'provisional' || raw === 'stable') return raw;
+  return deriveSampleBand(sampleSize);
 }

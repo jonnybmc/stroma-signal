@@ -48,7 +48,10 @@ import {
   SIGNAL_MIN_LCP_COVERAGE,
   SIGNAL_MIN_RACE_OBSERVATIONS,
   SIGNAL_PREVIEW_MINIMUM_SAMPLE,
-  SIGNAL_REPORT_VERSION
+  SIGNAL_REPORT_VERSION,
+  SIGNAL_SAMPLE_BAND_PROVISIONAL_THRESHOLD,
+  SIGNAL_SAMPLE_BAND_STABLE_THRESHOLD,
+  type SignalSampleBand
 } from './types.js';
 
 // Re-export `classifyThirdPartyShareTier` from its new home so the
@@ -443,6 +446,24 @@ export function deriveSignalAggregateWarnings(
   return warnings;
 }
 
+/**
+ * Sample-band derivation — single source of truth for the
+ * preliminary/provisional/stable thresholds.
+ *
+ *   sample_size <  SIGNAL_SAMPLE_BAND_PROVISIONAL_THRESHOLD (100) → 'preliminary'
+ *   sample_size <  SIGNAL_SAMPLE_BAND_STABLE_THRESHOLD     (500) → 'provisional'
+ *   sample_size >= SIGNAL_SAMPLE_BAND_STABLE_THRESHOLD     (500) → 'stable'
+ *
+ * Drives the /r cover's preliminary-read banner. The SQL URL-builder
+ * computes the same value via inline CASE so warehouse-only paths
+ * don't have to round-trip through TS to label themselves.
+ */
+export function deriveSampleBand(sampleSize: number): SignalSampleBand {
+  if (sampleSize < SIGNAL_SAMPLE_BAND_PROVISIONAL_THRESHOLD) return 'preliminary';
+  if (sampleSize < SIGNAL_SAMPLE_BAND_STABLE_THRESHOLD) return 'provisional';
+  return 'stable';
+}
+
 // marginal-coverage caveat. Fires when the LCP race cohort lands
 // within the slack thresholds of the ship gates — the numbers are
 // defensible, but barely, and the view model uses this warning to tone
@@ -760,6 +781,7 @@ export function aggregateSignalEvents(
     navigation_timing_story: finalizeNavigationTimingStory(navTimingStoryAcc),
     context_story: contextStory,
     top_page_path: computeTopPagePathFromCounts(topPathCounts),
-    warnings
+    warnings,
+    band: deriveSampleBand(total)
   };
 }

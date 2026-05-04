@@ -73,7 +73,7 @@ function renderRaceBlock(race: ReportRaceViewModel): string {
   return `
     <div class="figure" style="padding:clamp(24px,3vw,40px);">
       <div class="race-grid">
-        ${renderRacePhone('cyan', `Urban · ${race.metric_label} p75`, urbanSeconds, urbanMs)}
+        ${renderRacePhone('cyan', `Urban · ${race.metric_label}, slowest quarter`, urbanSeconds, urbanMs)}
         ${renderRaceCenter(
           race.wait_delta_ms,
           `${escapeHtml(race.comparison_label)} users wait this much longer than urban, every visit.`,
@@ -82,7 +82,7 @@ function renderRaceBlock(race: ReportRaceViewModel): string {
         )}
         ${renderRacePhone(
           'accent',
-          `${race.comparison_label} · ${race.metric_label} p75`,
+          `${race.comparison_label} · ${race.metric_label}, slowest quarter`,
           comparisonSeconds,
           comparisonMs
         )}
@@ -128,7 +128,7 @@ function renderLcpSubparts(rows: ReportLcpSubpartRow[]): string {
 
   return `
     <div class="figure">
-      <div class="figure-eyebrow">Where the gap lives · LCP subparts</div>
+      <div class="figure-eyebrow">Where the gap lives — between connection, content arriving, and paint</div>
       <div style="display:flex;height:10px;border-radius:999px;overflow:hidden;background:var(--bg-3);margin-top:16px;">${bar}</div>
       <div style="display:grid;grid-template-columns:repeat(${rows.length},1fr);gap:8px;margin-top:18px;">${cells}</div>
     </div>
@@ -136,15 +136,17 @@ function renderLcpSubparts(rows: ReportLcpSubpartRow[]): string {
 }
 
 function renderPaidMediaImpact(vm: ReportViewModel): string {
-  // Educational consequence cells — pull from race wait-delta + LCP story
-  // dominant subpart. Pure presentation; no commercial modelling.
-  // Magnitudes are banded by wait_delta to avoid alarmist phrasing on
-  // contained datasets and underclaim on severe ones.
+  // Wait-delta-banded observation about the cohort experience gap.
+  // Names what the measured delta means in user-experience terms;
+  // does NOT invent commercial magnitudes (CPC %, bounce %) the report
+  // cannot prove without warehouse joins. The wait_delta_seconds
+  // figure stays as the lead measurement; everything else is
+  // confident observation tied to user behaviour.
   const race = vm.race;
   const eyebrow = vm.editorial.distance_paid_media_eyebrow;
 
   if (!race.race_available) {
-    // Honest fallback — no delta to cost. We render the editorial
+    // Honest fallback — no delta to describe. Render the editorial
     // explanation instead of a fabricated impact ledger.
     return `
       <div class="figure">
@@ -156,47 +158,34 @@ function renderPaidMediaImpact(vm: ReportViewModel): string {
     `;
   }
 
-  const cells: Array<{ label: string; value: string; term: string | null }> = [];
   const deltaMs = race.wait_delta_ms ?? 0;
-
-  // Three bands — contained / visible / severe. The labels stay diagnostic;
-  // the magnitudes scale with the measured delta rather than asserting a
-  // single industry headline regardless of severity.
+  // Three bands — contained / visible / severe. Each band gets a single
+  // observational sentence about the user-experience consequence at that
+  // wait-delta magnitude. No invented %s.
+  let bandObservation: string;
   if (deltaMs < 900) {
-    cells.push({ label: 'Quality Score impact', value: 'sub-tier', term: 'qs' });
-    cells.push({ label: 'CPC pressure (Google)', value: 'negligible at this delta', term: 'cpc' });
-    cells.push({ label: 'Mobile bounce per +1s of delta', value: '+12%', term: null });
+    bandObservation = 'The wait gap here is small. Cohort experience is broadly aligned across networks.';
   } else if (deltaMs < 2200) {
-    cells.push({ label: 'Quality Score impact', value: '−1 tier', term: 'qs' });
-    cells.push({ label: 'CPC pressure (Google)', value: '+8 to +14%', term: 'cpc' });
-    cells.push({ label: 'Mobile bounce per +1s of delta', value: '+24%', term: null });
+    bandObservation =
+      'The wait gap here is large enough that landing-page experience scoring will register it as a cohort divergence.';
   } else {
-    cells.push({ label: 'Quality Score impact', value: '−1 to −2 tiers', term: 'qs' });
-    cells.push({ label: 'CPC pressure (Google)', value: '+12 to +20%', term: 'cpc' });
-    cells.push({ label: 'Mobile bounce per +1s of delta', value: '+32%', term: null });
+    bandObservation =
+      'The wait gap here is categorical — at this magnitude, cohort experience diverges enough that any optimisation calibrated to one baseline is calibrating to the wrong one.';
   }
 
-  if (race.lcp_story?.dominant_subpart === 'element_render_delay') {
-    cells.push({ label: 'Render-delay dominance', value: 'script-bound', term: 'renderdelay' });
-  }
-
-  const rows = cells
-    .map((c, i, arr) => {
-      const isLast = i === arr.length - 1;
-      const labelHtml = c.term ? renderTerm(c.term as Parameters<typeof renderTerm>[0], c.label) : escapeHtml(c.label);
-      return `
-        <div class="row-between" style="padding:12px 0;${isLast ? '' : 'border-bottom:1px solid var(--line);'}">
-          <span style="font-size:13px;color:var(--ink-soft);">${labelHtml}</span>
-          <span class="mono" style="color:var(--accent);">${escapeHtml(c.value)}</span>
-        </div>
-      `;
-    })
-    .join('');
+  // Render-delay dominance is a specific mechanism worth surfacing
+  // when the LCP story finds it — keeps the diagnostic-handoff useful
+  // without inventing a commercial figure.
+  const renderDelayNote =
+    race.lcp_story?.dominant_subpart === 'element_render_delay'
+      ? `<p class="section-lede" style="margin-top:var(--stack-sm);font-style:italic;">Render delay dominates this cohort's LCP — the bytes arrive on time, but ${renderTerm('renderdelay', 'paint commits late')} (typically script-bound).</p>`
+      : '';
 
   return `
     <div class="figure">
       <div class="figure-eyebrow">${escapeHtml(eyebrow)}</div>
-      <div style="margin-top:8px;">${rows}</div>
+      <p class="section-lede" style="margin-top:var(--stack-sm);">${escapeHtml(bandObservation)}</p>
+      ${renderDelayNote}
     </div>
   `;
 }
@@ -206,7 +195,7 @@ export function renderDistanceSection(vm: ReportViewModel): string {
   return `
     <section id="distance" class="section" data-tone="paper" aria-labelledby="distance-eyebrow">
       <div class="section-inner">
-        <div class="act-intro" style="padding-block:0;">
+        <div class="act-intro">
           <div class="act-intro-stack">
             ${renderReveal(`<div id="distance-eyebrow" class="act-intro-eyebrow"><span class="dot"></span>Act 02 · Temporal comparison</div>`)}
             ${renderReveal(vm.editorial.distance_headline_html, { delay: 120 })}

@@ -10,7 +10,8 @@ Signal reads browser APIs (`navigator`, `document`, `performance`). It must not 
 |---|---|
 | Next.js (App Router) | `'use client'` directive |
 | Next.js (Pages Router) | `typeof window !== 'undefined'` check |
-| Remix / React Router v7 | `useEffect` + dynamic `import()` |
+| React Router v7 (framework mode) | `entry.client.tsx` (browser-only entry) |
+| Remix v2 (legacy) | `entry.client.tsx` (browser-only entry) |
 | Nuxt 3 | `.client.ts` plugin suffix |
 | Angular Universal | `isPlatformBrowser(platformId)` |
 | SvelteKit | `import { browser } from '$app/environment'` |

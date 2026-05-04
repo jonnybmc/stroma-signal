@@ -1,6 +1,27 @@
 export const SIGNAL_EVENT_VERSION = 1 as const;
 export const SIGNAL_REPORT_VERSION = 1 as const;
 export const SIGNAL_PREVIEW_MINIMUM_SAMPLE = 100 as const;
+
+/**
+ * Sample-band thresholds — used to label a report's confidence at-a-glance
+ * on the /r cover so a thin report can't masquerade as a stable read.
+ *
+ *   sample_size <  100  → 'preliminary' (banner: "wait for more traffic")
+ *   sample_size <  500  → 'provisional' (banner: "directionally stable")
+ *   sample_size >= 500  → 'stable'      (no banner)
+ *
+ * Derived deterministically from sample_size by `deriveSampleBand()` in
+ * aggregation.ts, encoded into the report URL as `&b=<band>`, and read
+ * back by the /r cover renderer to choose copy. Threshold lives in ONE
+ * place (this constant + the helper); SQL templates compute the same
+ * value via inline CASE so warehouse-only and SDK-only paths agree.
+ */
+export const SIGNAL_SAMPLE_BAND_PROVISIONAL_THRESHOLD = SIGNAL_PREVIEW_MINIMUM_SAMPLE;
+export const SIGNAL_SAMPLE_BAND_STABLE_THRESHOLD = 500 as const;
+
+export type SignalSampleBand = 'preliminary' | 'provisional' | 'stable';
+
+export const SIGNAL_SAMPLE_BAND_VALUES: readonly SignalSampleBand[] = ['preliminary', 'provisional', 'stable'] as const;
 export const SIGNAL_MIN_RACE_OBSERVATIONS = 25 as const;
 export const SIGNAL_MIN_LCP_COVERAGE = 50 as const;
 export const SIGNAL_FUNNEL_FCP_POOR_THRESHOLD = 3000 as const;
@@ -286,7 +307,7 @@ export interface SignalVitalsNavigationTiming {
   // responseStart can precede activationStart on prerender.
   activation_adjusted_ttfb_ms: number | null;
 
-  // Raw anchor timestamps for downstream verification + future TTFB
+  // Raw anchor timestamps for downstream verification + TTFB
   // recalculation (ms relative to nav startTime).
   first_interim_response_start_ms: number | null;
   final_response_headers_start_ms: number | null;
@@ -791,6 +812,12 @@ export interface SignalAggregateV1 {
   navigation_timing_story?: SignalNavigationTimingStory;
   top_page_path: string | null;
   warnings: string[];
+  /** Sample-confidence band derived deterministically from sample_size
+   *  via deriveSampleBand(). Drives the /r cover's preliminary/
+   *  provisional banner. Required field — every aggregate has one,
+   *  even old fixtures (decoder back-fills from sample_size if the URL
+   *  predates the b= param). */
+  band: SignalSampleBand;
 }
 
 export interface SignalReportUrlResult {

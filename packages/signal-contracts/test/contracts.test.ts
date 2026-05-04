@@ -55,6 +55,19 @@ describe('signal contracts', () => {
     expect(decoded.vitals.comparison.fcp_coverage).toBe(previewAggregateFixture.vitals.comparison.fcp_coverage);
     expect(decoded.vitals.comparison.ttfb_coverage).toBe(previewAggregateFixture.vitals.comparison.ttfb_coverage);
     expect(decoded.experience_funnel).toEqual(previewAggregateFixture.experience_funnel);
+    // Sample-confidence band round-trips through the URL via the b= param.
+    expect(decoded.band).toBe(previewAggregateFixture.band);
+    expect(encoded.url).toContain(`&b=${previewAggregateFixture.band}`);
+  });
+
+  it('decoder back-fills band from sample_size when the URL predates the b= param', () => {
+    // Strip the b= param to simulate a pre-band URL emitted by an older
+    // SQL builder. The decoder should fall back to deriveSampleBand().
+    const encoded = encodeSignalReportUrl(previewAggregateFixture);
+    const urlWithoutBand = encoded.url.replace(/&b=[a-z]+/, '');
+    expect(urlWithoutBand).not.toContain('&b=');
+    const decoded = decodeSignalReportUrl(urlWithoutBand);
+    expect(decoded.band).toBe(previewAggregateFixture.band);
   });
 
   it('rejects invalid enum values in report urls', () => {
@@ -360,6 +373,7 @@ describe('signal contracts', () => {
 
   it('ships scenario fixtures that cover the intended report fallbacks and edge cases', () => {
     expect(signalReportScenarioFixtures.map((fixture) => fixture.id)).toEqual([
+      'sa-insurance-month-one',
       'preview',
       'mixed-lifecycle',
       'strong-lcp',
@@ -429,6 +443,30 @@ describe('signal contracts', () => {
     expect(deriveSignalAggregateWarnings({ mode: 'preview', sample_size: 200, race_metric: 'none' })).toHaveLength(1);
     // Production + small sample + LCP race → 0 warnings (preview check only applies to preview mode)
     expect(deriveSignalAggregateWarnings({ mode: 'production', sample_size: 5, race_metric: 'lcp' })).toHaveLength(0);
+  });
+
+  it('deriveSampleBand maps sample_size to confidence bands at the documented thresholds', async () => {
+    const { deriveSampleBand } = await import('../src/aggregation.js');
+    // Preliminary boundary: < 100
+    expect(deriveSampleBand(0)).toBe('preliminary');
+    expect(deriveSampleBand(1)).toBe('preliminary');
+    expect(deriveSampleBand(99)).toBe('preliminary');
+    // Provisional boundary: 100 <= n < 500
+    expect(deriveSampleBand(100)).toBe('provisional');
+    expect(deriveSampleBand(250)).toBe('provisional');
+    expect(deriveSampleBand(499)).toBe('provisional');
+    // Stable boundary: >= 500
+    expect(deriveSampleBand(500)).toBe('stable');
+    expect(deriveSampleBand(10_000)).toBe('stable');
+    expect(deriveSampleBand(1_000_000)).toBe('stable');
+  });
+
+  it('aggregateSignalEvents stamps the correct band on the produced aggregate', async () => {
+    const { aggregateSignalEvents } = await import('../src/aggregation.js');
+    // Empty event list → sample_size 0 → band: preliminary
+    const empty = aggregateSignalEvents([], 'preview', 1_700_000_000_000);
+    expect(empty.band).toBe('preliminary');
+    expect(empty.sample_size).toBe(0);
   });
 
   it('keeps the aggregation spec object in sync with types.ts constants', () => {

@@ -38,7 +38,60 @@ const FORBIDDEN_WHOLEDOC: string[] = [
   'bid down',
   'lower CPC ceilings',
   'lower bids',
-  'bid lower'
+  'bid lower',
+  // Closing-modal redirect-implied phrasing — the modal is pure
+  // demand-sampling, no booking flow, no follow-up promise. These
+  // phrases must never reappear in the rendered modal body.
+  'booked through stroma',
+  "we'll come back",
+  'we will come back',
+  // Engineering-shorthand jargon that has no anchor for the paid-media /
+  // CMO / PPC / martech reader. Per the persona discipline:
+  // recognisable industry terms (LCP, FCP, INP, CWV, CPC, ROAS, CAC,
+  // CPA, TTFB) stay — they live behind glossary popovers — but layer-4
+  // networking shorthand and engineering-only stat / spec vocab gets
+  // replaced with operator-language equivalents in body copy.
+  // Glossary tooltips themselves are excluded by extractBodyCopy() —
+  // these guards only fire on body prose.
+  'pre-LCP weight',
+  'long-frame floor',
+  'median origin',
+  'dominant phase',
+  'LoAF worst-frame',
+  // UK-English regression guards — Stroma editorial register is UK
+  // English (optimise / optimisation, behaviour, colour, fibre, centre,
+  // etc.). CSS property names and JS API identifiers are exempt because
+  // they're language tokens, not prose; the guards only fire on
+  // rendered body copy. Add to this list when a new American spelling
+  // sneaks in via a future edit.
+  'optimize',
+  'optimization',
+  'optimized',
+  'optimizing',
+  'analyze',
+  'analyzed',
+  'organization',
+  'organize',
+  'recognize',
+  'minimize',
+  'maximize',
+  'realize',
+  'customize',
+  'utilize',
+  'prioritize',
+  'standardize',
+  'characterize',
+  'categorize',
+  'fiber-cable', // catch "fiber" without false-positive on glossary "Fiber"-style proper-noun cases
+  'flavor',
+  'rumor',
+  'savior',
+  'aluminum',
+  'traveler',
+  'neighbor',
+  // "different than" is the most common non-UK syntax leak (UK uses
+  // "different from"). Catch the literal phrase.
+  'different than'
 ];
 
 // Headline + lede forbidden tokens — prescription verbs that read as
@@ -100,7 +153,29 @@ const FORBIDDEN_BUSINESS_SECTION_SALES_TOKENS: string[] = [
   'limited time',
   'limited offer',
   'special offer',
-  'exclusive access'
+  'exclusive access',
+  // Commercial-claim over-reach (Act 4 reframe — the report measures
+  // post-click experience, not commercial outcomes; row-level copy
+  // never asserts CPC / CPA / ROAS / conversion movement).
+  'you are paying more',
+  'inflated cpa',
+  'leak roas',
+  'leaky roas',
+  'leak campaign efficiency',
+  'same ad spend',
+  'drop conversion',
+  'stall conversion',
+  'suppress conversion',
+  'raise cpc',
+  'lift cpc',
+  'shrinks ad reach',
+  // Self-deprecation hedges (per feedback_no_self_deprecation_in_artifacts —
+  // the boundary disclosure lives ONCE in the section-lede; row-level
+  // copy proceeds with confident observation, never re-apologises).
+  "the report doesn't see",
+  'outside the scope of this report',
+  "this report doesn't carry",
+  'depends on context the report cannot measure'
 ];
 
 const FORBIDDEN_BUSINESS_SECTION_CELEBRATION_TOKENS: string[] = [

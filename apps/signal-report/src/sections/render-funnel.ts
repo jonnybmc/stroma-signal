@@ -70,7 +70,7 @@ export function renderFunnelSection(vm: ReportViewModel): string {
   return `
     <section id="funnel" class="section" data-tone="cream" aria-labelledby="funnel-eyebrow">
       <div class="section-inner">
-        <div class="act-intro" style="padding-block:0;">
+        <div class="act-intro">
           <div class="act-intro-stack">
             ${renderReveal(`<div id="funnel-eyebrow" class="act-intro-eyebrow"><span class="dot"></span>${escapeHtml(vm.editorial.funnel_eyebrow)}</div>`)}
             ${renderReveal(vm.editorial.funnel_headline_html, { delay: 120 })}

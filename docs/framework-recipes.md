@@ -2,6 +2,8 @@
 
 Copy-paste installation snippets for common environments.
 
+> **Most operators should start with `npx @stroma-labs/signal init`** — the wizard detects your framework and generates the right snippet. This doc is the manual reference behind it for engineers who prefer copy-paste, and the source of truth for what the wizard generates. Last verified against current upstream docs: **2026-05-03** (see [packages/signal/src/cli/RECIPE-CURRENCY-SWEEP.md](../packages/signal/src/cli/RECIPE-CURRENCY-SWEEP.md) for the quarterly sweep schedule and [packages/signal/src/cli/snippets/recipe-currency-data.json](../packages/signal/src/cli/snippets/recipe-currency-data.json) for the per-recipe version pins).
+
 Signal is framework-agnostic. These are installation notes, not framework integrations. Each recipe answers:
 
 - Where to initialise
@@ -56,26 +58,45 @@ Initialise once in your root layout or `_app.tsx`. Use a client-only boundary.
 
 ### Next.js App Router (recommended)
 
-```ts
-// app/signal.ts
+The canonical Next.js pattern is to compose a Client Component as a child boundary inside the Server Layout — NOT a side-effect import of a `'use client'` module. Verified against [nextjs.org App Router docs](https://nextjs.org/docs/app/getting-started/server-and-client-components) for Next 16.x (May 2026).
+
+```tsx
+// app/SignalClient.tsx
 'use client';
 
-import { init } from '@stroma-labs/signal';
-import { createDataLayerSink } from '@stroma-labs/signal/ga4';
+import { useEffect } from 'react';
 
-init({
-  sinks: [createDataLayerSink()]
-});
+export function SignalClient() {
+  useEffect(() => {
+    (async () => {
+      const { init } = await import('@stroma-labs/signal');
+      const { createDataLayerSink } = await import('@stroma-labs/signal/ga4');
+      init({
+        sinks: [createDataLayerSink()]
+      });
+    })();
+  }, []);
+  return null;
+}
 ```
 
 ```tsx
 // app/layout.tsx
-import './signal';
+import { SignalClient } from './SignalClient';
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  return <html><body>{children}</body></html>;
+  return (
+    <html lang="en">
+      <body>
+        <SignalClient />
+        {children}
+      </body>
+    </html>
+  );
 }
 ```
+
+> **Why a Client Component, not a side-effect `'use client'` import?** Next.js's canonical guidance is to "use Client Components when you need browser-only APIs" rendered as boundaries inside Server Components. A side-effect import bypasses the Server/Client composition model and is brittle across Next 14 → 15 → 16 transitions; the rendered-component pattern survives them all. Next 16 also requires Node ≥ 20.9 — verify your environment if upgrading.
 
 ### Next.js Pages Router
 
@@ -121,44 +142,69 @@ import App from './App';
 createRoot(document.getElementById('root')!).render(<App />);
 ```
 
-### Remix / React Router v7
+### React Router v7 (framework mode)
 
-Remix renders on both server and client. Signal must only run in the browser.
+React Router v7 framework mode (formerly Remix v3) uses `entry.client.tsx` as its canonical browser-only entry point. Verified against [reactrouter.com framework docs](https://reactrouter.com/start/framework/route-module) for React Router 7.x (May 2026).
 
 ```tsx
-// app/root.tsx
-import { useEffect } from 'react';
-import { Links, Meta, Outlet, Scripts, ScrollRestoration } from '@remix-run/react';
+// app/entry.client.tsx — exposed via `npx react-router reveal entry.client` if not present
+import { startTransition, StrictMode } from 'react';
+import { hydrateRoot } from 'react-dom/client';
+import { HydratedRouter } from 'react-router/dom';
 
-export default function App() {
-  useEffect(() => {
-    import('@stroma-labs/signal').then(({ init }) =>
-      import('@stroma-labs/signal/ga4').then(({ createDataLayerSink }) => {
-        init({ sinks: [createDataLayerSink()] });
-      })
-    );
-  }, []);
+import { init } from '@stroma-labs/signal';
+import { createDataLayerSink } from '@stroma-labs/signal/ga4';
 
-  return (
-    <html lang="en">
-      <head><Meta /><Links /></head>
-      <body>
-        <Outlet />
-        <ScrollRestoration />
-        <Scripts />
-      </body>
-    </html>
+init({
+  sinks: [createDataLayerSink()]
+});
+
+startTransition(() => {
+  hydrateRoot(
+    document,
+    <StrictMode>
+      <HydratedRouter />
+    </StrictMode>
   );
-}
+});
 ```
 
-`useEffect` only runs in the browser, which keeps Signal out of the server bundle. Dynamic `import()` inside the effect ensures the package is client-only even if the bundler would otherwise inline it.
+The `entry.client.tsx` file runs only in the browser — server bundles never reach it. No `useEffect` workaround needed.
+
+### Remix v2 (legacy)
+
+Remix v2 is a distinct, still-maintained product alongside React Router v7. Verified against [v2.remix.run entry.client docs](https://v2.remix.run/docs/file-conventions/entry.client) (May 2026).
+
+```tsx
+// app/entry.client.tsx — exposed via `npx remix reveal entry.client` if not present
+import { RemixBrowser } from '@remix-run/react';
+import { startTransition, StrictMode } from 'react';
+import { hydrateRoot } from 'react-dom/client';
+
+import { init } from '@stroma-labs/signal';
+import { createDataLayerSink } from '@stroma-labs/signal/ga4';
+
+init({
+  sinks: [createDataLayerSink()]
+});
+
+startTransition(() => {
+  hydrateRoot(
+    document,
+    <StrictMode>
+      <RemixBrowser />
+    </StrictMode>
+  );
+});
+```
+
+Same browser-only-entry guarantee as React Router v7. Don't use the prior `useEffect` + dynamic-import pattern from older Signal docs — it's no longer the canonical convention for either project.
 
 ### React notes
 
 - **React Strict Mode** calls effects twice in development. This does not matter — `init()` is idempotent. The second call returns the existing controller.
 - **SSR (Next.js):** Signal touches browser APIs (`navigator`, `document`). The `'use client'` directive or `typeof window` guard keeps it out of server rendering.
-- **SSR (Remix):** Use `useEffect` + dynamic `import()` as above. Do not import `@stroma-labs/signal` at module scope in any file that the server bundle sees.
+- **React Router v7 framework mode + Remix v2:** Use `entry.client.tsx` as shown above. The file runs only in the browser; server bundles never reach it.
 - **SPA navigations:** Signal fires one event per real page load, not per client-side route change. See [SPA/SSR caveats](./spa-ssr-caveats.md).
 
 ---
@@ -264,52 +310,31 @@ platformBrowserDynamic().bootstrapModule(AppModule);
 
 ## Svelte / SvelteKit
 
-### SvelteKit
+### SvelteKit (Svelte 5 runes)
 
-Initialise in the root layout, guarded by `browser`:
+Verified against [Svelte 5 migration guide](https://svelte.dev/docs/svelte/v5-migration-guide) (May 2026). `$effect` is the canonical browser-only side-effect rune — it does NOT run on the server, so Signal stays out of SSR.
 
 ```svelte
 <!-- src/routes/+layout.svelte -->
-<script>
-  import { browser } from '$app/environment';
+<script lang="ts">
+  import type { LayoutProps } from './$types';
+  let { children }: LayoutProps = $props();
 
-  if (browser) {
-    import('@stroma-labs/signal').then(({ init }) => {
-      import('@stroma-labs/signal/ga4').then(({ createDataLayerSink }) => {
-        init({
-          sinks: [createDataLayerSink()]
-        });
+  $effect(() => {
+    (async () => {
+      const { init } = await import('@stroma-labs/signal');
+      const { createDataLayerSink } = await import('@stroma-labs/signal/ga4');
+      init({
+        sinks: [createDataLayerSink()]
       });
-    });
-  }
-</script>
-
-<slot />
-```
-
-Or with a top-level await approach:
-
-```ts
-// src/lib/signal.ts
-import { browser } from '$app/environment';
-
-if (browser) {
-  const { init } = await import('@stroma-labs/signal');
-  const { createDataLayerSink } = await import('@stroma-labs/signal/ga4');
-  init({
-    sinks: [createDataLayerSink()]
+    })();
   });
-}
-```
-
-```svelte
-<!-- src/routes/+layout.svelte -->
-<script>
-  import '$lib/signal';
 </script>
 
-<slot />
+{@render children?.()}
 ```
+
+> **Svelte 4 fallback**: legacy projects using the `let` + `$:` reactive syntax can still guard with `import { browser } from '$app/environment'` and a top-level `if (browser) { ... }` block — the runes-mode pattern above is the new canonical for Svelte 5+ projects, but the older recipe still works.
 
 ### Plain Svelte (Vite)
 

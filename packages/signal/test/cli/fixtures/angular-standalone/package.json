@@ -1,0 +1,10 @@
+{
+  "name": "fixture-angular-standalone",
+  "version": "0.0.0",
+  "private": true,
+  "dependencies": {
+    "@angular/core": "^21.0.0",
+    "@angular/common": "^21.0.0",
+    "@angular/platform-browser": "^21.0.0"
+  }
+}

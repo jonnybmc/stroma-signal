@@ -10,6 +10,12 @@ export default defineConfig({
         find: '@stroma-labs/signal/report',
         replacement: path.resolve(__dirname, 'packages/signal/src/report/index.ts')
       },
+      // More-specific subpath alias FIRST so '/install-event' doesn't
+      // get caught by the root alias and re-resolved to index.ts.
+      {
+        find: '@stroma-labs/signal-contracts/install-event',
+        replacement: path.resolve(__dirname, 'packages/signal-contracts/src/install-event.ts')
+      },
       {
         find: '@stroma-labs/signal-contracts',
         replacement: path.resolve(__dirname, 'packages/signal-contracts/src/index.ts')

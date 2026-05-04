@@ -35,9 +35,28 @@ describe('fixture coverage — every scenario renders without null/undefined/NaN
         }
       });
 
-      it('renders the canonical CTA + boundary statement', () => {
-        expect(html, `${fx.id} missing Rapid Fix Plan CTA`).toContain('Rapid Fix Plan');
+      it('renders the canonical closing trigger + boundary statement', () => {
+        expect(html, `${fx.id} missing closing-modal trigger`).toContain('data-closing-modal-open');
+        expect(html, `${fx.id} missing closing-modal dialog`).toContain('id="closing-modal"');
         expect(html, `${fx.id} missing boundary statement`).toContain(vm.boundary_statement);
+      });
+
+      // Sample-band note (P2-credibility): the sticky scroll-nav
+      // surfaces a persistent disclaimer chip when band !== 'stable'
+      // (lives in the nav so it follows the recipient's eye through
+      // every section). Fixture-driven sanity check: render contains
+      // the headline iff band is preliminary/provisional, suppressed
+      // entirely when stable.
+      it('renders the sample-band note only when band !== stable', () => {
+        if (vm.band === 'preliminary') {
+          expect(html, `${fx.id} (band=preliminary) missing band note`).toContain('Early read');
+        } else if (vm.band === 'provisional') {
+          expect(html, `${fx.id} (band=provisional) missing band note`).toContain('Building sample');
+        } else {
+          expect(html, `${fx.id} (band=stable) leaks band note`).not.toContain('Early read');
+          expect(html, `${fx.id} (band=stable) leaks band note`).not.toContain('Building sample');
+          expect(html, `${fx.id} (band=stable) leaks band note container`).not.toContain('scroll-nav-note');
+        }
       });
 
       it('does not leak null / undefined / NaN as visible content', () => {
@@ -124,13 +143,13 @@ describe('fixture coverage — every scenario renders without null/undefined/NaN
   }
 });
 
-describe('cross-fixture invariants: lcp_bounce glossary anchor matches its cameo', () => {
-  it('every fixture emitting lcp_bounce row anchors to "cpc" (matches the italicized CPC cameo)', () => {
+describe('cross-fixture invariants: every act4 row populates both halves of the what-it-says / why-it-matters pair', () => {
+  it('every emitted act4 impact row has non-empty what_it_says + why_it_matters', () => {
     for (const fx of signalReportScenarioFixtures) {
       const vm = buildReportViewModel(fx.aggregate);
-      const lcpRow = vm.act4_impact_rows.find((r) => r.id === 'lcp_bounce');
-      if (lcpRow) {
-        expect(lcpRow.glossary_key, `${fx.id}: lcp_bounce glossary_key drift`).toBe('cpc');
+      for (const row of vm.act4_impact_rows) {
+        expect(row.what_it_says.length, `${fx.id}: row ${row.id} missing what_it_says`).toBeGreaterThan(0);
+        expect(row.why_it_matters.length, `${fx.id}: row ${row.id} missing why_it_matters`).toBeGreaterThan(0);
       }
     }
   });

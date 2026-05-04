@@ -16,6 +16,66 @@ pnpm add @stroma-labs/signal                 # latest stable (when published)
 
 Bump the exact pin example whenever a new `-rc.N` is cut so onboarders default to the freshest pinned snapshot.
 
+## [Unreleased]
+
+### Changed — Pre-launch fix pass for the `signal init` wizard (PR #53 review remediation)
+
+A 14-finding technical review of the wizard branch surfaced privacy-promise, packaging, and telemetry-honesty issues that would not have made the launch bar. This pass closes them as a single shippable PR; details by severity:
+
+- **Telemetry default-on without first-run disclosure (B1)** — the wizard now refuses to enqueue any event until the user has answered the disclosure prompt. `resolveOptOut` returns a discriminated union (`disabled` / `enabled` / `needs_disclosure`). `needs_disclosure` triggers a panel + `confirm()` prompt; the answer is persisted via `writeDisclosureConfig` keyed on a new `DISCLOSURE_VERSION` constant so a future material copy change re-prompts everyone with prior consent. **Ctrl-C at the disclosure prompt exits 130 with ZERO telemetry — consent never happened.** Network-isolation gate now enforces this invariant.
+- **CLI version drift (B2)** — `cli/util/version.ts` is the single source. `--version`, telemetry `cli_version`, and the vanilla CDN snippet pinning all read from the same constant (build-time JSON import of `package.json`). New `check:exports` assertion fails the release if `cli.mjs --version` does not equal `packages/signal/package.json` `version`.
+- **Build-hang DoD (B3)** — release is blocked until `pnpm --filter @stroma-labs/signal build` exits in under 60 seconds in a fresh shell AND fresh CI run. `process.exit()` in the rollup config is last resort only — a masked exit hides the underlying plugin bug.
+- **Stage-tracked abort/error telemetry (H1)** — `WizardStage` enum (9 values: `disclosure`/`detection`/`framework_prompt`/`sink_prompt`/`sample_rate_prompt`/`snippet_render`/`output`/`telemetry_flush`/`unknown`) updated at every phase boundary. New `AbortError` sentinel; wizard catch maps stage → `error_category` and emits `install_aborted` (exit 130) or `install_error` (exit 1) with the partial state the user reached. `install_error` `error_category` enum extended with `prompt_failed` + `output_failed`.
+- **Install rate-limit math (H2, snapshot-engine)** — `/api/v1/install` per-IP window bumped from 60/h → 1000/h. The original 60/h ceiling silently throttled even a 5-dev NAT'd team (≈80 events/h); 1000/h covers a 50-dev team while keeping the abuse ceiling low (~333 valid attempts before throttle).
+- **CLI fixture bundling (H3)** — `@stroma-labs/signal-contracts` adds `./install-event` subpath export with mirrored `tsconfig.base.json` paths. CLI imports from the narrow subpath, NOT the root. `check:exports` adds a < 100 KB bundle-size assertion + a fixture-marker scan that rejects `previewAggregateFixture` / `affirmingAggregateFixture` / etc. in `dist/cli.mjs`. Result: bundle drops from 80 KB → 44 KB.
+- **`--yes` ambiguous detection (M1)** — emits a stderr warning when multiple high-confidence framework candidates are auto-resolved under `--yes`, naming the picked candidate + the alternates + the fix (`--framework <id>`). CI/docs pipelines now have a visible signal.
+- **Invalid sample-rate feedback (M2)** — interactive sample-rate inputs that fail `Number.parseFloat` validation now print `(invalid sample rate "<x>" — using <default>)` to stderr instead of silently dropping.
+- **`installed_signal_version` (M3)** — new `cli/detect/installed-version.ts` walks up from cwd reading `node_modules/@stroma-labs/signal/package.json` for the actually-installed version. Telemetry now reports the resolved version, not the dep-spec range.
+- **Honest flush count (M4)** — `TelemetryQueue.flush()` tracks per-promise settlement and reports `{ flushed: actuallySettled, pending: timedOut }` instead of the misleading `pending.length-before` it used to log.
+- **Network-isolation teardown (M5)** — `afterAll` guarded against partial `beforeAll` (port-bind failure surfaces a clear message rather than cascading "cannot read property of undefined").
+- **Recipe sweep doc references (M6)** — `RECIPE-CURRENCY-SWEEP.md` no longer references the never-implemented `generate:recipes-doc` script (replaced with manual instructions). New `pnpm test:cli:snippet-compile` script wraps the existing vitest invocation.
+- **Removed `--no-clipboard` for v1 (M7)** — clipboard is deferred to v0.2; the flag's continued presence in help/parsing implied clipboard existed. Reserved for re-introduction when clipboard ships.
+- **Vanilla CDN pinning (L1)** — `matrix.ts` vanilla `<script type="module">` snippets pin to `https://esm.sh/@stroma-labs/signal@${CLI_VERSION}` instead of the unpinned `@latest`. Snapshot tests regenerated.
+- **Manual fresh-project release-gate (item A condition)** — `RELEASE-GATE.md` adds a per-framework smoke checklist (Next App Router, React Router v7, Remix v2, SvelteKit on Svelte 5 runes, vanilla) that must be ticked before any tagged release. SvelteKit specifically because parser-level validation cannot catch framework API drift.
+
+Tests: 2552 → 2578 (+26 new across `disclosure-flow.test.ts`, `installed-version.test.ts`, `telemetry-queue.test.ts`, `init-command.test.ts`, `entry-routing.test.ts`, `network-isolation.test.ts`).
+
+### Added — `signal init` install wizard + install telemetry feature
+
+- **New CLI: `signal init` — `npx @stroma-labs/signal init`** detects your framework from `package.json`, asks a small set of questions (sink, sample rate, optional beacon endpoint), and prints the framework-correct snippet ready to paste. Surfaces a Step 0 install panel with the right package-manager command (`pnpm add` / `npm install` / `yarn add` / `bun add`) when `@stroma-labs/signal` isn't yet a project dependency. Hand-rolled UI primitives — zero new runtime dependencies on the published `@stroma-labs/signal` package. Bin field added; shebang preserved through Rollup + terser.
+- **12 framework × 3 sink = 36 snippet matrix entries**, all verified May 2026 against current upstream docs:
+  * Next.js App Router (Client Component composition pattern, NOT side-effect import)
+  * Next.js Pages Router (`typeof window` guard)
+  * React Router v7 framework mode (`entry.client.tsx` with `HydratedRouter`)
+  * Remix v2 (`entry.client.tsx` with `RemixBrowser`)
+  * Nuxt (`.client.ts` plugin)
+  * SvelteKit (Svelte 5 runes — `$props` + `$effect`)
+  * Plain Vue / Plain Svelte / Plain React (Vite entry side-effect import)
+  * Angular standalone (`bootstrapApplication`) + Angular NgModule (legacy)
+  * Vanilla (`<script type="module">` with esm.sh CDN)
+- **Non-interactive mode**: every interactive prompt has a flag equivalent (`--framework`, `--sink`, `--sample-rate`, `--beacon-endpoint`, `--cwd`, `--yes`, `--json`, `--no-telemetry`, `--verbose`, `--skip-install-check`). `--json` mode outputs a single line of JSON to stdout (chrome to stderr) for CI / docs-screenshot pipelines.
+- **Anonymous install telemetry** to `https://api.stroma.design/api/v1/install` — opt-out by default with a prominent first-run disclosure. Captures: framework + version, sink choice, sample rate, package manager, Node version, OS family, CLI version. NEVER captures: project name, file paths, file contents, free text, emails, hostnames, full user-agent string. Disable via `--no-telemetry`, `STROMA_TELEMETRY=0`, `DO_NOT_TRACK=1` (industry standard), or run in CI / non-TTY environment (auto-disabled silently). Network-isolation test gates the zero-requests-when-disabled invariant.
+- **Recipe currency discipline**: per-recipe `verified_against_version` + `last_verified_at` + `upstream_doc_url` metadata in `packages/signal/src/cli/snippets/recipe-currency-data.json`. Quarterly sweep checklist documented in `packages/signal/src/cli/RECIPE-CURRENCY-SWEEP.md` — runs every Feb / May / Aug / Nov + within 2 weeks of any tracked framework's major release + when snapshot-engine telemetry's `recipe_currency_pressure` for any framework exceeds 5%.
+- **`SignalInstallEventV1` contract** in `@stroma-labs/signal-contracts` with full validator + 12 cross-repo wire-format drift fixtures.
+- Snapshot-engine companion: new `src/features/install/` encapsulated module mirrors the existing intent module (deletion-test discipline preserved), `POST /api/v1/install` + `GET /api/v1/install/stats`, dedicated `install_events` Turso table with per-phase timestamps + idempotent retry via `last_event_id`, zod `.strict()` mode, 4 KB body cap, NO User-Agent header capture.
+- Existing intent module: removed dead `weekly_inbox` value from the `pill_id` CHECK constraint (pre-existing drift between migration text and validator/contract enums); added migration-validator alignment test that catches future drift in either direction.
+
+### Added — Sample-confidence band on `/r` cover (premature-pull guard)
+
+A first-time installer who runs the BigQuery URL-builder query at N=12 events generates a thin report and, if shared externally, burns trust before the data is meaningful. Three additions close the gap without ever blocking the operator from querying their warehouse:
+
+- **Wizard outro (Task A):** the `signal init` next-steps panel now includes a "Wait ~5–7 days of real traffic before running the BigQuery URL-builder for a representative report" bullet, linking to `first-successful-report.md §8` for the rubric. Sets the right expectation at the moment of install — the cheapest gate.
+- **Contract + SQL + codec (Task C):** new `SignalAggregateV1.band` field — `'preliminary'` (sample < 100), `'provisional'` (100–499), `'stable'` (≥ 500). Threshold lives in ONE place: `SIGNAL_SAMPLE_BAND_PROVISIONAL_THRESHOLD` + `SIGNAL_SAMPLE_BAND_STABLE_THRESHOLD` in `signal-contracts/src/types.ts`, with the SQL `URL_builder` templates computing the same value via inline CASE so warehouse-only paths agree without round-tripping through TS. New `b=<band>` URL parameter; codec back-fills from `s=` (sample_size) for older URLs.
+- **`/r` cover banner (Task B):** when `vm.band !== 'stable'`, the cover renders a brand-olive note above the masthead — "Preliminary read — sample of N sessions. Ranges and percentiles stabilise around 100+ events..." (or the provisional variant). Suppressed entirely when stable. Banner is a self-honesty signal in the artifact recipients see — not a gate on the operator's BigQuery query.
+
+Test coverage: `deriveSampleBand` boundary tests at 0/99/100/499/500/10k; codec round-trip + back-fill paths; per-fixture banner-render assertion in `report-fixture-coverage.test.ts` (every fixture gets the right banner rendered or suppressed based on its sample size). Total tests: 2552 (was 2529; +23 new).
+
+### Notes
+
+- Wizard adds zero runtime dependencies to the published `@stroma-labs/signal` package — both `check-release-readiness.mjs` invariants stay intact (no `dependencies` block, no bundled deps in the packed artifact).
+- `dist/cli.mjs` bundles `@stroma-labs/signal-contracts` validators inline (workspace-private package; would otherwise leak at consumer install time).
+- ~72 KB minified CLI bundle; runtime SDK (`dist/index.mjs`) size unchanged at ≤ 6,656 bytes gzipped.
+
 ## [0.1.0-rc.3] - 2026-05-02
 
 ### Added (RC3 — Closing-section needs-inquiry router + intent-capture telemetry)
