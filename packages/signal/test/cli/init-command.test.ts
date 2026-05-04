@@ -357,6 +357,54 @@ describe('run() — JSON mode (deterministic)', () => {
     ).rejects.toThrow(/Install failed/);
   });
 
+  it('auto-install failure in --json mode emits parseable JSON failure payload with install_error_output', async () => {
+    // Regression lock — the InitJsonOutput contract declares
+    // install_error_output as an optional field, but earlier versions
+    // never set it: install failures threw before reaching the JSON
+    // write, so JSON consumers got nothing on stdout. Now the outer
+    // catch writes the failure payload in --json mode, including the
+    // captured stderr (capped 4 KB).
+    const dir = makeTmpProject({ name: 'smoke', dependencies: { next: '^16.2.4' } });
+    const { mkdirSync } = await import('node:fs');
+    mkdirSync(join(dir, 'app'));
+    const longStderr = `npm error ${'X'.repeat(5000)}`; // > 4 KB to verify capping
+    const stdout = captureWrites();
+    const stderr = captureWrites();
+    await expect(
+      run(
+        {
+          cwd: dir,
+          yes: true,
+          json: true,
+          noTelemetry: true,
+          verbose: false,
+          noInstall: false,
+          skipInstallCheck: false,
+          help: false,
+          version: false,
+          sink: 'dataLayer'
+        },
+        {
+          stdout: stdout.stream,
+          stderr: stderr.stream,
+          isInteractive: () => false,
+          runInstallSignal: async () => ({ ok: false, exitCode: 1, stderr: longStderr })
+        }
+      )
+    ).rejects.toThrow(/Install failed/);
+
+    // stdout MUST carry a parseable JSON object even on failure.
+    const json = JSON.parse(stdout.captured());
+    expect(json.outcome).toBe('error');
+    expect(json.error).toMatch(/Install failed/);
+    expect(json.framework).toBe('next-app-router'); // detection ran before failure
+    expect(json.auto_installed).toBe(true); // we attempted
+    expect(typeof json.install_error_output).toBe('string');
+    // Capped at 4 KB to prevent log floods.
+    expect(json.install_error_output.length).toBeLessThanOrEqual(4096);
+    expect(json.install_error_output).toMatch(/^npm error /);
+  });
+
   it('returns null install_command when SDK already in deps (no install ran)', async () => {
     const dir = makeTmpProject({
       name: 'smoke',

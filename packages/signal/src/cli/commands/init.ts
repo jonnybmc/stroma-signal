@@ -596,6 +596,11 @@ export async function run(args: InitArgs, deps: RunDeps = {}): Promise<{ exitCod
   // from event) when the dep was already declared, so we don't claim
   // credit for an install we didn't run.
   let autoInstalled: boolean | undefined;
+  // Captured install spawn stderr (capped 4 KB at the run-install
+  // module). Hoisted to closure scope so the outer catch can surface
+  // it in the JSON error payload — JSON-mode consumers (CI / scripted
+  // pipelines) need to read the failure cause without parsing stderr.
+  let installError: string | undefined;
 
   const buildSnapshotEvent = (
     kind: SignalInstallEventKind,
@@ -815,7 +820,9 @@ export async function run(args: InitArgs, deps: RunDeps = {}): Promise<{ exitCod
     // the install command at the top of the snippet output. The spawn
     // cwd MUST be pkgResult.dir (the resolved package root) — args.cwd
     // can differ in monorepos and nested src/ layouts.
-    let installError: string | undefined;
+    // installError (hoisted to closure scope above so the outer catch
+    // can include it in the JSON error payload). installFatal is local
+    // — only governs the immediate-throw decision in this block.
     let installFatal = false;
     const runInstall = deps.runInstallSignal ?? runInstallSignalDefault;
     const spawnCwd = pkgResult.dir ?? args.cwd;
@@ -1019,6 +1026,38 @@ export async function run(args: InitArgs, deps: RunDeps = {}): Promise<{ exitCod
     } catch {
       // Drop flush errors — the original error is what matters.
     }
+
+    // JSON mode — emit a parseable error payload to stdout so CI /
+    // scripted consumers can read the failure cause without parsing
+    // stderr. install_error_output is populated when the throw came
+    // from the install spawn (errorCategory === 'package_install_failed').
+    // Empty arrays / placeholder verified honour the InitJsonOutput
+    // contract; the error + outcome fields carry the real signal.
+    if (args.json) {
+      const message = err instanceof Error ? err.message : String(err);
+      const failureSink: SinkChoice = chosenSink === 'undecided' ? 'dataLayer' : chosenSink;
+      const failureJson: InitJsonOutput = {
+        framework: chosenFramework,
+        framework_version: chosenFrameworkVersion,
+        framework_confidence: chosenFrameworkConfidence,
+        sink: failureSink,
+        sample_rate: chosenSampleRate ?? 1,
+        package_manager: chosenPackageManager,
+        install_command: null,
+        step_zero_install_command: null,
+        auto_installed: autoInstalled === true,
+        installed_signal_version: installedVersion,
+        ...(installError ? { install_error_output: installError.slice(0, 4096) } : {}),
+        files: [],
+        notes: [],
+        next_steps: [],
+        verified: { against_version: '', last_verified_at: '', upstream_doc_url: '' },
+        outcome: 'error',
+        error: message
+      };
+      stdout.write(`${JSON.stringify(failureJson)}\n`);
+    }
+
     throw err;
   }
 }
