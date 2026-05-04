@@ -62,12 +62,20 @@ export function buildInstallCommandString(pm: PackageManager, spec: string): str
 
 export async function runInstallSignal(opts: RunInstallOptions): Promise<RunInstallResult> {
   const [command, args] = buildInstallArgv(opts.pm, opts.spec);
+  // Windows: npm / pnpm / yarn ship as .cmd files (yarn.cmd, pnpm.cmd,
+  // npm.cmd) — node's spawn with shell:false won't find them via
+  // PATHEXT resolution and will throw ENOENT. shell:true delegates to
+  // cmd.exe which DOES resolve .cmd extensions. The shell-injection
+  // surface is effectively zero here because args[1] is built from a
+  // hardcoded prefix + CLI_VERSION (no user input).
+  // POSIX (linux/darwin): keep shell:false — no .cmd dance, smaller
+  // overhead, no shell metacharacter quoting concerns.
+  const isWindows = process.platform === 'win32';
   const spawnOptions: SpawnOptions = {
     cwd: opts.cwd,
-    // jsonMode → capture; pretty mode → stream. shell:false so we don't
-    // pay a shell-parse round-trip + reduce injection surface.
+    // jsonMode → capture; pretty mode → stream.
     stdio: opts.jsonMode ? ['ignore', 'pipe', 'pipe'] : ['ignore', 'inherit', 'inherit'],
-    shell: false
+    shell: isWindows
   };
 
   return await new Promise<RunInstallResult>((resolve) => {

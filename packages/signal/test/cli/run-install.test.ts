@@ -31,6 +31,32 @@ describe('buildInstallCommandString', () => {
   });
 });
 
+describe('Windows shell:true semantics (regression lock)', () => {
+  // Regression lock — earlier the spawn used `shell: false`
+  // unconditionally. On Windows, npm/pnpm/yarn ship as .cmd files;
+  // node's spawn without shell:true cannot resolve them through
+  // PATHEXT and throws ENOENT. Every Windows user would hit an
+  // immediate Pattern 2 install failure. Now shell:true on win32,
+  // shell:false on POSIX.
+  //
+  // We can't easily simulate process.platform without monkey-patching
+  // node:child_process, but we can lock the source string so a future
+  // refactor can't silently flip to shell:false unconditionally.
+  it('source code carries the platform-conditional shell setting', async () => {
+    const fs = await import('node:fs/promises');
+    const url = await import('node:url');
+    const path = await import('node:path');
+    const here = path.dirname(url.fileURLToPath(import.meta.url));
+    const src = await fs.readFile(path.join(here, '..', '..', 'src', 'cli', 'install', 'run-install.ts'), 'utf8');
+    expect(src).toMatch(/process\.platform === 'win32'/);
+    expect(src).toMatch(/shell: isWindows/);
+    // Must NOT contain a SpawnOptions literal with unconditional shell:false
+    // (matches the actual options object, not prose comments mentioning the
+    // pre-fix form).
+    expect(src).not.toMatch(/spawnOptions[^}]*shell:\s*false/);
+  });
+});
+
 describe('runInstallSignal (real spawn smoke)', () => {
   it('returns ok:true when the command exits 0 (echo via npm)', async () => {
     // Don't actually shell out to a PM in unit tests — test the spawn
