@@ -59,6 +59,7 @@ export type SignalInstallErrorCategory =
   | 'output_failed'
   | 'clipboard_failed'
   | 'telemetry_flush_failed'
+  | 'package_install_failed'
   | 'unknown';
 
 export interface SignalInstallEventV1 {
@@ -100,6 +101,11 @@ export interface SignalInstallEventV1 {
    *  trace, NEVER a message — one of a small enum so we can prioritise
    *  bug-fixing without leaking project paths or PII. */
   error_category?: SignalInstallErrorCategory;
+  /** Whether the wizard auto-ran `<pm> add @stroma-labs/signal` for the
+   *  user (Pattern 2 default) vs. printed an install command for them
+   *  to run manually (`--no-install` opt-out). Drives the auto-install-
+   *  adoption stat on the snapshot-engine side. */
+  auto_installed?: boolean;
 }
 
 export const SIGNAL_INSTALL_EVENT_VALID_KINDS: ReadonlySet<SignalInstallEventKind> = new Set([
@@ -174,6 +180,7 @@ export const SIGNAL_INSTALL_VALID_ERROR_CATEGORIES: ReadonlySet<SignalInstallErr
   'output_failed',
   'clipboard_failed',
   'telemetry_flush_failed',
+  'package_install_failed',
   'unknown'
 ]);
 
@@ -357,6 +364,10 @@ export function explainInstallEventIssues(value: unknown): string[] {
     } else if (v.error_category !== undefined) {
       issues.push(`Expected "error_category" to be absent for event_kind "${kind}".`);
     }
+  }
+
+  if (v.auto_installed !== undefined && typeof v.auto_installed !== 'boolean') {
+    issues.push('Expected "auto_installed" to be a boolean when present.');
   }
 
   return issues;

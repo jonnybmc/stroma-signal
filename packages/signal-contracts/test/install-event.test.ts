@@ -441,6 +441,7 @@ describe('explainInstallEventIssues', () => {
       'snippet_render_failed',
       'clipboard_failed',
       'telemetry_flush_failed',
+      'package_install_failed',
       'unknown'
     ] as const)('accepts category %s on install_error', (cat) => {
       const ev = {
@@ -450,6 +451,37 @@ describe('explainInstallEventIssues', () => {
         error_category: cat
       };
       expect(explainInstallEventIssues(ev)).toEqual([]);
+    });
+  });
+
+  describe('auto_installed (Pattern 2 telemetry)', () => {
+    it('accepts auto_installed: true on install_completed', () => {
+      const ev = {
+        ...makeBase(),
+        event_kind: 'install_completed' as const,
+        outcome: 'completed' as const,
+        auto_installed: true
+      };
+      expect(explainInstallEventIssues(ev)).toEqual([]);
+    });
+
+    it('accepts auto_installed: false on install_completed', () => {
+      const ev = {
+        ...makeBase(),
+        event_kind: 'install_completed' as const,
+        outcome: 'completed' as const,
+        auto_installed: false
+      };
+      expect(explainInstallEventIssues(ev)).toEqual([]);
+    });
+
+    it('accepts auto_installed absent (legacy clients)', () => {
+      expect(explainInstallEventIssues(makeBase())).toEqual([]);
+    });
+
+    it('rejects non-boolean auto_installed', () => {
+      const ev = { ...makeBase(), auto_installed: 'true' } as unknown;
+      expect(explainInstallEventIssues(ev)).toContain('Expected "auto_installed" to be a boolean when present.');
     });
   });
 

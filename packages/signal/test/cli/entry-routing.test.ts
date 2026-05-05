@@ -87,7 +87,11 @@ describe('CLI entry routing (dist/cli.mjs)', () => {
   // produced [] and the routing checked args.length === 0. Should
   // now RUN the wizard.
   it('REGRESSION: `signal init` (no other flags) RUNS the wizard, NOT prints help', () => {
-    const { status, stdout, stderr } = runCli(['init', '--no-telemetry'], { cwd: FIXTURE_NEXT });
+    // --no-install is required so the wizard doesn't auto-install
+    // @stroma-labs/signal into the fixture directory (Pattern 2 default
+    // behaviour). Tests must opt out explicitly when they don't want
+    // the side effect on the fixture.
+    const { status, stdout, stderr } = runCli(['init', '--no-telemetry', '--no-install'], { cwd: FIXTURE_NEXT });
     // Combined output (pretty mode goes to stdout in non-json mode).
     const combined = stdout + stderr;
     // Wizard panel chrome should appear; usage should NOT.

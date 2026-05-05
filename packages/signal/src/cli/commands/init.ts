@@ -36,6 +36,12 @@ import { detectFrameworks, type FrameworkCandidate, type FrameworkId, vanillaCan
 import { readInstalledSignalVersion } from '../detect/installed-version.js';
 import { detectMonorepo, mergedDeps, readPackageJson } from '../detect/package-json.js';
 import { detectPackageManager, type PackageManager } from '../detect/package-manager.js';
+import {
+  buildInstallCommandString,
+  type RunInstallOptions,
+  type RunInstallResult,
+  runInstallSignal as runInstallSignalDefault
+} from '../install/run-install.js';
 import { findSnippet, SUPPORTED_FRAMEWORKS_IN_MATRIX } from '../snippets/matrix.js';
 import { RECIPE_CURRENCY as recipeCurrency } from '../snippets/recipe-currency-data.js';
 import { renderSnippet } from '../snippets/render-snippet.js';
@@ -65,6 +71,14 @@ export interface InitArgs {
   json: boolean;
   noTelemetry: boolean;
   verbose: boolean;
+  /** Pattern 2 default: when @stroma-labs/signal isn't a project dep,
+   *  the wizard auto-installs it via the project package manager.
+   *  --no-install opts out — wizard prints the install command at the
+   *  top of the snippet output and proceeds without touching deps. */
+  noInstall: boolean;
+  /** Deprecated alias of noInstall, kept for one rc cycle. Setting
+   *  either flag is sufficient; both being set is a no-op (same effect
+   *  as just one). */
   skipInstallCheck: boolean;
   help: boolean;
   version: boolean;
@@ -76,8 +90,27 @@ export interface InitJsonOutput {
   framework_confidence: 'high' | 'medium' | 'low' | null;
   sink: SinkChoice;
   sample_rate: number;
+  /** Reflects project_pm (lockfile-based) — the axis that drove the
+   *  install decision. Not runner_pm, which can be poisoned by npx. */
   package_manager: PackageManager;
+  /** Set when the wizard skipped auto-install (--no-install) OR when
+   *  auto-install failed; carries the manual command the user can run.
+   *  Null when auto-install succeeded (the dep is already there). */
+  install_command: string | null;
+  /** Deprecated — same value as install_command. Will be removed after
+   *  one rc cycle. New consumers should read install_command. */
   step_zero_install_command: string | null;
+  /** True when the wizard auto-ran `<pm> add @stroma-labs/signal@<v>`
+   *  for the user. False when --no-install opted out OR the dep was
+   *  already present. */
+  auto_installed: boolean;
+  /** Re-read after install completes so the JSON reflects the version
+   *  actually on disk. Falls back to cli_version on read failure when
+   *  install ran (we know the spec was pinned to that version). */
+  installed_signal_version: string | null;
+  /** Captured PM stderr (capped 4 KB) when auto_install failed; absent
+   *  on success or when --no-install was set. */
+  install_error_output?: string;
   files: Array<{ path: string; action: 'create' | 'modify'; body: string; position?: string }>;
   notes: string[];
   next_steps: string[];
@@ -103,6 +136,7 @@ export function parseInitArgs(argv: readonly string[]): InitArgs {
     json: false,
     noTelemetry: false,
     verbose: false,
+    noInstall: false,
     skipInstallCheck: false,
     help: false,
     version: false
@@ -164,7 +198,14 @@ export function parseInitArgs(argv: readonly string[]): InitArgs {
       case '--verbose':
         args.verbose = true;
         break;
+      case '--no-install':
+        args.noInstall = true;
+        break;
       case '--skip-install-check':
+        // Deprecated alias of --no-install. Kept for one rc cycle so
+        // anyone scripting against rc.4 doesn't break. Sets BOTH so
+        // downstream code only needs to read noInstall.
+        args.noInstall = true;
         args.skipInstallCheck = true;
         break;
       case '-h':
@@ -217,18 +258,17 @@ export function pickPrimaryCandidate(
   return { candidate: candidates[0] ?? vanillaCandidate(), needsPrompt: !yes, ambiguous: false };
 }
 
-function buildStepZeroInstallCommand(pm: PackageManager): string {
-  switch (pm) {
-    case 'pnpm':
-      return 'pnpm add @stroma-labs/signal';
-    case 'yarn':
-      return 'yarn add @stroma-labs/signal';
-    case 'bun':
-      return 'bun add @stroma-labs/signal';
-    default:
-      // npm + unknown fall through to the standard `npm install` form.
-      return 'npm install @stroma-labs/signal';
-  }
+function buildPinnedSpec(cliVersion: string): string {
+  return `@stroma-labs/signal@${cliVersion}`;
+}
+
+/** Pretty install command for prelude / fallback messaging. Shape:
+ *  `<pm> add @stroma-labs/signal@<v>`. Always pinned to the running
+ *  CLI version so the wizard's snippets cannot drift from the runtime
+ *  SDK that gets installed. Delegates to the run-install module so the
+ *  spawn path and the printed prelude share one source of truth. */
+function buildInstallCommand(pm: PackageManager, cliVersion: string): string {
+  return buildInstallCommandString(pm, buildPinnedSpec(cliVersion));
 }
 
 function buildNextSteps(sink: SinkChoice): string[] {
@@ -277,6 +317,9 @@ Options:
   --cwd <path>               Override working directory (default: cwd)
   --yes, -y                  Accept all defaults — no prompts
   --json                     Single-line JSON output to stdout (chrome to stderr)
+  --no-install               Skip auto-install of @stroma-labs/signal;
+                             print the install command at the top of the
+                             snippet output instead (for CI / inspection)
   --no-telemetry             Disable install telemetry for this run
   --verbose                  Print detection evidence + telemetry status
   --help, -h                 Print this usage
@@ -316,6 +359,9 @@ export interface RunDeps {
   /** Override for tests — disclosure persistence (avoid touching the
    *  user's real config dir). */
   writeDisclosureConfigOverride?: (decision: { telemetry: boolean; disclosure_version: string }) => void;
+  /** Override for tests — fakes the spawn that runs `<pm> add
+   *  @stroma-labs/signal@<v>`. Default impl uses node:child_process. */
+  runInstallSignal?: (opts: RunInstallOptions) => Promise<RunInstallResult>;
 }
 
 function osPlatformToEnum(platform: NodeJS.Platform): SignalInstallOsPlatform {
@@ -341,6 +387,9 @@ function buildEvent(opts: {
   packageManager: PackageManager;
   outcome?: 'completed' | 'aborted' | 'error';
   errorCategory?: SignalInstallErrorCategory;
+  /** Pattern 2 telemetry — true when the wizard auto-ran the install,
+   *  false when --no-install opted out OR the dep was already there. */
+  autoInstalled?: boolean;
 }): SignalInstallEventV1 {
   return {
     v: 1,
@@ -361,7 +410,8 @@ function buildEvent(opts: {
     node_version: process.version,
     os_platform: osPlatformToEnum(osPlatform()),
     ...(opts.outcome ? { outcome: opts.outcome } : {}),
-    ...(opts.errorCategory ? { error_category: opts.errorCategory } : {})
+    ...(opts.errorCategory ? { error_category: opts.errorCategory } : {}),
+    ...(opts.autoInstalled !== undefined ? { auto_installed: opts.autoInstalled } : {})
   };
 }
 
@@ -391,6 +441,7 @@ export type WizardStage =
   | 'framework_prompt'
   | 'sink_prompt'
   | 'sample_rate_prompt'
+  | 'package_install'
   | 'snippet_render'
   | 'output'
   | 'telemetry_flush'
@@ -402,6 +453,7 @@ const STAGE_TO_ERROR_CATEGORY: Record<WizardStage, SignalInstallErrorCategory> =
   framework_prompt: 'prompt_failed',
   sink_prompt: 'prompt_failed',
   sample_rate_prompt: 'prompt_failed',
+  package_install: 'package_install_failed',
   snippet_render: 'snippet_render_failed',
   output: 'output_failed',
   telemetry_flush: 'telemetry_flush_failed',
@@ -539,6 +591,16 @@ export async function run(args: InitArgs, deps: RunDeps = {}): Promise<{ exitCod
   let chosenSampleRate: number | null = null;
   let chosenPackageManager: PackageManager = 'unknown';
   let installedVersion: string | null = null;
+  // Pattern 2 telemetry — true when wizard ran the install, false when
+  // --no-install opted out (with dep missing). Stays undefined (omitted
+  // from event) when the dep was already declared, so we don't claim
+  // credit for an install we didn't run.
+  let autoInstalled: boolean | undefined;
+  // Captured install spawn stderr (capped 4 KB at the run-install
+  // module). Hoisted to closure scope so the outer catch can surface
+  // it in the JSON error payload — JSON-mode consumers (CI / scripted
+  // pipelines) need to read the failure cause without parsing stderr.
+  let installError: string | undefined;
 
   const buildSnapshotEvent = (
     kind: SignalInstallEventKind,
@@ -557,6 +619,7 @@ export async function run(args: InitArgs, deps: RunDeps = {}): Promise<{ exitCod
       sink: chosenSink,
       sampleRate: chosenSampleRate,
       packageManager: chosenPackageManager,
+      autoInstalled,
       ...overrides
     });
 
@@ -727,20 +790,94 @@ export async function run(args: InitArgs, deps: RunDeps = {}): Promise<{ exitCod
       }
     }
 
-    // ── Step 0 install check ───────────────────────────────────────
-    // Uses the dep SPEC (mergedDeps) — a separate concern from
+    // ── framework_picked telemetry — fire BEFORE the install spawn ──
+    // so a downstream install failure still has a corresponding
+    // framework_picked event in the database. Otherwise stats around
+    // "which framework had the most install failures?" cannot
+    // correlate. The recipe-currency-pressure flag is computed here
+    // because it depends only on the detected framework version vs.
+    // the recipe's verified-against version.
+    const recipeKey = chosenFramework === 'unknown' ? null : (chosenFramework as keyof typeof recipeCurrency.recipes);
+    const recipeMeta = recipeKey ? recipeCurrency.recipes[recipeKey] : null;
+    chosenFrameworkAhead = recipeMeta ? compareMajor(detected.versionSpec, recipeMeta.verified_against_version) : false;
+    telemetry.enqueue(buildSnapshotEvent('install_framework_picked'));
+
+    // ── Install check ──────────────────────────────────────────────
+    // Uses the dep SPEC (mergedDeps) — separate concern from
     // `installedVersion` (which reads node_modules for telemetry).
-    const stepZeroCommand = buildStepZeroInstallCommand(pmDetect.pm);
+    const installCommand = buildInstallCommand(chosenPackageManager, cliVersion);
+    const installSpec = buildPinnedSpec(cliVersion);
     let needsInstall = false;
-    if (!args.skipInstallCheck) {
-      if (pkgResult.pkg) {
-        const allDeps = mergedDeps(pkgResult.pkg);
-        if ('@stroma-labs/signal' in allDeps) {
-          // declared as a dep — no Step 0 needed
-        } else {
-          needsInstall = true;
-        }
+    if (pkgResult.pkg) {
+      const allDeps = mergedDeps(pkgResult.pkg);
+      needsInstall = !('@stroma-labs/signal' in allDeps);
+    }
+
+    // ── Auto-install (Pattern 2) ───────────────────────────────────
+    // Default behaviour: when @stroma-labs/signal isn't a project dep,
+    // the wizard auto-runs `<project_pm> add @stroma-labs/signal@<v>`
+    // for the user. --no-install opts out and falls through to printing
+    // the install command at the top of the snippet output. The spawn
+    // cwd MUST be pkgResult.dir (the resolved package root) — args.cwd
+    // can differ in monorepos and nested src/ layouts.
+    // installError (hoisted to closure scope above so the outer catch
+    // can include it in the JSON error payload). installFatal is local
+    // — only governs the immediate-throw decision in this block.
+    let installFatal = false;
+    const runInstall = deps.runInstallSignal ?? runInstallSignalDefault;
+    const spawnCwd = pkgResult.dir ?? args.cwd;
+    // Treat the deprecated --skip-install-check as a synonym of
+    // --no-install at the decision site too, so test inputs that set
+    // skipInstallCheck directly (without going through parseInitArgs)
+    // behave the same as the canonical flag.
+    const installOptOut = args.noInstall || args.skipInstallCheck;
+    if (needsInstall && !installOptOut) {
+      stage = 'package_install';
+      if (!args.json) {
+        chromeWrite(
+          `${c.dim('· Installing')} ${c.bold(installSpec)} ${c.dim(`via ${chosenPackageManager} in ${spawnCwd}…`)}\n\n`
+        );
       }
+      const installResult = await runInstall({
+        pm: chosenPackageManager,
+        spec: installSpec,
+        cwd: spawnCwd,
+        jsonMode: args.json
+      });
+      if (installResult.ok) {
+        autoInstalled = true;
+        // Re-read installed_signal_version so the telemetry +
+        // JSON output reflect what's actually on disk now. Falls
+        // back to the pinned cliVersion on read failure (we know
+        // the install ran for that exact spec).
+        const reread = readInstalledSignalVersion(spawnCwd);
+        installedVersion = reread ?? cliVersion;
+      } else {
+        autoInstalled = true; // we DID attempt; the error category captures the failure
+        installError = installResult.stderr;
+        installFatal = true;
+      }
+    } else if (needsInstall && installOptOut) {
+      autoInstalled = false;
+    }
+
+    if (installFatal) {
+      // Surface the install failure as a top-level error: emit the
+      // install_error telemetry with package_install_failed, print a
+      // clear message + manual fallback command, and exit non-zero.
+      // Skips snippet rendering — the snippets reference an import
+      // that won't resolve, no point printing them.
+      stage = 'package_install';
+      if (!args.json) {
+        chromeWrite(
+          `${c.red('✕')} ${c.bold(`${chosenPackageManager} add ${installSpec}`)} ${c.red('failed.')}\n` +
+            `${c.dim('Try running it manually:')}\n  ${c.bold(installCommand)}\n\n`
+        );
+      }
+      // Throw so the outer catch builds + emits the install_error
+      // event with errorCategory='package_install_failed' (set via
+      // the stage→category map).
+      throw new Error(installError ? `Install failed: ${installError.trim().slice(0, 500)}` : 'Install failed');
     }
 
     // ── Render ─────────────────────────────────────────────────────
@@ -752,13 +889,13 @@ export async function run(args: InitArgs, deps: RunDeps = {}): Promise<{ exitCod
     const rendered = renderSnippet(spec, { sampleRate, beaconEndpoint });
     const nextSteps = buildNextSteps(sink);
 
-    // Telemetry: framework_picked event with the resolved sink + sample
-    // rate. Carries the recipe-currency-pressure flag (true when detected
-    // framework version major > recipe's verified.against_version major).
-    const recipeKey = chosenFramework === 'unknown' ? null : (chosenFramework as keyof typeof recipeCurrency.recipes);
-    const recipeMeta = recipeKey ? recipeCurrency.recipes[recipeKey] : null;
-    chosenFrameworkAhead = recipeMeta ? compareMajor(detected.versionSpec, recipeMeta.verified_against_version) : false;
-    telemetry.enqueue(buildSnapshotEvent('install_framework_picked'));
+    // The install_command surfaced in JSON / prelude. Null when:
+    //   - the dep was already declared (no install ever needed), or
+    //   - auto-install ran successfully (dep is now there)
+    // Carries the manual command when --no-install opted out so the
+    // user can copy-paste it. (Install-failure path doesn't reach
+    // here — it throws above.)
+    const surfacedInstallCommand = needsInstall && installOptOut ? installCommand : null;
 
     // ── Output ─────────────────────────────────────────────────────
     stage = 'output';
@@ -769,8 +906,11 @@ export async function run(args: InitArgs, deps: RunDeps = {}): Promise<{ exitCod
         framework_confidence: detected.confidence,
         sink,
         sample_rate: sampleRate,
-        package_manager: pmDetect.pm,
-        step_zero_install_command: needsInstall ? stepZeroCommand : null,
+        package_manager: chosenPackageManager,
+        install_command: surfacedInstallCommand,
+        step_zero_install_command: surfacedInstallCommand,
+        auto_installed: autoInstalled === true,
+        installed_signal_version: installedVersion,
         files: rendered.files.map((f) => ({
           path: f.path,
           action: f.action,
@@ -789,17 +929,29 @@ export async function run(args: InitArgs, deps: RunDeps = {}): Promise<{ exitCod
       return { exitCode: 0, json };
     }
 
-    // Pretty mode chrome.
-    if (needsInstall) {
+    // Pretty mode — when --no-install (or the deprecated alias) is
+    // set AND the dep is missing, print a single-line install hint at
+    // the top so the user can copy-paste it after reviewing the
+    // snippets.
+    if (needsInstall && installOptOut) {
       chromeWrite(
-        `${info('Step 0 — Install Signal (required first)', [
-          `${c.brand('@stroma-labs/signal')} is not yet in your project's deps. The wizard ran via npx,`,
-          `which fetches the CLI temporarily — your project still needs the package added. Run:`,
+        `${info('Install Signal as a project dep first', [
+          `${c.brand('@stroma-labs/signal')} is not yet in your project's deps. Run:`,
           '',
-          `  ${c.bold(stepZeroCommand)}`,
+          `  ${c.bold(installCommand)}`,
           '',
-          `Then re-run ${c.dim('npx @stroma-labs/signal init')} to generate snippets that resolve at build time.`
+          `Then paste the snippets below.`
         ])}\n`
+      );
+    }
+    if (args.skipInstallCheck && !args.noInstall) {
+      // Only nag when the user explicitly used the deprecated flag
+      // (parseInitArgs sets BOTH; flag-direct callers may set just
+      // skipInstallCheck — that's the case worth deprecating loudly).
+      chromeWrite(
+        `${c.yellow('!')} ${c.dim(
+          '--skip-install-check is deprecated. Use --no-install (same effect; alias removed in next rc).'
+        )}\n\n`
       );
     }
 
@@ -807,7 +959,7 @@ export async function run(args: InitArgs, deps: RunDeps = {}): Promise<{ exitCod
     for (let i = 0; i < rendered.files.length; i += 1) {
       const file = rendered.files[i];
       if (!file) continue;
-      const stepNumber = needsInstall ? i + 2 : i + 1;
+      const stepNumber = i + 1;
       const verb = file.action === 'create' ? 'Create' : 'Modify';
       chromeWrite(`${c.dim(`Step ${stepNumber}.`)} ${c.bold(verb)} ${c.brand(file.path)}\n`);
       chromeWrite(`${snippetBlock(file.body)}\n\n`);
@@ -874,6 +1026,38 @@ export async function run(args: InitArgs, deps: RunDeps = {}): Promise<{ exitCod
     } catch {
       // Drop flush errors — the original error is what matters.
     }
+
+    // JSON mode — emit a parseable error payload to stdout so CI /
+    // scripted consumers can read the failure cause without parsing
+    // stderr. install_error_output is populated when the throw came
+    // from the install spawn (errorCategory === 'package_install_failed').
+    // Empty arrays / placeholder verified honour the InitJsonOutput
+    // contract; the error + outcome fields carry the real signal.
+    if (args.json) {
+      const message = err instanceof Error ? err.message : String(err);
+      const failureSink: SinkChoice = chosenSink === 'undecided' ? 'dataLayer' : chosenSink;
+      const failureJson: InitJsonOutput = {
+        framework: chosenFramework,
+        framework_version: chosenFrameworkVersion,
+        framework_confidence: chosenFrameworkConfidence,
+        sink: failureSink,
+        sample_rate: chosenSampleRate ?? 1,
+        package_manager: chosenPackageManager,
+        install_command: null,
+        step_zero_install_command: null,
+        auto_installed: autoInstalled === true,
+        installed_signal_version: installedVersion,
+        ...(installError ? { install_error_output: installError.slice(0, 4096) } : {}),
+        files: [],
+        notes: [],
+        next_steps: [],
+        verified: { against_version: '', last_verified_at: '', upstream_doc_url: '' },
+        outcome: 'error',
+        error: message
+      };
+      stdout.write(`${JSON.stringify(failureJson)}\n`);
+    }
+
     throw err;
   }
 }
