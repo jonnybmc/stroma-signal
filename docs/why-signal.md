@@ -2,9 +2,9 @@
 
 <img src="./images/signal-stroma-logo.png" alt="Signal" width="270" />
 
-**Attribution tools tell you which channel got credit. Server-side tracking makes sure the event was captured. Signal tells you whether the click landed in conditions where conversion ever stood a fair chance — and what to change when it didn't.**
+**Attribution tools tell you which channel got credit. Server-side tracking makes sure the event was captured. Signal tells you whether the user even had a fair shot at converting — and what to change when they didn't.**
 
-Signal is the missing operational layer between attribution truth and landing reality. It sits beneath your server-side and attribution tools; it does not replace, compete with, or reconcile them.
+Signal is the missing layer beneath your attribution and server-side tracking: the one that records what users actually experienced when they arrived. It does not replace, compete with, or reconcile your other tools.
 
 Shortest form: *server-side fixes missing events; Signal explains missing performance — and names what to do about it.*
 
@@ -22,9 +22,9 @@ Signal exists to make that gap measurable, honest, and actionable — the third 
 
 Signal is a browser instrumentation package that classifies real-user network and device conditions on every page load, tags Web Vitals to those classifications, and delivers the enriched data to your own analytics.
 
-The classification is not based on browser-estimated labels. It uses the TCP-handshake span exposed by the Navigation Timing API — a connection-setup measurement, when the browser exposes it as an isolatable signal — and turns it into a tier: urban, moderate, constrained moderate, or constrained. It is a useful diagnostic slice, not a complete user-network cohort axis; the richer per-subpart picture (DNS, TLS, request, response, redirect, service worker; three named TTFB definitions) is captured separately as `vitals.navigation_timing` for warehouse analysis. Device capability gets the same treatment: low, mid, or high, scored from real hardware signals.
+The classification is not based on browser-estimated labels. It uses the TCP-handshake span exposed by the Navigation Timing API — a connection-setup measurement, when the browser exposes it as an isolatable signal — and turns it into a tier: urban, moderate, constrained moderate, or constrained. It is a useful diagnostic slice, not a full classification of the user's network reality; the richer per-subpart picture (DNS, TLS, request, response, redirect, service worker; three named TTFB definitions) is captured separately as `vitals.navigation_timing` for warehouse analysis. Device capability gets the same treatment: low, mid, or high, scored from real hardware signals.
 
-Every page load produces one canonical event. Network tier, device tier, Core Web Vitals, LCP / INP attribution context, and on Chromium 123+, the Long Animation Frame story (worst-frame duration plus dominant cause: script, layout, style, or paint) when coverage is defensible. Enough diagnostic context to understand what the load actually felt like. One event. One beacon. Zero dependencies. No PII.
+Every page load produces one canonical event. Network tier, device tier, Core Web Vitals, LCP / INP attribution context, and on Chromium 123+, Long Animation Frame attribution (worst-frame duration plus dominant cause: script, layout, style, or paint) when coverage is defensible. Enough diagnostic context to understand what the load actually felt like. One event. One beacon. Zero dependencies. No PII.
 
 The base SDK adds around 6 KB gzipped to your page (it carries the per-subpart Navigation Timing breakdown). The GA4 helper and report-builder subpaths are optional and add roughly 0.5 KB and 1 KB respectively when used.
 
@@ -84,7 +84,7 @@ There is also a deliberate field-level boundary: viewport dimensions, device pix
 
 ## Action vocabulary discipline
 
-Signal outputs bridge diagnosis → decision → action. Diagnosis-only artifacts fail the "now what?" test and risk becoming an excuse generator. That framing is commercially dead and ethically indefensible for an Africa-calibrated product.
+Signal outputs bridge diagnosis → decision → action. Diagnosis-only artifacts fail the "now what?" test and risk becoming an excuse generator. That framing is commercially dead and ethically indefensible — when your audience includes users on constrained networks, "exclude" turns the audience itself into the problem.
 
 **Signal uses** reroute / reshape / split vocabulary:
 
@@ -137,7 +137,7 @@ Because each alternative answers a different question.
 - **Lighthouse** — lab data, cannot tell you what real users on constrained networks are experiencing.
 - **CrUX** — Chrome field data, segments by the same coarse labels that hide the gap in the first place.
 
-Signal fills the space beneath all of them: measured substrate classification on every page load, joined to your own warehouse, rendered as a shareable proof artifact. Small enough to embed anywhere, structured enough to produce trustworthy output, and explicit enough about its boundaries that you know exactly what you are getting — and what you are not.
+Signal fills the space beneath all of them: measured network and device classification on every page load, joined to your own warehouse, rendered as a shareable proof artifact. Small enough to embed anywhere, structured enough to produce trustworthy output, and explicit enough about its boundaries that you know exactly what you are getting — and what you are not.
 
 ## The Architecture in One Sentence
 

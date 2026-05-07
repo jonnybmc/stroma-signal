@@ -179,3 +179,5 @@ If you are onboarding a GTM/GA4-led client, start here:
 - [marketer-quickstart.md](./marketer-quickstart.md)
 - [gtm-recipe.md](./gtm-recipe.md)
 - [launch-troubleshooting.md](./launch-troubleshooting.md)
+
+> Optional: if the client also wants Signal parameters available as filters in standard GA4 reports and Explorations (not needed for `/r`), see [GA4 custom definitions](./gtm-recipe.md#ga4-custom-definitions-optional).

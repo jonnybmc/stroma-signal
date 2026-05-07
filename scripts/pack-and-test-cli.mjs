@@ -125,7 +125,7 @@ function testWithPm(pm, tgz) {
       pm === 'pnpm'
         ? ['exec', 'signal', 'init']
         : pm === 'yarn'
-          ? ['signal', 'init']
+          ? ['--silent', 'signal', 'init']
           : pm === 'bun'
             ? ['x', 'signal', 'init']
             : ['signal', 'init'];

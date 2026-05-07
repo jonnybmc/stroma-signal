@@ -98,6 +98,59 @@ This table is intentionally small. It is not your raw event table and not your a
 
 For the canonical daily artifact, `window_start` and `window_end` should bracket the last 7 complete days, not a today-inclusive rolling slice.
 
+### Example DDL (BigQuery)
+
+```sql
+CREATE TABLE IF NOT EXISTS `your-project.signal_ops.signal_report_urls_current` (
+  host STRING NOT NULL,
+  window_start DATE NOT NULL,
+  window_end DATE NOT NULL,
+  sample_size INT64 NOT NULL,
+  signal_report_url STRING NOT NULL,
+  updated_at TIMESTAMP NOT NULL
+)
+CLUSTER BY host;
+```
+
+### Example MERGE (use as the body of your scheduled query)
+
+The URL-builder query already returns one row with `signal_report_url`. Wrap it in a `MERGE` so the scheduled job upserts a single current-state row per host instead of accumulating history:
+
+```sql
+MERGE `your-project.signal_ops.signal_report_urls_current` T
+USING (
+  -- Paste the entire ga4-bigquery-url-builder.sql or normalized-bigquery-url-builder.sql
+  -- query body here, then enrich the output with window + sample_size columns:
+  WITH builder AS (
+    /* ...the URL-builder query body... */
+  )
+  SELECT
+    'your-domain.com' AS host,
+    DATE_SUB(CURRENT_DATE(), INTERVAL 7 DAY) AS window_start,
+    DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY) AS window_end,
+    /* sample_size is already computed inside the builder's `counts` CTE; expose it in the final SELECT */
+    sample_size,
+    signal_report_url,
+    CURRENT_TIMESTAMP() AS updated_at
+  FROM builder
+) S
+ON T.host = S.host
+WHEN MATCHED THEN
+  UPDATE SET
+    window_start = S.window_start,
+    window_end = S.window_end,
+    sample_size = S.sample_size,
+    signal_report_url = S.signal_report_url,
+    updated_at = S.updated_at
+WHEN NOT MATCHED THEN
+  INSERT (host, window_start, window_end, sample_size, signal_report_url, updated_at)
+  VALUES (S.host, S.window_start, S.window_end, S.sample_size, S.signal_report_url, S.updated_at);
+```
+
+If you prefer history (one row per refresh) instead of current-state-only, swap the `MERGE` for a plain `INSERT` and read the latest by `ORDER BY updated_at DESC LIMIT 1`. History is useful for "did the URL change after the deploy?" audits but doubles the table's growth rate.
+
+To schedule it: BigQuery Studio → open the saved query → **Schedule** → daily, post-export window (typically 06:00 UTC or later for properties on US/EU export schedules).
+
 ## Daily Vs Intraday
 
 Use daily when:

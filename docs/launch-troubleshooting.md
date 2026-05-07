@@ -45,6 +45,14 @@ Check:
 
 Use [gtm-recipe.md](./gtm-recipe.md) and [public-api-v0.1.md](./public-api-v0.1.md) as the source of truth for the supported compact subset.
 
+## Signal Params Land But I Cannot Filter By Them In Standard GA4 Reports
+
+If `perf_tier_report` events show up in DebugView and BigQuery but `net_tier`, `device_tier`, or other Signal params are not available as filters or breakdowns in standard GA4 reports and Explorations, that is expected.
+
+Standard GA4 reports only surface parameters that have been promoted to Custom Dimensions or Custom Metrics in GA4 admin. This is purely a GA4-UI step and does not affect `/r`, the BigQuery export, or DebugView. See [GA4 custom definitions](./gtm-recipe.md#ga4-custom-definitions-optional) for the registration walkthrough.
+
+`/r` does not require this step.
+
 ## BigQuery Rows Are Not Landing
 
 Run [ga4-bigquery-validation.sql](./ga4-bigquery-validation.sql).

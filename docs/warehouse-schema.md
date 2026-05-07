@@ -1,6 +1,61 @@
 # Signal Warehouse Schema
 
-Recommended flat warehouse row shape for non-GA4 collection:
+Recommended flat warehouse row shape for non-GA4 collection.
+
+## Example row
+
+One realistic row from a Chromium browser on a moderate network, mid-tier device. Many fields are nullable in practice — Safari/Firefox events have `lcp_ms`, `cls`, `inp_ms` and the `lcp_breakdown_*` fields all null; reused connections have `net_tcp_ms` and `navigation_timing_tcp_ms` null.
+
+```
+schema_version              = 1
+event_id                    = "01JFGH8K2WXP3M9R5T6V7Y8Z2A"
+observed_at                 = 2026-05-07T14:23:45.145Z
+host                        = "example.com"
+path                        = "/pricing"
+referrer                    = "https://www.google.com/"
+net_tier                    = "moderate"
+net_tcp_ms                  = 84
+net_tcp_source              = "nav_timing_tcp_isolated"
+device_tier                 = "mid"
+device_cores                = 8
+device_memory_gb            = 8.0
+device_screen_w             = 1440
+device_screen_h             = 900
+lcp_ms                      = 2140
+cls                         = 0.04
+inp_ms                      = 96
+fcp_ms                      = 1180
+ttfb_ms                     = 320
+effective_type              = "4g"
+downlink_mbps               = 10.0
+rtt_ms                      = 50
+save_data                   = false
+connection_type             = "wifi"
+browser                     = "chrome"
+navigation_type             = "navigate"
+lcp_load_state              = "complete"
+lcp_target                  = "img.hero"
+lcp_element_type            = "image"
+lcp_resource_url            = "https://cdn.example.com/hero.jpg"
+lcp_attribution_culprit_kind = "hero_image"
+inp_load_state              = "complete"
+interaction_target          = "button.cta"
+interaction_type            = "pointer"
+interaction_time_ms         = 4250
+input_delay_ms              = 8
+processing_duration_ms      = 64
+presentation_delay_ms       = 24
+inp_attribution_dominant_phase = "processing"
+third_party_pre_lcp_script_share_pct = 32
+third_party_origin_count    = 4
+loaf_dominant_cause         = "script"
+context_visibility_hidden_at_load = false
+navigation_timing_next_hop_protocol = "h2"
+navigation_timing_activation_adjusted_ttfb_ms = 320
+-- ...remaining navigation_timing_* and lcp_breakdown_* columns
+```
+
+## Column reference
 
 | Column | Type | Notes |
 | --- | --- | --- |
