@@ -166,6 +166,8 @@ The GTM / GA4 path emits this compact report-and-debug subset:
 
 24 user-defined parameters plus the `event` name = exactly 25, sitting at GA4's per-event custom-parameter cap. Enough for the GTM recipe, the BigQuery validation query, and the URL-builder query.
 
+GA4 Custom Dimension registration is **optional** and is purely GA4-UI polish — `/r`, BigQuery export, and DebugView all work without it. For the full step-by-step walkthrough and the canonical 12-dimension + 8-metric registration set, see [GA4 custom definitions](./gtm-recipe.md#ga4-custom-definitions-optional). The narrower list below is a reading aid for which fields are most commonly *worth* promoting; the gtm-recipe section is the source of truth.
+
 These fields are commonly useful in GA4 custom definitions:
 
 - `navigation_type`

@@ -113,22 +113,72 @@ The full payload sits at exactly the 25-parameter cap (24 user-defined + the eve
 
 ## GA4 custom definitions (optional)
 
-GA4 lets you promote up to 50 custom dimensions and 50 custom metrics per property so they can be used in reports / explorations. Most teams don't need to promote every parameter — DebugView and BigQuery work without any custom definitions configured.
+> ⚠ **Skip this section if you only want the /r Tier Report.**
+> /r reads directly from BigQuery's `event_params` and renders without any Custom Dimensions registered. This step is purely GA4-UI polish for teams that also want to use GA4's native reporting on top of Signal data.
 
-If you do promote some, the useful split:
+### When to do this
 
-**Custom dimensions** (string, used for grouping):
+Register Custom Dimensions if you want to:
 
-- `net_tier`, `device_tier`, `browser`, `navigation_type`
-- `lcp_load_state`, `lcp_element_type`, `inp_load_state`, `interaction_type`
-- `lcp_culprit_kind`, `lcp_dominant_subpart`, `inp_dominant_phase`, `third_party_weight_tier`
+- Filter or break down standard GA4 reports by Signal parameters (e.g. group by `net_tier`, segment by `device_tier`).
+- Build Explorations that pivot on Signal dimensions.
+- Define audiences based on substrate-tier behavior (e.g. "users who hit constrained network on mobile devices").
 
-**Custom metrics** (numeric, used for sums / averages):
+### What /r already gives you without this
 
-- `lcp_ms`, `fcp_ms`, `ttfb_ms`, `net_tcp_ms`
-- `input_delay_ms`, `processing_duration_ms`, `presentation_delay_ms`, `device_screen_w`
+The `/r` Tier Report reads BigQuery's raw `event_params` array — it does not depend on registered Custom Dimensions. Skip this section entirely if `/r` is the only surface you care about. The same applies to BigQuery's own SQL queries and DebugView, which both work against the raw param payload without any registration step.
 
-Identifiers like `event_id`, `host`, `url` stay in DebugView and BigQuery; promoting them to custom definitions adds noise without analytical value.
+### Steps (5 minutes)
+
+**Step 1.** GA4 → **Admin** (gear icon, bottom left).
+
+**Step 2.** **Property** column → **Custom definitions**.
+
+**Step 3.** **Custom dimensions** tab → **Create custom dimensions**. Register these as **event-scoped** dimensions:
+
+| Dimension name           | Event parameter           |
+|--------------------------|---------------------------|
+| Network tier             | `net_tier`                |
+| Device tier              | `device_tier`             |
+| Browser                  | `browser`                 |
+| Navigation type          | `navigation_type`         |
+| LCP load state           | `lcp_load_state`          |
+| LCP element type         | `lcp_element_type`        |
+| INP load state           | `inp_load_state`          |
+| Interaction type         | `interaction_type`        |
+| LCP culprit kind         | `lcp_culprit_kind`        |
+| LCP dominant subpart     | `lcp_dominant_subpart`    |
+| INP dominant phase       | `inp_dominant_phase`      |
+| Third-party weight tier  | `third_party_weight_tier` |
+
+**Step 4.** **Custom metrics** tab → **Create custom metrics**. Register these as **event-scoped** metrics. Set unit to **Milliseconds** for the time fields and **Standard** for `device_screen_w`:
+
+| Metric name              | Event parameter          | Unit         |
+|--------------------------|--------------------------|--------------|
+| LCP (ms)                 | `lcp_ms`                 | Milliseconds |
+| FCP (ms)                 | `fcp_ms`                 | Milliseconds |
+| TTFB (ms)                | `ttfb_ms`                | Milliseconds |
+| Net TCP (ms)             | `net_tcp_ms`             | Milliseconds |
+| Input delay (ms)         | `input_delay_ms`         | Milliseconds |
+| Processing duration (ms) | `processing_duration_ms` | Milliseconds |
+| Presentation delay (ms)  | `presentation_delay_ms`  | Milliseconds |
+| Device screen width      | `device_screen_w`        | Standard     |
+
+That's **12 dimensions + 8 metrics = 20 of your 50 + 50 quota used.** Plenty of headroom.
+
+### What you can intentionally skip
+
+These params arrive in BigQuery and the `/r` URL builder regardless, but don't make sense as registered GA4 dimensions:
+
+- `event_id` — identifier; promoting it adds no analytical value.
+- `host`, `url` — already available as standard GA4 page-path / hostname dimensions.
+- `net_tcp_source` — diagnostic metadata, not a useful breakdown.
+
+These show up in DebugView and BigQuery either way.
+
+### Verification
+
+After registering, allow up to **24-48 hours** before the new dimensions and metrics start populating in standard reports. They appear immediately in DebugView. BigQuery export is not affected by this step at all — it always carries every parameter regardless of registration.
 
 ## 5. Verify in GTM Preview and GA4 DebugView
 

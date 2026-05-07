@@ -4,7 +4,7 @@
 [![npm @next](https://img.shields.io/npm/v/@stroma-labs/signal/next?label=npm%20%40next)](https://www.npmjs.com/package/@stroma-labs/signal)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 
-> 🧪 **Release Candidate** — `0.1.0-rc.3` on the `next` dist-tag. The `0.x` line is pre-stable; the API can change before `1.0`.
+> 🧪 **Release Candidate** on the `next` dist-tag (see badge above for current version). The `0.x` line is pre-stable; the API can change before `1.0`.
 
 **Other RUM tools tell you what your average user experiences. Signal tells you _who_ is getting which experience — and lets you act on it.**
 
@@ -28,14 +28,14 @@ GA4 is comprehensive on conversions, sessions, and attribution. It's deliberatel
 
 | The question your operator is asking | **GA4 alone** | **GA4 + Signal** |
 |---|---|---|
-| Which network were users actually on? | `effective_type` — a browser hint that bins both fibre and a congested 4G tower as `4g` | TCP-handshake substrate tier (urban / moderate / constrained moderate / constrained) — measured per session, not guessed |
+| Which network were users actually on? | `effective_type` — a browser hint that bins both fibre and a congested 4G tower as `4g` | TCP-handshake-based network tier (urban / moderate / constrained moderate / constrained) — measured per session, not guessed |
 | Why was the page slow? | LCP / INP scores | LCP element + render-delay phase, INP interaction-phase breakdown, third-party scripts that loaded before paint |
 | Per-session detail? | Free tier samples after 10M events / month | Every event, joined to your existing warehouse, no sampling |
-| Long Animation Frame story? | Not captured | Chromium 123+ worst-frame duration + dominant cause (script / layout / style / paint) |
+| Long Animation Frame attribution? | Not captured | Chromium 123+ worst-frame duration + dominant cause (script / layout / style / paint) |
 | Navigation Timing decomposition? | Not captured | Per-subpart DNS / TCP / TLS / request / response / SW timings, three TTFB definitions (raw, connection, activation-adjusted), Early-Hints provenance |
 | Where does the raw data live? | Google's warehouse, GA4 schema | Your warehouse, your schema — joinable to spend, conversions, anything else you already have |
 
-Signal is the substrate evidence layer underneath whatever you already use. GA4 keeps doing what it does; Signal answers the questions GA4 was never designed to.
+Signal is the evidence layer underneath whatever you already use. GA4 keeps doing what it does; Signal answers the questions GA4 was never designed to.
 
 ## Install
 
@@ -99,8 +99,8 @@ One event per page load with:
 - **Network tier** — `urban`, `moderate`, `constrained_moderate`, `constrained` from the TCP-handshake span exposed by Navigation Timing (a useful diagnostic slice — not a complete network-speed cohort; see [Navigation Timing breakdown](./docs/signal-technical-reference.md#navigation-timing-breakdown) for the richer picture)
 - **Device tier** — `low`, `mid`, `high` from real hardware signals
 - **Web Vitals** — LCP, INP, CLS, FCP, TTFB with attribution (which element was slow, which interaction phase dominated, which third-party scripts loaded before paint)
-- **Navigation Timing breakdown** — DNS / TCP / TLS / request / response / redirect / SW subparts, three named TTFB definitions (raw, connection, activation-adjusted-and-clamped), `next_hop_protocol`, transfer + body sizes, plus an Early-Hints-aware provenance sub-block. Warehouse-only.
-- **Long Animation Frame** story on Chromium 123+
+- **Navigation Timing breakdown** — per-subpart DNS / TCP / TLS / request / response / redirect / SW timings and protocol detail. Warehouse-only. See [signal-technical-reference.md#navigation-timing-breakdown](./docs/signal-technical-reference.md#navigation-timing-breakdown) for the full field list.
+- **Long Animation Frame** attribution on Chromium 123+
 - **Background-tab filter** so percentiles aren't poisoned by hidden-tab loads
 
 No PII. No cookies set by us. The runtime is opinionated about what *not* to capture — see [why-signal.md](./docs/why-signal.md) for the deliberate exclusions.

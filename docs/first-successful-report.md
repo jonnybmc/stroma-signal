@@ -55,11 +55,29 @@ Signal must run in the browser, not during SSR. Framework-specific client-only i
 
 The check depends on your sink.
 
-- GTM / GA4: `perf_tier_report` appears in GTM Preview, then in GA4 DebugView. Wiring reference: [gtm-recipe.md](./gtm-recipe.md) + [gtm-workspace-template.json](./gtm-workspace-template.json).
-- Own endpoint: one request lands at your collector containing `event_id`. Contract: [collector-contract.md](./collector-contract.md).
-- Full control: your callback fires once with the canonical event object. Reference shape: [warehouse-schema.md](./warehouse-schema.md).
+**GTM / GA4 path.** Use the click-by-click GTM Preview + GA4 DebugView walkthrough in [marketer-quickstart.md §3](./marketer-quickstart.md#3-verify-gtm-and-ga4). Wiring reference: [gtm-recipe.md](./gtm-recipe.md) + [gtm-workspace-template.json](./gtm-workspace-template.json).
 
-If the event does not appear, stop here and work through [launch-troubleshooting.md](./launch-troubleshooting.md) before continuing.
+**Own-endpoint path.** Concrete verification:
+
+1. Open the page with Signal deployed in a browser with DevTools open (F12 / Cmd-Option-I).
+2. Switch to the **Network** tab → filter for your endpoint path (e.g., `signal` or `/rum/`).
+3. Trigger a flush — close the tab, switch tabs, or call `window.signalRuntime?.flushNow()` from the console.
+4. **What success looks like:** one `POST` request to your endpoint with `Content-Type: application/json`, request body ~1-2KB containing fields like `v: 1`, `event_id`, `host`, `vitals`, response status `204` or `200`.
+5. **If the request never appears:** confirm Signal initialized — type `window.signalRuntime` in the console; should return an object, not `undefined`. If undefined, the SDK didn't load — check your import path and bundler output.
+6. **If the request appears but fails (4xx/5xx):** your endpoint is rejecting the payload. Common causes: CORS not configured for the page origin, auth middleware blocking unauthenticated POSTs (Signal beacons are unauthenticated by design), payload-size limits.
+
+Contract for what the endpoint must accept and return: [collector-contract.md](./collector-contract.md).
+
+**Full-control path.** Concrete verification:
+
+1. Temporarily change your `onReport` callback to log: `onReport(event) { console.log('[Signal]', event); /* your code */ }`.
+2. Open the page in DevTools and trigger a flush as above.
+3. **What success looks like:** one `[Signal] {v: 1, event_id: "...", host: "...", vitals: {...}, ...}` log entry per page hide, with all top-level fields populated. Attribution fields (`vitals.lcp_attribution`, `vitals.inp_attribution`, `vitals.loaf`) may be null on a single page view — that's expected.
+4. **If the callback never fires:** the SDK is sample-rate-gated, the page didn't actually flush (no `visibilitychange` / `pagehide`), or Signal initialized after the page was already mid-flush. Try `init({ sinks: [...], sampleRate: 1 })` to force capture, and reload.
+
+Reference shape: [warehouse-schema.md](./warehouse-schema.md).
+
+If the event does not appear on any path, stop here and work through [launch-troubleshooting.md](./launch-troubleshooting.md) before continuing.
 
 ## 4. Run the validation SQL
 

@@ -1396,7 +1396,7 @@ exports[`rendered snippets per (framework × sink) — snapshot stability > rend
       "action": "modify",
       "body": "<!-- Add this <script type="module"> tag in your <head> or before </body>: -->
 <script type="module">
-  import { init, createBeaconSink } from 'https://esm.sh/@stroma-labs/signal@0.1.0-rc.3';
+  import { init, createBeaconSink } from 'https://esm.sh/@stroma-labs/signal@0.1.0-rc.4';
   init({
     sinks: [createBeaconSink({ endpoint: '/rum/signal' })],
     sampleRate: 1
@@ -1427,7 +1427,7 @@ exports[`rendered snippets per (framework × sink) — snapshot stability > rend
       "action": "modify",
       "body": "<!-- Add this <script type="module"> tag in your <head> or before </body>: -->
 <script type="module">
-  import { init, createCallbackSink } from 'https://esm.sh/@stroma-labs/signal@0.1.0-rc.3';
+  import { init, createCallbackSink } from 'https://esm.sh/@stroma-labs/signal@0.1.0-rc.4';
   init({
     sinks: [createCallbackSink({ onReport: (event) => {
       // Receive every SignalEventV1. Send to your collector / log / etc.
@@ -1459,8 +1459,8 @@ exports[`rendered snippets per (framework × sink) — snapshot stability > rend
       "action": "modify",
       "body": "<!-- Add this <script type="module"> tag in your <head> or before </body>: -->
 <script type="module">
-  import { init } from 'https://esm.sh/@stroma-labs/signal@0.1.0-rc.3';
-  import { createDataLayerSink } from 'https://esm.sh/@stroma-labs/signal@0.1.0-rc.3/ga4';
+  import { init } from 'https://esm.sh/@stroma-labs/signal@0.1.0-rc.4';
+  import { createDataLayerSink } from 'https://esm.sh/@stroma-labs/signal@0.1.0-rc.4/ga4';
   init({
     sinks: [createDataLayerSink()],
     sampleRate: 1

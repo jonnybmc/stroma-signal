@@ -10,13 +10,33 @@ dist-tag. The `latest` dist-tag is reserved for stable releases.
 
 ```
 pnpm add @stroma-labs/signal@next            # latest pre-release
-pnpm add @stroma-labs/signal@0.1.0-rc.3      # exact rc.3 pin
+pnpm add @stroma-labs/signal@0.1.0-rc.4      # exact rc.4 pin
 pnpm add @stroma-labs/signal                 # latest stable (when published)
 ```
 
 Bump the exact pin example whenever a new `-rc.N` is cut so onboarders default to the freshest pinned snapshot.
 
 ## [Unreleased]
+
+## [0.1.0-rc.4] - 2026-05-07
+
+### Changed — Onboarding-experience hardening across public docs
+
+A 9-doc pass that closes the launch-experience gaps a first-time integrator would hit. No SDK behaviour change; pure docs and one tooling fix.
+
+- **`marketer-quickstart.md`** — adds a §4 "Link GA4 to BigQuery" walkthrough (the missing prerequisite step the prior quickstart silently assumed); a 24-hour first-export wait callout (closing the #1 false-broken support pattern); a placeholder reference table enumerating the three SQL substitutions (`your-project`, `analytics_XXXXXXXX`, `your-domain.com`) so non-engineers can self-serve; an explicit zero-rows decision tree under §5; a click-by-click GTM Preview + GA4 DebugView walkthrough under §3 with concrete success criteria per UI; a sample-size band sharing-guidance table under §7 (preliminary / provisional / stable thresholds aligned to the SQL CASE in `ga4-bigquery-url-builder.sql`); a clarification that `signal_report_url` is opened by clicking the URL string inside BigQuery's result cell.
+- **`gtm-recipe.md`** — expands the GA4 custom definitions section from 17 lines into a structured walkthrough with a top-of-section "skip if you only want `/r`" callout, a "when to do this" / "what `/r` already gives you" split, the GA4 → Admin → Custom definitions UI path, recommended dimension and metric tables, an explicit "intentionally skip" list (`event_id` / `host` / `url` / `net_tcp_source`), and a 24-48 hour latency note for standard-report population.
+- **`launch-troubleshooting.md`** — new "Signal Params Land But I Cannot Filter By Them In Standard GA4 Reports" entry catching the post-install confusion where data flows but native GA4 dashboards look empty for Signal dimensions.
+- **`first-successful-report.md`** — concrete per-sink verification walkthroughs: DevTools Network filter and expected payload shape for the beacon path; `console.log` instrumentation pattern for the callback path; `window.signalRuntime` undefined-check; common-failure-mode triage (CORS, auth middleware blocking unauthenticated POSTs, sample-rate gating).
+- **`collector-contract.md`** — full example `SignalEventV1` POST payload covering every nested block (`vitals.lcp_attribution`, `vitals.inp_attribution`, `vitals.lcp_breakdown`, `vitals.third_party`, `vitals.loaf`, `vitals.navigation_timing.provenance`, `context`, `meta`); expected response status (`204` preferred); typical payload-size range with a hard-reject guidance for malformed oversized bodies; explicit "never reject because nullable fields are absent" note (Safari/Firefox parity).
+- **`warehouse-schema.md`** — realistic example row at the top showing ~50 of the 73 columns with concrete values; explicit Safari/Firefox null-pattern note for `lcp_ms` / `cls` / `inp_ms` / `lcp_breakdown_*` so analysts don't write false-positive data-quality alerts; restructured into "Example row" + "Column reference" headings.
+- **`production-report-automation.md`** — example BigQuery DDL for the recommended `signal_report_urls_current` table (with `CLUSTER BY host`); a complete `MERGE` template wrapping the URL-builder query body for scheduled-query use; history-vs-current-state tradeoff guidance; specific schedule-time recommendation for post-export windows.
+- **`public-api-v0.1.md`** + **`client-integrations.md`** — cross-references pointing at the canonical "GA4 custom definitions (optional)" section, plus an explicit note that the narrower "commonly useful" list is a reading aid and the gtm-recipe section is the source of truth for the registration set.
+- **`README.md`** + **`docs/why-signal.md`** — language polish: tag-agnostic version line in README (no more hardcoded rc-number drift), undefined "substrate" jargon replaced with plainer language on first-encounter surfaces, "Long Animation Frame story" → "Long Animation Frame attribution" for parallelism, marketing-speak triple-noun phrasing tightened, un-contextualized geographic qualifier removed from the action-vocabulary section. Distinctive voice preserved; jargon-without-definition removed.
+
+Tooling:
+
+- **`scripts/pack-and-test-cli.mjs`** — yarn invocation now passes `--silent` so the wizard's stdout JSON output isn't polluted by yarn's "Done in Xs" trailer when the pack-and-test script runs against a yarn-managed test fixture.
 
 ### Changed — `signal init` Pattern 2 redesign (one-shot install + snippet)
 
