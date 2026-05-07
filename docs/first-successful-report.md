@@ -1,5 +1,7 @@
 # First Successful Report
 
+<img src="./images/signal-stroma-logo.png" alt="Signal" width="270" />
+
 The shortest linear path from install to a shareable hosted report URL. Follow it top-to-bottom once; revisit individual links only if a step fails.
 
 If you already know which role you are and prefer the role-specific walkthrough, use [marketer-quickstart.md](./marketer-quickstart.md) or [client-integrations.md](./client-integrations.md) instead.

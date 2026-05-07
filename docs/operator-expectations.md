@@ -1,5 +1,7 @@
 # Operator Expectations
 
+<img src="./images/signal-stroma-logo.png" alt="Signal" width="270" />
+
 Read this **before installing Signal**. It's the one-page honest answer to "what am I signing up for?" — capture model, vendor quotas, costs, browser support, privacy posture. Linked from the README install path on purpose.
 
 If your situation isn't covered here, [open an issue](https://github.com/jonnybmc/stroma-signal/issues) — gaps in this page are bugs.
