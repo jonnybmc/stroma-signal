@@ -32,7 +32,15 @@ WITH raw_events AS (
     TIMESTAMP(observed_at) AS observed_at
   FROM `your-project.signal.signal_events`
   WHERE DATE(observed_at) BETWEEN DATE_SUB(CURRENT_DATE(), INTERVAL 7 DAY) AND DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY)
-    AND host = 'your-domain.com' -- replace with your domain; use @host in parameterized queries for production automation
+    AND host = 'your-domain.com'
+    -- ^ The SUBJECT host — the domain this report is ABOUT (your site).
+    -- NOT signal.stroma.design (that's the renderer, hard-coded in the
+    -- final SELECT below). Replace with the exact host string Signal is
+    -- capturing for your site (the value in the `host` column of your
+    -- normalized signal_events table). Replace 'your-domain.com' in BOTH
+    -- this WHERE clause AND the COALESCE fallback in the `counts` CTE
+    -- below — one find-and-replace covers both. For production automation,
+    -- replace the literal with @host as a parameterized query argument.
     AND COALESCE(navigation_type, 'navigate') NOT IN ('restore', 'prerender')
   QUALIFY ROW_NUMBER() OVER (PARTITION BY event_id ORDER BY observed_at) = 1
 ),
@@ -48,7 +56,13 @@ visibility_counts AS (
 ),
 counts AS (
   SELECT
-    ANY_VALUE(host) AS host, -- single domain after WHERE host filter
+    -- COALESCE fallback: ANY_VALUE(host) returns NULL when source_events is
+    -- empty (zero matching rows) and BigQuery's CONCAT() returns NULL if
+    -- ANY input is NULL — which would poison the entire signal_report_url.
+    -- The literal fallback ensures empty-data still emits a usable URL
+    -- with the operator's intended subject host. Keep this literal in
+    -- lockstep with the WHERE clause above — one find-and-replace.
+    COALESCE(ANY_VALUE(host), 'your-domain.com') AS host, -- single domain after WHERE host filter
     COUNT(*) AS sample_size,
     -- Sample-confidence band — drives the /r cover's preliminary banner.
     -- Thresholds mirror packages/signal-contracts/src/types.ts
@@ -78,7 +92,25 @@ counts AS (
     IFNULL(ROUND(100 * SAFE_DIVIDE(COUNTIF(device_screen_w IS NOT NULL AND device_screen_w > 0 AND device_screen_w < 768), COUNTIF(device_screen_w IS NOT NULL AND device_screen_w > 0))), 0) AS ff_mobile,
     IFNULL(ROUND(100 * SAFE_DIVIDE(COUNTIF(device_screen_w IS NOT NULL AND device_screen_w >= 768 AND device_screen_w < 1280), COUNTIF(device_screen_w IS NOT NULL AND device_screen_w > 0))), 0) AS ff_tablet,
     IFNULL(ROUND(100 * SAFE_DIVIDE(COUNTIF(device_screen_w IS NOT NULL AND device_screen_w >= 1280), COUNTIF(device_screen_w IS NOT NULL AND device_screen_w > 0))), 0) AS ff_desktop,
-    (SELECT SPLIT(url, '?')[OFFSET(0)] FROM UNNEST(ARRAY_AGG(url)) AS url GROUP BY 1 ORDER BY COUNT(*) DESC LIMIT 1) AS top_path
+    -- Most-frequent URL path with query strings stripped. Uses an exact
+    -- scalar subquery (not APPROX_TOP_COUNT) so the result is
+    -- deterministic and the credibility story stays intact — no
+    -- "approximate" disclaimer in customer-facing reports. NULL urls are
+    -- filtered before counting; ties broken alphabetically so reruns at
+    -- the same cardinality produce identical URLs.
+    (
+      SELECT path
+      FROM (
+        SELECT
+          SPLIT(url, '?')[OFFSET(0)] AS path,
+          COUNT(*) AS path_count
+        FROM source_events
+        WHERE url IS NOT NULL
+        GROUP BY path
+        ORDER BY path_count DESC, path ASC
+        LIMIT 1
+      )
+    ) AS top_path
   FROM source_events
 ),
 comparison_tier AS (

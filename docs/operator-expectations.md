@@ -80,11 +80,11 @@ Storage cost is dominated by GA4's other event types, not Signal's contribution.
 
 ### Query (per URL refresh)
 
-Signal's URL-builder query (`docs/ga4-bigquery-url-builder.sql`) **scans your perf-event partitions** for the chosen window (default 30 days). Typical scans:
+Signal's URL-builder query (`docs/ga4-bigquery-url-builder.sql`) **scans your perf-event partitions** for the chosen window (default 7 complete calendar days, excluding the in-progress day). Typical scans:
 
-- 1M events / 30 days ≈ 5 GB scan ≈ **$0.03 / refresh** (first 1 TB / month free)
-- 10M events / 30 days ≈ 50 GB scan ≈ $0.30 / refresh
-- 100M events / 30 days ≈ 500 GB scan ≈ $3.00 / refresh
+- 1M events / 7 days ≈ 1.2 GB scan ≈ **$0.01 / refresh** (first 1 TB / month free)
+- 10M events / 7 days ≈ 12 GB scan ≈ $0.07 / refresh
+- 100M events / 7 days ≈ 120 GB scan ≈ $0.70 / refresh
 
 **Operating advice:** schedule the query **once a day, not on every dashboard view** — cache the resulting `signal_report_url` and serve it from your own surface (CDN, internal dashboard). See [production-report-automation.md](./production-report-automation.md).
 
@@ -98,7 +98,8 @@ Signal degrades gracefully — unsupported fields render as `null`, never as fab
 
 | Field family | Chrome / Edge | Safari (macOS / iOS) | Firefox | Android WebView | Notes |
 |---|---|---|---|---|---|
-| Core Web Vitals (LCP, INP, CLS, FCP, TTFB) | ✅ all versions | ✅ Safari 16+ | ✅ all versions | ✅ | INP missing on older Safari |
+| `fcp_ms`, `ttfb_ms` (universal vitals) | ✅ all versions | ✅ all versions | ✅ all versions | ✅ | Always populated when measurable. |
+| `lcp_ms`, `cls`, `inp_ms` (Chromium-only vitals) | ✅ all versions | ❌ not exposed | ❌ not exposed | ✅ | These fields are `null` on Safari and Firefox — Signal never fabricates metrics. Plan for a meaningful share of `null`s on iOS/macOS Safari traffic in particular. See [signal-technical-reference.md](./signal-technical-reference.md#vitals) for the canonical matrix. |
 | `vitals.navigation_timing` (per-subpart breakdown) | ✅ all versions | ✅ Safari 14+ | ✅ all versions | ✅ | TLS isolation requires HTTPS |
 | `vitals.loaf` (Long Animation Frame) | ✅ Chromium 123+ | ❌ not exposed | ❌ not exposed | ✅ Chromium 123+ | Field is `null` elsewhere |
 | `lcp_attribution` (which element was LCP) | ✅ all | ❌ not exposed | ❌ not exposed | ✅ | Field is `null` elsewhere |

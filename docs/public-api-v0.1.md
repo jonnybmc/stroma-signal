@@ -200,7 +200,6 @@ The GTM / GA4 path does not emit these warehouse-only fields in v0.1:
 - `ref`
 - `device_cores`
 - `device_memory_gb`
-- `device_screen_w`
 - `device_screen_h`
 - `cls`
 - `inp_ms`

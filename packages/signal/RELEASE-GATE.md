@@ -27,6 +27,19 @@ SDK, runs `pnpm pack`, and for each available package manager:
 Package managers that aren't installed locally are skipped (the script
 soft-fails). On CI every PM should be available.
 
+## Manual gate — BigQuery dry-run on customer-facing SQL templates
+
+Required for any release that touches `docs/*.sql` or any code path that affects what those templates produce. The regex tests in `packages/signal-contracts/test/sql-templates.test.ts` cannot honestly guarantee parse correctness — they only catch known forbidden patterns. A latent `ARRAY_AGG`-in-`UNNEST` parse error survived rc.2-rc.4 because the test surface was regex-only.
+
+Run `bq query --dry_run --use_legacy_sql=false` against each of the four SQL templates with realistic placeholder substitutions and confirm each parses against real BigQuery:
+
+- [ ] `docs/ga4-bigquery-validation.sql` parses (GA4 dataset; `your-project` + `analytics_XXXXXXXX` substituted).
+- [ ] `docs/ga4-bigquery-url-builder.sql` parses (`your-domain.com` substituted in BOTH the WHERE clause AND the COALESCE fallback in the `counts` CTE).
+- [ ] `docs/normalized-bigquery-validation.sql` parses against a real or scratch normalized `signal_events` table.
+- [ ] `docs/normalized-bigquery-url-builder.sql` parses against the same normalized table.
+
+A failed dry-run blocks the release. Future improvement: wrap these four invocations in a `pnpm check:sql` script and gate CI on it once GCP creds are available in the runner.
+
 ## Manual gate — fresh-project smoke matrix (per-framework, launch-fix item A)
 
 Parser-level snippet validation cannot catch framework API drift (e.g.

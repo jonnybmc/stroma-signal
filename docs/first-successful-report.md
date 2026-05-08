@@ -88,7 +88,12 @@ Confirms rows are actually landing in BigQuery before you try to build a report 
 - GTM / GA4 path: [ga4-bigquery-validation.sql](./ga4-bigquery-validation.sql).
 - Own-endpoint / full-control path: [normalized-bigquery-validation.sql](./normalized-bigquery-validation.sql).
 
-Both queries expect you to fill in project / dataset / table / host. You can do this manually, or use `scripts/bootstrap-sql.mjs` to prompt for the four values and write ready-to-paste copies.
+Placeholders differ between validation and URL-builder paths:
+
+- **Validation queries** need project + dataset only (they don't filter by host).
+- **URL-builder queries** need project + dataset + host (the host filter slices percentiles to one site and propagates the subject domain into `&d=` in the generated URL).
+
+You can do this manually, or use `scripts/bootstrap-sql.mjs` to prompt for the values and write ready-to-paste copies.
 
 The validation query intentionally includes `navigation_type = restore` and `navigation_type = prerender` rows so you can see the full raw picture. The URL-builder excludes them.
 

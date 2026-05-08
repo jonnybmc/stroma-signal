@@ -46,7 +46,8 @@ If you want automatic refresh here as well, create a scheduled query around the 
 
 ## Minimal Setup Rules
 
-- Replace only the project / dataset / table placeholders.
+- **Validation queries** — replace only the project / dataset placeholders. They do not filter by host.
+- **URL-builder queries** — replace project / dataset placeholders **and** the `'your-domain.com'` host literal (in BOTH the WHERE clause and the COALESCE fallback in the `counts` CTE — one find-and-replace covers both).
 - Keep the event name frozen as `perf_tier_report` in the GA4 path.
 - Do not rename canonical fields if you want the templates to keep working.
 - Use the validation query first if you want to inspect raw restore/prerender rows; the URL-builder query filters them out by default.

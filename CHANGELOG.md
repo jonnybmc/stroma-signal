@@ -16,6 +16,33 @@ Bump the exact pin example whenever a new `-rc.N` is cut so onboarders default t
 
 ## [Unreleased]
 
+### Fixed — URL-builder queries parse against BigQuery (rc.2-rc.4 latent regression)
+
+`docs/ga4-bigquery-url-builder.sql` and `docs/normalized-bigquery-url-builder.sql` no longer fail with `Aggregate function ARRAY_AGG not allowed in UNNEST` when run against real BigQuery. The broken `top_path` correlated subquery is replaced with an exact scalar subquery using deterministic alphabetical tie-breaking; same nullability contract; same emitted `&v=<path>` URL segment.
+
+### Fixed — URL-builder no longer returns NULL signal_report_url on empty data
+
+`COALESCE(ANY_VALUE(host), 'your-domain.com')` in the `counts` CTE prevents BigQuery's strict-NULL `CONCAT()` from poisoning the entire URL when `source_events` has zero rows (RC day-one operators with no captured events; operators who pasted a host that doesn't match real traffic). The URL still renders with `&s=0&b=preliminary&...`, which the `/r` cover handles via the existing sample-band banner.
+
+### Added — Regex tests + RELEASE-GATE manual dry-run for SQL templates
+
+Three new regex tests in `packages/signal-contracts/test/sql-templates.test.ts` lock in the parse-clean shape: forbid `UNNEST(ARRAY_AGG(...))`, require the exact `top_path` shape, and require the `COALESCE(ANY_VALUE(host), ...)` empty-data fallback. `packages/signal/RELEASE-GATE.md` adds a manual `bq query --dry_run` pre-publish gate covering all four customer-facing SQL templates so future RC cuts cannot ship a parse-broken query the way rc.2-rc.4 did.
+
+### Changed — Doc clarifications across the BigQuery launch path
+
+- **Two-`host` model spelled out.** `marketer-quickstart.md` §6 and the URL-builder SQL headers now decompose the published URL: `signal.stroma.design/r/` is the renderer (always Stroma), `&d=<your-host>` is the subject (the domain the report is about).
+- **Placeholder guidance corrected.** `marketer-quickstart.md` §5 no longer claims the validation SQL needs three substitutions (it needs two). `bigquery-saved-query-setup.md` and `first-successful-report.md` updated in lockstep to reflect that validation = project + dataset, URL-builder = project + dataset + host. Validation SQL headers now point operators at the `host` column as the no-guessing source for the URL-builder filter.
+- **`events_*` named as a wildcard, not a placeholder.** A callout in `marketer-quickstart.md` §6 spells out that replacing `events_*` with a concrete table name breaks the `_TABLE_SUFFIX` filter.
+- **Host-mismatch troubleshooting moved.** The "host filter mismatch" decision tree is now in `launch-troubleshooting.md` under the URL-builder section, not under validation troubleshooting (validation has no host filter).
+
+### Fixed — Doc-drift sweep across public BigQuery surface
+
+- `public-api-v0.1.md` no longer contradicts itself on `device_screen_w` — the field is GA4-eligible and feeds the form-factor split; removed from the warehouse-only list.
+- `ga4-bigquery-url-builder.sql` updated to "GA4 24-field event param map" (was stale "21-field"; the map has been 24 fields + the event name = 25 since iteration-6).
+- `gtm-recipe.md` clarifies that the warehouse-only fields are excluded to avoid exceeding GA4's 25-param cap, not to "preserve headroom" — the GA4 subset is exactly at the cap.
+- `operator-expectations.md` cost examples re-based to the canonical 7-day production window (was incorrectly stated as 30 days; the SQL, technical reference, and automation doc all say 7 complete days).
+- `operator-expectations.md` browser-support matrix aligned with `signal-technical-reference.md` — LCP / CLS / INP are Chromium-only; FCP and TTFB are universal. The previous claim that all CWV are supported on Safari 16+ / Firefox was wrong.
+
 ## [0.1.0-rc.4] - 2026-05-08
 
 ### Changed — Pre-1.0 dist-tag policy: rc lands on `latest`

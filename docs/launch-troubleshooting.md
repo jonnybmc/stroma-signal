@@ -74,11 +74,32 @@ Check:
 - the validation query returns rows
 - the time window in the URL-builder query includes the exported events
 - the canonical production window still means the last 7 complete days, excluding today
-- the project, dataset, and property placeholders were replaced correctly
+- the project, dataset, and host placeholders were replaced correctly
 - the event parameters still match the canonical field names
 - the available rows are not only `navigation_type = restore` or `navigation_type = prerender`
 
 If rows are landing but the URL-builder query returns nothing, compare the landed params against [ga4-bigquery-url-builder.sql](./ga4-bigquery-url-builder.sql).
+
+### Most common cause: host filter mismatch
+
+The URL-builder filters by `host` exact-match; the validation query does not. If validation returns rows but the URL-builder doesn't, the `your-domain.com` value in the URL-builder almost certainly doesn't match the actual `host` value in your events.
+
+Common mismatches:
+
+- you put `example.com`, traffic is on `www.example.com` (or vice-versa)
+- you put `https://example.com`, but `host` never includes the protocol
+- you put `example.com/`, but `host` never includes a trailing slash
+- you put `Example.com`, but `host` is lowercased
+
+Run the validation query and look at the `host` column. Whatever string appears there is the exact literal to paste into the URL-builder filter. Copy from BigQuery; do not retype.
+
+Remember to replace `'your-domain.com'` in **both** places in the URL-builder SQL: the `WHERE host = ...` filter AND the `COALESCE(ANY_VALUE(host), 'your-domain.com')` fallback in the `counts` CTE. A single find-and-replace covers both.
+
+## The URL-Builder Query Returns A Row With `signal_report_url = NULL`
+
+This means the `counts` CTE's `host` resolved to NULL. BigQuery's `CONCAT()` returns NULL if any argument is NULL, so a NULL `host` poisons the entire URL.
+
+The `COALESCE(ANY_VALUE(host), 'your-domain.com')` literal-fallback in the patched URL-builder prevents this — empty data still emits a usable URL with the operator's intended subject host. If you're seeing a NULL URL, your SQL is the pre-patch version. Re-paste the latest [ga4-bigquery-url-builder.sql](./ga4-bigquery-url-builder.sql) (or [normalized-bigquery-url-builder.sql](./normalized-bigquery-url-builder.sql)) and re-substitute the placeholders.
 
 ## The Report URL Is No Longer Refreshing
 

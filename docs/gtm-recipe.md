@@ -70,7 +70,7 @@ Map all 24 fields. They split into two groups by what the report SQL actually co
 | `DLV - inp_dominant_phase`        | `inp_dominant_phase`         | Per-event INP phase summary                                    |
 | `DLV - third_party_weight_tier`   | `third_party_weight_tier`    | Pre-LCP third-party script weight tier                         |
 
-Fields that are deliberately **not** in the GA4 path (warehouse-only via beacon / callback): `lcp_target`, `lcp_resource_url`, `interaction_target`, `interaction_time_ms`, `device_cores`, `device_memory_gb`, `effective_type`, `downlink_mbps`, `rtt_ms`, `save_data`, `connection_type`. They preserve GA4 parameter headroom.
+Fields that are deliberately **not** in the GA4 path (warehouse-only via beacon / callback): `lcp_target`, `lcp_resource_url`, `interaction_target`, `interaction_time_ms`, `device_cores`, `device_memory_gb`, `effective_type`, `downlink_mbps`, `rtt_ms`, `save_data`, `connection_type`. The compact GA4 subset is exactly 24 user-defined params + the event name = 25, which sits at GA4's per-event custom-parameter cap; including the warehouse-only fields would exceed it.
 
 ## 4. Create the GA4 event tag
 

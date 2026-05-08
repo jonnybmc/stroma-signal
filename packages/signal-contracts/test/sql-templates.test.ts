@@ -212,6 +212,47 @@ describe('bigquery sql templates', () => {
     expect(normalizedSql).not.toMatch(/ARRAY_AGG\(url ORDER BY observed_at DESC/);
   });
 
+  it('does not contain ARRAY_AGG inside UNNEST (BigQuery rejects this pattern)', () => {
+    // BigQuery rejects `UNNEST(ARRAY_AGG(...))` inside an aggregate-context
+    // query with "Aggregate function ARRAY_AGG not allowed in UNNEST". This
+    // bug was latent across rc.2-rc.4 because tests are regex-only and never
+    // execute SQL. This test forbids the specific shape; the dry-run gate in
+    // RELEASE-GATE.md is the authoritative parse check.
+    for (const fileName of ['ga4-bigquery-url-builder.sql', 'normalized-bigquery-url-builder.sql']) {
+      const sql = readSqlTemplate(fileName);
+      expect(
+        sql,
+        `${fileName}: aggregate inside UNNEST inside aggregate context. BigQuery rejects this with "Aggregate function ARRAY_AGG not allowed in UNNEST".`
+      ).not.toMatch(/UNNEST\s*\(\s*ARRAY_AGG/i);
+    }
+  });
+
+  it('uses an exact scalar subquery for top_path with deterministic tie-breaking', () => {
+    // The replacement for the ARRAY_AGG-in-UNNEST bug uses a scalar subquery
+    // with explicit GROUP BY + ORDER BY path_count DESC, path ASC + LIMIT 1.
+    // The alphabetical tie-break makes reruns at the same cardinality
+    // produce identical URLs — important for scheduled-query stability.
+    for (const fileName of ['ga4-bigquery-url-builder.sql', 'normalized-bigquery-url-builder.sql']) {
+      const sql = readSqlTemplate(fileName);
+      expect(sql).toMatch(/SELECT\s+SPLIT\(url,\s*'\?'\)\[OFFSET\(0\)\]\s+AS\s+path/);
+      expect(sql).toMatch(/ORDER BY path_count DESC,\s*path ASC/);
+    }
+  });
+
+  it('emits a literal-fallback host so empty-data still produces a complete URL', () => {
+    // Without COALESCE, ANY_VALUE(host) returns NULL on empty source_events,
+    // and BigQuery's CONCAT() returns NULL if any argument is NULL — which
+    // poisons the entire signal_report_url. The literal fallback ensures
+    // empty-data still emits a usable URL with the operator's subject host.
+    for (const fileName of ['ga4-bigquery-url-builder.sql', 'normalized-bigquery-url-builder.sql']) {
+      const sql = readSqlTemplate(fileName);
+      expect(
+        sql,
+        `${fileName}: empty source_events would otherwise return ANY_VALUE(host) = NULL, poisoning the whole CONCAT URL. COALESCE fallback is required.`
+      ).toMatch(/COALESCE\(\s*ANY_VALUE\(host\)\s*,/);
+    }
+  });
+
   it('conditionally omits nsl and nsr params when quartiles are unavailable in the normalized builder', () => {
     const sql = readSqlTemplate('normalized-bigquery-url-builder.sql');
 
