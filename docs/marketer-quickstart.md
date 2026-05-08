@@ -161,25 +161,42 @@ Important:
 
 ## 7. Open And Share The URL
 
-In BigQuery's result pane, the query returns one row with one column called `signal_report_url`. The cell contains the full hosted URL, e.g.:
+The query always returns **exactly one row, one column** called `signal_report_url`. The cell contains one of three things, depending on how much real-user traffic has accumulated in your 7-day window:
+
+### State 1 — Production URL (sample size ≥ 100 events)
 
 ```
 https://signal.stroma.design/r?rv=1&mode=production&d=your-domain.com&nt=42,28,15,10,5&dt=20,55,25&...
 ```
 
-**Click the URL string directly inside the result cell** to open the report in a new tab. If the cell appears truncated, click to expand it or use BigQuery's "Copy cell value" action — the URL is usually long enough that you'll want the full string, not the visually-cropped version.
-
-That hosted `/r?...` URL is the launch artifact. It is the measured proof layer your team can share internally after enough real traffic has accumulated.
+This is the launch artifact. **Click the URL string directly inside the result cell** to open the report in a new tab. If the cell appears truncated, click to expand it or use BigQuery's "Copy cell value" action.
 
 **Before you share it externally, check the sample-size band.** Look at the URL for the `&b=` parameter:
 
 | Band            | What it means                                              | Sharing guidance                                                                    |
 |-----------------|------------------------------------------------------------|-------------------------------------------------------------------------------------|
-| `b=preliminary` | Fewer than 100 events captured                             | Internal sanity-check only. Do not share with stakeholders — numbers will move significantly as more data lands. |
 | `b=provisional` | 100-499 events captured                                    | OK to share with a "preliminary, will firm up over the next week" caveat.            |
 | `b=stable`      | 500+ events captured                                       | Production-ready. Share confidently. Tier dominance and p75 numbers are statistically meaningful at this scale. |
 
-The hosted report renders the band in its cover section, but knowing the threshold up front prevents the "is it ready?" conversation later.
+(There is no `b=preliminary` URL — see State 3 below for why.)
+
+### State 2 — `NO_EVENTS_IN_WINDOW` diagnostic (sample size = 0)
+
+```
+NO_EVENTS_IN_WINDOW: zero rows matched event_name=perf_tier_report AND host=www.your-domain.com in the last 7 complete calendar days. Run the validation SQL — if it also returns zero, GTM/GA4 is not capturing. If validation returns rows, your host literal or window is the issue. Daily-export latency is ~24h; if you installed Signal in the last day, wait and re-run. See docs/launch-troubleshooting.md.
+```
+
+The cell starts with `NO_EVENTS_IN_WINDOW:` rather than `https://`. The URL-builder deliberately does not emit a URL when no events were captured, because a zero-event report would render as misleading blank blocks. Read the message — it names the three things to check, in order. The most common cause for first-day operators is daily-export latency: GA4's daily-batch export lands ~24 hours after the day closes, so if you installed Signal less than 24 hours ago, the 7-day window is genuinely empty and there's nothing to fix — just wait and re-run tomorrow.
+
+### State 3 — `SAMPLE_BELOW_RECOMMENDED_MINIMUM` diagnostic (1–99 events)
+
+```
+SAMPLE_BELOW_RECOMMENDED_MINIMUM: captured 47 events for host=www.your-domain.com in the last 7 complete calendar days. The /r report needs at least 100 events to be statistically meaningful — below that, percentile distributions are noisy and tier shares are unreliable. Re-run after more traffic accumulates (typical timeline: 1-3 days for a moderate-traffic site). The validation SQL shows your event flow rate.
+```
+
+The threshold is exactly the application's documented `SIGNAL_PREVIEW_MINIMUM_SAMPLE = 100`. Below that, the /r renderer would show a "preliminary read" banner but the underlying numbers (p75 percentiles, tier dominance) carry too much sampling noise to be a defensible artifact. Rather than ship a misleading URL, the SQL emits an honest diagnostic naming exactly how many events you have and what to do.
+
+**You do not need to change anything** when you see State 2 or State 3 — the SQL is working correctly. The diagnostic is your signal that production traffic hasn't reached the threshold yet. Re-run the query after more events accumulate.
 
 ## 8. If SQL Is Blocked
 

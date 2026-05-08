@@ -95,11 +95,31 @@ Run the validation query and look at the `host` column. Whatever string appears 
 
 Remember to replace `'your-domain.com'` in **both** places in the URL-builder SQL: the `WHERE host = ...` filter AND the `COALESCE(ANY_VALUE(host), 'your-domain.com')` fallback in the `counts` CTE. A single find-and-replace covers both.
 
-## The URL-Builder Query Returns A Row With `signal_report_url = NULL`
+## The URL-Builder Query Returns A Diagnostic Message Instead Of A URL
 
-This means the `counts` CTE's `host` resolved to NULL. BigQuery's `CONCAT()` returns NULL if any argument is NULL, so a NULL `host` poisons the entire URL.
+The `signal_report_url` column always contains exactly one of three things:
 
-The `COALESCE(ANY_VALUE(host), 'your-domain.com')` literal-fallback in the patched URL-builder prevents this — empty data still emits a usable URL with the operator's intended subject host. If you're seeing a NULL URL, your SQL is the pre-patch version. Re-paste the latest [ga4-bigquery-url-builder.sql](./ga4-bigquery-url-builder.sql) (or [normalized-bigquery-url-builder.sql](./normalized-bigquery-url-builder.sql)) and re-substitute the placeholders.
+1. **A production URL** starting with `https://signal.stroma.design/r?` — paste-and-share artifact.
+2. **`NO_EVENTS_IN_WINDOW: ...`** — zero qualifying events in the 7-day window.
+3. **`SAMPLE_BELOW_RECOMMENDED_MINIMUM: captured N events ...`** — fewer than 100 events; not enough for a statistically meaningful report.
+
+States 2 and 3 are **not failures** — they are explicit operator-facing signals that production traffic hasn't reached the threshold yet. The SQL deliberately refuses to emit a URL because a zero-event or sub-100-event /r report would render as misleading blank blocks or noisy percentiles. Read the diagnostic — it names the next action.
+
+### `NO_EVENTS_IN_WINDOW` — most common causes, in order
+
+1. **Daily-export latency.** GA4's daily-batch export lands ~24 hours after the day closes. The URL-builder excludes the in-progress day. If you installed Signal less than 24 hours ago, the 7-day window is genuinely empty and there's nothing to fix — just wait and re-run tomorrow.
+2. **Host literal mismatch.** Run the validation SQL (which has no host filter) and check its `host` column. Whatever string appears there is the exact literal to paste into the URL-builder. Common typos: missing `www.` subdomain, wrong case, accidental `https://` or trailing slash.
+3. **GTM/GA4 isn't capturing.** If the validation SQL also returns zero rows, the issue is upstream — go back to the GTM Preview / GA4 DebugView verification steps in the marketer-quickstart.
+
+### `SAMPLE_BELOW_RECOMMENDED_MINIMUM` — what to do
+
+The diagnostic names exactly how many events were captured and the 100-event floor. Wait for traffic to accumulate. The validation SQL shows your event flow rate, so you can estimate when you'll cross 100. For a moderate-traffic site this is typically 1–3 days from initial install.
+
+You do not need to edit anything in either case. The SQL is working correctly; the diagnostic is the SQL telling you what state your data is in.
+
+### Pre-patch SQL? `signal_report_url` literally NULL?
+
+If you're seeing a literal NULL value (not a diagnostic message), you're running the pre-patch version of the SQL. Re-paste the latest [ga4-bigquery-url-builder.sql](./ga4-bigquery-url-builder.sql) (or [normalized-bigquery-url-builder.sql](./normalized-bigquery-url-builder.sql)) and re-substitute the placeholders. The current version always returns one row with one of the three documented values above.
 
 ## The Report URL Is No Longer Refreshing
 

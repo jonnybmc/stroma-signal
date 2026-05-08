@@ -260,6 +260,50 @@ describe('bigquery sql templates', () => {
     }
   });
 
+  it('emits a NO_EVENTS_IN_WINDOW diagnostic when sample_size = 0 instead of a misleading URL or empty result pane', () => {
+    // Operator-experience principle: never leave a user with a dead-end
+    // empty result pane and never emit a half-baked URL that would render
+    // a misleading /r report. When source_events is empty after the WHERE
+    // filter, the URL-builder must emit an actionable diagnostic message
+    // in the signal_report_url cell so the operator has a clear next step.
+    for (const fileName of ['ga4-bigquery-url-builder.sql', 'normalized-bigquery-url-builder.sql']) {
+      const sql = readSqlTemplate(fileName);
+      expect(sql).toMatch(/WHEN\s+sample_size\s*=\s*0\s+THEN/);
+      expect(sql).toContain("'NO_EVENTS_IN_WINDOW: ");
+    }
+  });
+
+  it('emits a SAMPLE_BELOW_RECOMMENDED_MINIMUM diagnostic when 0 < sample_size < 100', () => {
+    // Threshold matches SIGNAL_PREVIEW_MINIMUM_SAMPLE = 100 in
+    // packages/signal-contracts/src/types.ts. Below this, the /r report
+    // would render with noisy percentiles and unreliable tier shares —
+    // we explicitly do not emit a URL, we emit a diagnostic that names
+    // exactly how many events were captured so the operator can wait
+    // for traffic with a clear target in mind.
+    for (const fileName of ['ga4-bigquery-url-builder.sql', 'normalized-bigquery-url-builder.sql']) {
+      const sql = readSqlTemplate(fileName);
+      expect(sql).toMatch(/WHEN\s+sample_size\s*<\s*100\s+THEN/);
+      expect(sql).toContain("'SAMPLE_BELOW_RECOMMENDED_MINIMUM: captured '");
+      expect(sql).toContain('events for host=');
+    }
+  });
+
+  it('threshold for emitting the production URL matches SIGNAL_PREVIEW_MINIMUM_SAMPLE (100)', async () => {
+    // Imports the constant from the same source-of-truth module the SQL
+    // mirrors. If someone changes SIGNAL_PREVIEW_MINIMUM_SAMPLE in
+    // types.ts, this test fails until the SQL CASE threshold is updated
+    // in lockstep.
+    const { SIGNAL_PREVIEW_MINIMUM_SAMPLE } = await import('../src/index.js');
+    expect(SIGNAL_PREVIEW_MINIMUM_SAMPLE).toBe(100);
+    for (const fileName of ['ga4-bigquery-url-builder.sql', 'normalized-bigquery-url-builder.sql']) {
+      const sql = readSqlTemplate(fileName);
+      expect(
+        sql,
+        `${fileName}: SQL diagnostic threshold (sample_size < 100) must match SIGNAL_PREVIEW_MINIMUM_SAMPLE in types.ts.`
+      ).toMatch(new RegExp(`WHEN\\s+sample_size\\s*<\\s*${SIGNAL_PREVIEW_MINIMUM_SAMPLE}\\s+THEN`));
+    }
+  });
+
   it('funnel_rollup anchors on funnel_activation with LEFT JOIN source_events so empty data still emits a row', () => {
     // The previous CROSS JOIN form (FROM source_events, funnel_activation)
     // produced 0 rows when source_events was empty after the WHERE filter

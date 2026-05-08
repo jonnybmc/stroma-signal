@@ -16,6 +16,18 @@ Bump the exact pin example whenever a new `-rc.N` is cut so onboarders default t
 
 ## [Unreleased]
 
+### Changed — URL-builder emits actionable diagnostics instead of half-baked URLs
+
+The GA4 and normalized URL-builder queries now return a three-state result in the single `signal_report_url` column, gated on the application's documented `SIGNAL_PREVIEW_MINIMUM_SAMPLE = 100`:
+
+- `sample_size >= 100` → production URL (unchanged shape, same renderer contract).
+- `sample_size = 0` → `NO_EVENTS_IN_WINDOW: …` diagnostic message naming the three things to check (validation query, host literal, daily-export latency).
+- `sample_size BETWEEN 1 AND 99` → `SAMPLE_BELOW_RECOMMENDED_MINIMUM: captured N events …` diagnostic naming the 100-event threshold and a typical 1–3 day timeline.
+
+The principle: never leave operators with a "There is no data to display" empty result pane (the previous behaviour with empty source_events) and never emit a half-baked URL that opens a /r report with all-zero columns or noisy percentiles. The diagnostic is always actionable text in the same column, so dashboards, scheduled-query consumers, and the persistence table schema stay shape-stable.
+
+`marketer-quickstart.md`, `launch-troubleshooting.md`, and `production-report-automation.md` document all three states + how downstream consumers should branch on the literal prefix (`https://signal.stroma.design/r?` for URL, otherwise diagnostic).
+
 ### Fixed — URL-builder queries parse against BigQuery (rc.2-rc.4 latent regression)
 
 `docs/ga4-bigquery-url-builder.sql` and `docs/normalized-bigquery-url-builder.sql` no longer fail with `Aggregate function ARRAY_AGG not allowed in UNNEST` when run against real BigQuery. The broken `top_path` correlated subquery is replaced with an exact scalar subquery using deterministic alphabetical tie-breaking; same nullability contract; same emitted `&v=<path>` URL segment.

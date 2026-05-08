@@ -426,7 +426,39 @@ env AS (
     IFNULL(ROUND(100 * SAFE_DIVIDE(COUNTIF(LOWER(browser) NOT IN ('chrome', 'safari', 'firefox', 'edge') OR browser IS NULL), COUNT(*))), 0) AS br_other
   FROM source_events
 )
-SELECT CONCAT(
+-- Three-state output, single column (`signal_report_url`):
+--
+--   sample_size = 0   → diagnostic message starting with NO_EVENTS_IN_WINDOW
+--   sample_size 1-99  → diagnostic message starting with SAMPLE_BELOW_RECOMMENDED_MINIMUM
+--   sample_size >= 100 → production /r URL (the application's documented
+--                        recommended-minimum is SIGNAL_PREVIEW_MINIMUM_SAMPLE = 100;
+--                        below that, percentile distributions and tier
+--                        shares are statistically unreliable, so we do
+--                        not emit a URL — we emit a clear diagnostic
+--                        instead so operators always have an actionable
+--                        result in BigQuery's result pane, never a blank
+--                        "There is no data to display" dead end and never
+--                        a misleading half-baked report).
+--
+-- Downstream consumers (the persistence table writer, the operator
+-- copy-paste flow, the /r renderer) can dispatch on the literal prefix:
+-- if the cell starts with `https://signal.stroma.design/r?` it's a URL,
+-- otherwise it's an actionable diagnostic.
+SELECT
+  CASE
+    WHEN sample_size = 0 THEN CONCAT(
+      'NO_EVENTS_IN_WINDOW: zero rows matched host=',
+      host,
+      ' in the last 7 complete calendar days. Run the validation SQL — if it also returns zero, your beacon/callback ingest is not delivering rows. If validation returns rows, your host literal or window is the issue. See docs/launch-troubleshooting.md.'
+    )
+    WHEN sample_size < 100 THEN CONCAT(
+      'SAMPLE_BELOW_RECOMMENDED_MINIMUM: captured ',
+      CAST(sample_size AS STRING),
+      ' events for host=',
+      host,
+      ' in the last 7 complete calendar days. The /r report needs at least 100 events to be statistically meaningful — below that, percentile distributions are noisy and tier shares are unreliable. Re-run after more traffic accumulates (typical timeline: 1-3 days for a moderate-traffic site). The validation SQL shows your event flow rate.'
+    )
+    ELSE CONCAT(
   'https://signal.stroma.design/r?rv=1&mode=production',
   '&d=', host,
   '&nt=', CAST(nt_urban AS STRING), ',', CAST(nt_moderate AS STRING), ',', CAST(nt_constrained_moderate AS STRING), ',', CAST(nt_constrained AS STRING), ',', CAST(nt_unknown AS STRING),
@@ -484,5 +516,6 @@ SELECT CONCAT(
   '&xb=', CAST(excluded_background_sessions AS STRING),
   -- freshness provenance
   '&ga=', CAST(UNIX_MILLIS(CURRENT_TIMESTAMP()) AS STRING)
-) AS signal_report_url
+    )
+  END AS signal_report_url
 FROM counts, vitals, comparison_tier_lookup, race_inputs, race_choice, stage_inputs, funnel_rollup, device_hardware, network_signals, downlink_quartiles, rtt_quartiles, env, visibility_counts;
