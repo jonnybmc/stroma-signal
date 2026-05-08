@@ -5,20 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-Pre-release identifiers (e.g. `-rc.N`) are published to the npm `next`
-dist-tag. The `latest` dist-tag is reserved for stable releases.
+While the SDK is pre-1.0 every release — including `-rc.N` pre-releases — publishes to the npm `latest` dist-tag, so `npm install @stroma-labs/signal` (no version specifier) resolves to the current rc. The `next`-vs-`latest` split returns once `1.0.0` ships.
 
 ```
-pnpm add @stroma-labs/signal@next            # latest pre-release
+pnpm add @stroma-labs/signal                 # current pre-1.0 rc (latest)
 pnpm add @stroma-labs/signal@0.1.0-rc.4      # exact rc.4 pin
-pnpm add @stroma-labs/signal                 # latest stable (when published)
 ```
 
 Bump the exact pin example whenever a new `-rc.N` is cut so onboarders default to the freshest pinned snapshot.
 
 ## [Unreleased]
 
-## [0.1.0-rc.4] - 2026-05-07
+## [0.1.0-rc.4] - 2026-05-08
+
+### Changed — Pre-1.0 dist-tag policy: rc lands on `latest`
+
+While the SDK is pre-1.0 every release publishes to the npm `latest` dist-tag rather than `next`. `npm install @stroma-labs/signal` (no version specifier) now resolves to the current rc directly; the npmjs.com package page shows it as the headline version. The previous `latest`-stable / `next`-prerelease split returns once `1.0.0` ships.
+
+### Added — Social share card on `/r`
+
+Hosted Tier Reports shared via LinkedIn, Twitter, and Slack now render with a Signal · Stroma brand card. `og:*` and `twitter:*` meta tags added to the `/r` route; description copy stays observational ("See where your real users actually load — network and device tiers behind a single page.") to respect the artifact's editorial discipline. `og:url` is intentionally per-share — the crawler honours the URL it landed on.
 
 ### Changed — Onboarding-experience hardening across public docs
 
