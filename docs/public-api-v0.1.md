@@ -60,7 +60,7 @@ This subpath provides local output utilities so the package stands alone without
 
 - `formatSignalSummary(aggregate)` — returns a human-readable plain-text summary with tier distribution, race findings, experience funnel, and coverage stats
 - `exportSignalEventsToJSON(events)` — JSON.stringify with 2-space indent
-- `exportSignalEventsToCSV(events)` — flattened CSV matching the `SignalWarehouseRowV1` column order, with formula-injection protection
+- `exportSignalEventsToCSV(events)` — flattened CSV covering the core `SignalWarehouseRowV1` columns, with formula-injection protection. The optional `navigation_timing_*` per-subpart columns (added in iteration-7) are intentionally not part of the CSV output to keep the file shape stable for spreadsheet workflows; use the JSON exporter or query the warehouse directly when you need per-subpart Navigation Timing.
 - `exportSignalAggregateToJSON(aggregate)` — aggregate as formatted JSON
 
 This subpath is additive and does not affect the frozen v0.1 runtime surface.
@@ -82,12 +82,17 @@ init({
 ### Public `SignalInitConfig`
 
 - `sinks: SignalSink[]`
-- `sampleRate?: number`
+- `sampleRate?: number` — `0` means "sampled out" (runtime initialises but emits nothing); `1` (default) means "always emit." The `signal init` CLI wizard rejects `--sample-rate 0` because a freshly-installed wizard with sampleRate=0 looks like a misconfiguration; the runtime API accepts it directly for advanced operator use.
 - `networkTierThresholds?: SignalNetworkTierThresholds`
 - `deviceTierOverride?: (cores: number, memory: number | null, screenWidth: number) => SignalDeviceTier`
 - `generateTarget?: (element: Element | null) => string | null`
-- `debug?: boolean` logs raw FCP/LCP observations, the flush reason, and the final payload before sink emission
+- `firstPartyOriginsAllowlist?: readonly string[]` — opt-in aliasing for customers whose CDN origins can't be captured by strict-host + eTLD+1 matching
+- `debug?: boolean` — logs raw FCP/LCP observations, the flush reason, and the final payload before sink emission
 - `packageVersion?: string`
+- `clock?: () => number` — effect-injection point for deterministic event timestamps in tests
+- `random?: () => number` — effect-injection point for deterministic sampling in tests
+- `eventIdFactory?: () => string` — effect-injection point for deterministic event IDs in tests
+- `logger?: SignalRuntimeLogger` — route runtime warnings into your own observability without monkeypatching `console`
 
 ## Public sinks
 

@@ -387,8 +387,9 @@ funnel_rollup AS (
 -- Iteration-6 blocks (device_hardware, network_signals, environment) are
 -- NOT available in the GA4 recipe. The fields they require (device_cores,
 -- device_memory_gb, effective_type, downlink_mbps, rtt_ms, save_data,
--- browser) are warehouse-only — excluded from the GA4 21-field event param
--- map due to the 25-param standard-property limit. Use the normalized
+-- browser) are warehouse-only — excluded from the GA4 24-field event param
+-- map because adding them would push the GA4 event past its 25-param
+-- standard-property cap (24 fields + the event name = exactly 25). Use the normalized
 -- warehouse recipe (normalized-bigquery-url-builder.sql) to produce reports
 -- with the Actionable Signals slide populated.
 --

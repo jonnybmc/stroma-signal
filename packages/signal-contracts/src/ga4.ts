@@ -70,12 +70,13 @@ export const SIGNAL_GA4_FIELD_MAP_V1: SignalGa4FieldMapV1 = {
 
 // `lcp_target` and `interaction_target` (CSS-selector strings from LCP /
 // INP attribution) and `interaction_time_ms` are deliberately excluded
-// from the GA4 compact subset to preserve 4 slots of headroom against
-// GA4's 25-custom-parameter-per-event cap. They're carried in the
-// normalized warehouse path (`toSignalWarehouseRow`) below and remain
-// available via the beacon / callback sinks. Form-factor is derived from
-// `device_screen_w` at aggregation time, so the attribution targets
-// aren't needed in the GA4 report-URL path.
+// from the GA4 compact subset because the subset already sits at the
+// GA4 25-custom-parameter-per-event cap (24 fields + the event name
+// itself = 25); adding them would exceed the cap. They're carried in
+// the normalized warehouse path (`toSignalWarehouseRow`) below and
+// remain available via the beacon / callback sinks. Form-factor is
+// derived from `device_screen_w` at aggregation time, so the
+// attribution targets aren't needed in the GA4 report-URL path.
 export function flattenSignalEventForGa4(event: SignalEventV1): Record<string, string | number | boolean | null> {
   return {
     event: SIGNAL_GA4_EVENT_NAME,
