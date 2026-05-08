@@ -3,6 +3,25 @@
 -- Default report math excludes non-load-shaped restore/prerender rows.
 -- Canonical production window = the last 7 complete calendar days,
 -- excluding the current in-progress day.
+--
+-- IMPORTANT: There are TWO `host` concepts in this query, and they are
+-- different things. Do not confuse them.
+--
+--   1. The renderer host: `signal.stroma.design/r/...` (hard-coded in the
+--      final SELECT below). Operators do NOT change this.
+--
+--   2. The subject host: the value bound to `&d=<host>` in the generated
+--      URL. This is the domain the report is ABOUT — your site. Replace
+--      'your-domain.com' on the WHERE clause below with that exact value.
+--      The filter slices percentiles to one site so they aren't averaged
+--      across multi-site Signal deployments AND lets ANY_VALUE(host)
+--      deterministically resolve the `&d=` URL param.
+--
+-- For single-site operators the filter is technically redundant — there's
+-- only one host in your data — but it is still required by this SQL's
+-- shape. Set it to your one site's host. Replace 'your-domain.com' in
+-- BOTH the WHERE clause AND the COALESCE fallback in the `counts` CTE
+-- (one find-and-replace covers both).
 
 WITH ga4_events AS (
   SELECT
@@ -23,7 +42,7 @@ WITH ga4_events AS (
     (SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'presentation_delay_ms') AS presentation_delay_ms,
     -- Iteration-6 fields (device_cores, device_memory_gb, effective_type,
     -- downlink_mbps, rtt_ms, save_data) are warehouse-only — NOT included
-    -- in the GA4 21-field event param map due to the GA4 25-param
+    -- in the GA4 24-field event param map due to the GA4 25-param
     -- standard-property limit. These fields are available via the
     -- normalized warehouse recipe instead. device_screen_w IS included
     -- in the GA4 compact subset as of 0.1 — it unlocks the form-factor
@@ -35,7 +54,18 @@ WITH ga4_events AS (
     AND _TABLE_SUFFIX BETWEEN
       FORMAT_DATE('%Y%m%d', DATE_SUB(CURRENT_DATE(), INTERVAL 7 DAY))
       AND FORMAT_DATE('%Y%m%d', DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY))
-    AND (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'host') = 'your-domain.com' -- replace with your domain; use @host in parameterized queries for production automation
+    AND (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'host') = 'your-domain.com'
+    -- ^ The SUBJECT host — the domain this report is ABOUT (your site).
+    -- NOT signal.stroma.design (that's the renderer, hard-coded above).
+    -- Replace with the EXACT host string captured by Signal in your dataLayer
+    -- events — same as window.location.host. Include subdomain (use
+    -- www.example.com if your site is on www; example.com if it's on the
+    -- apex), exclude protocol, exclude path, exclude port, lowercase.
+    -- Easiest: run ga4-bigquery-validation.sql first and copy the value
+    -- from its `host` column. Replace 'your-domain.com' in BOTH this WHERE
+    -- clause AND the COALESCE fallback in the `counts` CTE below — one
+    -- find-and-replace covers both. For production automation, replace
+    -- the literal with @host as a parameterized query argument.
     AND COALESCE((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'navigation_type'), 'navigate')
       NOT IN ('restore', 'prerender')
   QUALIFY ROW_NUMBER() OVER (PARTITION BY (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'event_id') ORDER BY event_timestamp) = 1
@@ -67,7 +97,13 @@ source_events AS (
 ),
 counts AS (
   SELECT
-    ANY_VALUE(host) AS host, -- single domain after WHERE host filter
+    -- COALESCE fallback: ANY_VALUE(host) returns NULL when source_events is
+    -- empty (zero matching rows) and BigQuery's CONCAT() returns NULL if
+    -- ANY input is NULL — which would poison the entire signal_report_url.
+    -- The literal fallback ensures empty-data still emits a usable URL
+    -- with the operator's intended subject host. Keep this literal in
+    -- lockstep with the WHERE clause above — one find-and-replace.
+    COALESCE(ANY_VALUE(host), 'your-domain.com') AS host, -- single domain after WHERE host filter
     COUNT(*) AS sample_size,
     -- Sample-confidence band — drives the /r cover's preliminary banner.
     -- Thresholds mirror packages/signal-contracts/src/types.ts
@@ -99,7 +135,25 @@ counts AS (
     IFNULL(ROUND(100 * SAFE_DIVIDE(COUNTIF(device_screen_w IS NOT NULL AND device_screen_w > 0 AND device_screen_w < 768), COUNTIF(device_screen_w IS NOT NULL AND device_screen_w > 0))), 0) AS ff_mobile,
     IFNULL(ROUND(100 * SAFE_DIVIDE(COUNTIF(device_screen_w IS NOT NULL AND device_screen_w >= 768 AND device_screen_w < 1280), COUNTIF(device_screen_w IS NOT NULL AND device_screen_w > 0))), 0) AS ff_tablet,
     IFNULL(ROUND(100 * SAFE_DIVIDE(COUNTIF(device_screen_w IS NOT NULL AND device_screen_w >= 1280), COUNTIF(device_screen_w IS NOT NULL AND device_screen_w > 0))), 0) AS ff_desktop,
-    (SELECT SPLIT(url, '?')[OFFSET(0)] FROM UNNEST(ARRAY_AGG(url)) AS url GROUP BY 1 ORDER BY COUNT(*) DESC LIMIT 1) AS top_path
+    -- Most-frequent URL path with query strings stripped. Uses an exact
+    -- scalar subquery (not APPROX_TOP_COUNT) so the result is
+    -- deterministic and the credibility story stays intact — no
+    -- "approximate" disclaimer in customer-facing reports. NULL urls are
+    -- filtered before counting; ties broken alphabetically so reruns at
+    -- the same cardinality produce identical URLs.
+    (
+      SELECT path
+      FROM (
+        SELECT
+          SPLIT(url, '?')[OFFSET(0)] AS path,
+          COUNT(*) AS path_count
+        FROM source_events
+        WHERE url IS NOT NULL
+        GROUP BY path
+        ORDER BY path_count DESC, path ASC
+        LIMIT 1
+      )
+    ) AS top_path
   FROM source_events
 ),
 comparison_tier AS (
@@ -333,8 +387,9 @@ funnel_rollup AS (
 -- Iteration-6 blocks (device_hardware, network_signals, environment) are
 -- NOT available in the GA4 recipe. The fields they require (device_cores,
 -- device_memory_gb, effective_type, downlink_mbps, rtt_ms, save_data,
--- browser) are warehouse-only — excluded from the GA4 21-field event param
--- map due to the 25-param standard-property limit. Use the normalized
+-- browser) are warehouse-only — excluded from the GA4 24-field event param
+-- map because adding them would push the GA4 event past its 25-param
+-- standard-property cap (24 fields + the event name = exactly 25). Use the normalized
 -- warehouse recipe (normalized-bigquery-url-builder.sql) to produce reports
 -- with the Actionable Signals slide populated.
 --

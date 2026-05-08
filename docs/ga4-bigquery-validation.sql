@@ -4,6 +4,11 @@
 -- The URL-builder query excludes navigation_type = restore/prerender by default.
 -- Canonical production window = the last 7 complete calendar days,
 -- excluding the current in-progress day.
+--
+-- The `host` column in the result is the literal string to paste into
+-- the URL-builder query's host filter. Copy it; do not retype.
+-- Trailing slashes, protocols, and casing mismatches are the #1
+-- zero-rows cause for the URL-builder.
 
 SELECT
   TIMESTAMP_MICROS(event_timestamp) AS observed_at,

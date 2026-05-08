@@ -381,7 +381,7 @@ For the full aggregation specification including comparison tier selection logic
 
 ## Report URL
 
-The report URL encodes the full aggregate into URL parameters and points to the hosted report shell at `https://signal.stroma.design/r`. The report page is a static HTML file served from Cloudflare Pages. It parses URL parameters, computes the visualization, and renders entirely client-side. No API calls. No server-side processing. No data logging.
+The report URL encodes the full aggregate into URL parameters and points to the hosted report shell at `https://signal.stroma.design/r`. The report page is a static HTML file served from Cloudflare Pages. It parses URL parameters, computes the visualization, and renders entirely client-side. **Rendering and decoding the report makes no API calls, performs no server-side processing, and writes no logs of the report payload.** The closing-section CTAs in the report's needs-inquiry router are an explicit opt-in interaction that posts demand-signal events to `/api/v1/intent`; that path runs only when the recipient clicks a CTA pill, never as part of rendering, and carries no report payload — see [tier-report-design-spec.md](./tier-report-design-spec.md) for the captured fields.
 
 Two generation paths:
 

@@ -8,7 +8,7 @@ Before the first public publish:
 
 - confirm the `@stroma-labs` npm scope exists
 - confirm the publishing account has permission to publish `@stroma-labs/signal`
-- confirm the GitHub repository has the required `NPM_TOKEN` secret configured
+- confirm the npm Trusted Publisher policy on `@stroma-labs/signal` matches this repo + the `Publish` workflow on `main` (Settings → Trusted publishers on npmjs.com). Trusted Publishing is the auth model — there is no `NPM_TOKEN` secret, and adding one would be a regression.
 - confirm the publish workflow still keeps `id-token: write` plus `npm publish --provenance`
 - confirm the release target is the canonical repo: `jonnybmc/stroma-signal`
 

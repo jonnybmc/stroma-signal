@@ -50,13 +50,13 @@ Every GA4 event can carry **at most 25 custom parameters**. Signal's GA4 helper 
 
 **If a specific Signal field is missing in GA4 DebugView**, see the corresponding section in [launch-troubleshooting.md](./launch-troubleshooting.md). The most common cause is the field is warehouse-only (not part of the GA4 compact subset) — see the GA4 Compact Subset section in [signal-technical-reference.md](./signal-technical-reference.md).
 
-### 3b. The 10M-events-per-month free-tier threshold (sampling kicks in)
+### 3b. GA4 sampling in the reporting UI (BigQuery export is unaffected)
 
-Standard GA4 (free) starts **applying sampling in reporting** when a property exceeds 10M events / month. **Raw BigQuery export is not sampled** at this threshold — it remains 1:1.
+Standard GA4 (free) applies **per-request sampling in the reporting UI** once a request scans more events than its sampling threshold (the default is 10M events; the GA4 admin can lower this on individual requests). Sampling is a property of the *report request*, not a hard monthly cap on the property itself — so the figure you see in the GA4 UI may be a sampled aggregate even when the underlying property is well under 10M events / month if the request is unfiltered or spans a long window. **Raw BigQuery export is not sampled at all** — every event lands 1:1.
 
 **This means:**
-- If you're under 10M/month → no sampling concern
-- If you're over 10M/month → GA4 reporting UI will show sampled aggregates, but the BigQuery rows feeding Signal's URL-builder query are still complete. You're fine.
+- For Signal's purposes, sampling in the GA4 UI is a non-issue: the URL-builder query reads BigQuery rows directly, never the GA4 reporting endpoint.
+- If GA4-UI numbers and Signal-report numbers diverge for a comparable window, GA4 is the one being sampled.
 - If you want sampling-free reporting in GA4 itself → that's GA4 360 territory ($150K+/year). Signal doesn't need that — it pulls from BigQuery directly.
 
 ### 3c. BigQuery export rate cap (free tier)
@@ -80,11 +80,11 @@ Storage cost is dominated by GA4's other event types, not Signal's contribution.
 
 ### Query (per URL refresh)
 
-Signal's URL-builder query (`docs/ga4-bigquery-url-builder.sql`) **scans your perf-event partitions** for the chosen window (default 30 days). Typical scans:
+Signal's URL-builder query (`docs/ga4-bigquery-url-builder.sql`) **scans your perf-event partitions** for the chosen window (default 7 complete calendar days, excluding the in-progress day). Typical scans:
 
-- 1M events / 30 days ≈ 5 GB scan ≈ **$0.03 / refresh** (first 1 TB / month free)
-- 10M events / 30 days ≈ 50 GB scan ≈ $0.30 / refresh
-- 100M events / 30 days ≈ 500 GB scan ≈ $3.00 / refresh
+- 1M events / 7 days ≈ 1.2 GB scan ≈ **$0.01 / refresh** (first 1 TB / month free)
+- 10M events / 7 days ≈ 12 GB scan ≈ $0.07 / refresh
+- 100M events / 7 days ≈ 120 GB scan ≈ $0.70 / refresh
 
 **Operating advice:** schedule the query **once a day, not on every dashboard view** — cache the resulting `signal_report_url` and serve it from your own surface (CDN, internal dashboard). See [production-report-automation.md](./production-report-automation.md).
 
@@ -98,7 +98,8 @@ Signal degrades gracefully — unsupported fields render as `null`, never as fab
 
 | Field family | Chrome / Edge | Safari (macOS / iOS) | Firefox | Android WebView | Notes |
 |---|---|---|---|---|---|
-| Core Web Vitals (LCP, INP, CLS, FCP, TTFB) | ✅ all versions | ✅ Safari 16+ | ✅ all versions | ✅ | INP missing on older Safari |
+| `fcp_ms`, `ttfb_ms` (universal vitals) | ✅ all versions | ✅ all versions | ✅ all versions | ✅ | Always populated when measurable. |
+| `lcp_ms`, `cls`, `inp_ms` (Chromium-only vitals) | ✅ all versions | ❌ not exposed | ❌ not exposed | ✅ | These fields are `null` on Safari and Firefox — Signal never fabricates metrics. Plan for a meaningful share of `null`s on iOS/macOS Safari traffic in particular. See [signal-technical-reference.md](./signal-technical-reference.md#vitals) for the canonical matrix. |
 | `vitals.navigation_timing` (per-subpart breakdown) | ✅ all versions | ✅ Safari 14+ | ✅ all versions | ✅ | TLS isolation requires HTTPS |
 | `vitals.loaf` (Long Animation Frame) | ✅ Chromium 123+ | ❌ not exposed | ❌ not exposed | ✅ Chromium 123+ | Field is `null` elsewhere |
 | `lcp_attribution` (which element was LCP) | ✅ all | ❌ not exposed | ❌ not exposed | ✅ | Field is `null` elsewhere |

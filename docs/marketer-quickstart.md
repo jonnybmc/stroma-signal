@@ -105,7 +105,7 @@ This auto-creates a dataset named `analytics_<property_id>` in your GCP project.
 
 Open BigQuery Studio at <https://console.cloud.google.com/bigquery>. Pick the GCP project you linked GA4 to (top-left project picker).
 
-In the **Query editor** (the central pane with a `SQL` tab), paste the contents of [ga4-bigquery-validation.sql](./ga4-bigquery-validation.sql) and replace the placeholders (see the placeholder reference table in the next section — the same three substitutions apply here). Click **Run**.
+In the **Query editor** (the central pane with a `SQL` tab), paste the contents of [ga4-bigquery-validation.sql](./ga4-bigquery-validation.sql) and replace the two placeholders — the first two rows of the placeholder reference table in the next section (`your-project` and `analytics_XXXXXXXX`). The validation query does **not** filter by host, so you do not need `your-domain.com` here; the URL-builder query later does. Click **Run**.
 
 This answers the simple question:
 
@@ -116,9 +116,10 @@ This answers the simple question:
 **If the result is empty (zero rows):** work through these in order, not in parallel:
 
 1. **Has it been at least 24 hours since you linked GA4 → BigQuery?** Daily export runs once per day. Linking yesterday afternoon means data lands tomorrow morning at the earliest.
-2. **Are the placeholders correct?** Run this diagnostic in a new tab: `SELECT DISTINCT event_name FROM \`your-project.analytics_XXXXXXXX.events_*\` LIMIT 100` — replacing only the project + dataset. If this returns zero rows, the project or dataset name is wrong (check GA4 → Admin → BigQuery Links to confirm the dataset name). If it returns rows but no `perf_tier_report`, GTM is misconfigured — go back to the GTM / GA4 verification step.
-3. **Does your `host` filter match real traffic?** The validation SQL filters on a specific domain. If you set `your-domain.com` but real traffic comes from `www.your-domain.com`, you'll see zero rows. Run the diagnostic above and check `(SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'host')` for the actual host values.
-4. **Is real traffic landing in GA4?** Open GA4 → **Reports** → **Realtime**. If GA4 itself shows zero users, the GTM/GA4 path isn't capturing — go back to the GTM / GA4 verification step.
+2. **Are the two placeholders correct?** Run this diagnostic in a new tab: `SELECT DISTINCT event_name FROM \`your-project.analytics_XXXXXXXX.events_*\` LIMIT 100` — replacing only the project + dataset (the validation query has no host filter, so only those two substitutions matter here). If this returns zero rows, the project or dataset name is wrong (check GA4 → Admin → BigQuery Links to confirm the dataset name). If it returns rows but no `perf_tier_report`, GTM is misconfigured — go back to the GTM / GA4 verification step.
+3. **Is real traffic landing in GA4?** Open GA4 → **Reports** → **Realtime**. If GA4 itself shows zero users, the GTM/GA4 path isn't capturing — go back to the GTM / GA4 verification step.
+
+(Host-filter mismatches affect the URL-builder query in the next section, not this validation query. If the validation returns rows but the URL-builder returns none, see [launch-troubleshooting.md](./launch-troubleshooting.md) for the host-mismatch decision tree.)
 
 This validation step shows raw exported rows, including `navigation_type = restore` and `navigation_type = prerender` when they occur. Do not move to the URL-builder query until this query returns rows.
 
@@ -128,15 +129,24 @@ Once this succeeds, switch to [production-report-automation.md](./production-rep
 
 Once rows are landing, save the query in [ga4-bigquery-url-builder.sql](./ga4-bigquery-url-builder.sql) using the setup guide in [bigquery-saved-query-setup.md](./bigquery-saved-query-setup.md).
 
-> 📋 **Before you run the query, replace these three placeholders.** Both SQL files (`ga4-bigquery-validation.sql` and `ga4-bigquery-url-builder.sql`) need the same three substitutions. Copy them once, paste into both:
+> **How the report URL is structured.** The URL the SQL produces looks like `https://signal.stroma.design/r/?...&d=<your-host>&...`. Two pieces, two purposes:
+>
+> | Piece | Role |
+> |---|---|
+> | `signal.stroma.design/r/` | The renderer. Always Stroma — it's where the report displays. You don't change this. |
+> | `&d=<your-host>` | The subject. The domain the report is *about*. The SQL fills this in from the `host` filter you set below. |
+>
+> The `WHERE host = 'your-domain.com'` filter exists so the SQL knows which domain to put in `&d=` and so percentiles aren't averaged across unrelated sites if you later deploy Signal on multiple sub-domains. For a single-site install, set it to your one site's host.
+
+> 📋 **Before you run the URL-builder query, replace these placeholders.** The URL-builder needs all three; the validation query in the previous section needs only the first two (it does not filter by host).
 >
 > | Placeholder              | Where to find it                                                                                                       |
 > |--------------------------|------------------------------------------------------------------------------------------------------------------------|
 > | `your-project`           | Your GCP project ID (top of the BigQuery Studio left nav)                                                              |
 > | `analytics_XXXXXXXX`     | The GA4 BigQuery dataset (GA4 → Admin → BigQuery Links → click your link to see the dataset name, format `analytics_<property_id>`) |
-> | `your-domain.com`        | The host you want to report on (must match the `host` value in your dataLayer events)                                  |
+> | `your-domain.com`        | The exact `host` value Signal is capturing for your site (same as `window.location.host`). Include subdomain (`www.example.com` ≠ `example.com`), exclude protocol (no `https://`), exclude path, exclude port, lowercase. **Easiest path:** look at the `host` column in your validation-query result; copy that literal string. Replace `'your-domain.com'` in BOTH the WHERE clause AND the COALESCE fallback in the `counts` CTE — one find-and-replace covers both. |
 >
-> The placeholders appear at line 33 (`your-project.analytics_XXXXXXXX.events_*`) and line 38 (`your-domain.com`) of the URL-builder SQL. Forgetting one will return zero rows or a SQL error, not a useful diagnostic.
+> ⚠️ **`events_*` is a BigQuery wildcard pattern, not a placeholder.** Leave it exactly as written. Replacing it with a concrete table name (e.g. `events_intraday_20260508`) breaks the `_TABLE_SUFFIX` filter the SQL depends on.
 
 That query excludes `navigation_type = restore` and `navigation_type = prerender` by default so the hosted report stays tied to normal load performance.
 
