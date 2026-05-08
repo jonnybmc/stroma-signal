@@ -113,10 +113,16 @@ counts AS (
     ) AS top_path
   FROM source_events
 ),
-comparison_tier AS (
+comparison_tier_lookup AS (
   -- Tie-break order: when two tiers have equal counts, prefer
   -- moderate > constrained_moderate > constrained. Mirrors
   -- aggregation.ts pickComparisonTier() (CLASSIFIED_TIERS insertion order).
+  -- CTE is named *_lookup to avoid the BigQuery name-collision trap where
+  -- `(SELECT comparison_tier FROM comparison_tier_lookup)` resolves the inner
+  -- `comparison_tier` to the table struct, not the column — which gives
+  -- "No matching signature for operator =". Keep the column name as
+  -- `comparison_tier` so the `&ct=<value>` URL param emit and the tests
+  -- that pin that column name remain valid.
   SELECT
     IF(
       MAX(tier_count) = 0,
@@ -134,13 +140,13 @@ comparison_tier AS (
 race_inputs AS (
   SELECT
     COUNTIF(net_tier = 'urban') AS urban_observations,
-    COUNTIF(net_tier = (SELECT comparison_tier FROM comparison_tier)) AS comparison_observations,
+    COUNTIF(net_tier = (SELECT comparison_tier FROM comparison_tier_lookup)) AS comparison_observations,
     COUNTIF(net_tier = 'urban' AND lcp_ms IS NOT NULL) AS urban_lcp_observations,
-    COUNTIF(net_tier = (SELECT comparison_tier FROM comparison_tier) AND lcp_ms IS NOT NULL) AS comparison_lcp_observations,
+    COUNTIF(net_tier = (SELECT comparison_tier FROM comparison_tier_lookup) AND lcp_ms IS NOT NULL) AS comparison_lcp_observations,
     COUNTIF(net_tier = 'urban' AND fcp_ms IS NOT NULL) AS urban_fcp_observations,
-    COUNTIF(net_tier = (SELECT comparison_tier FROM comparison_tier) AND fcp_ms IS NOT NULL) AS comparison_fcp_observations,
+    COUNTIF(net_tier = (SELECT comparison_tier FROM comparison_tier_lookup) AND fcp_ms IS NOT NULL) AS comparison_fcp_observations,
     COUNTIF(net_tier = 'urban' AND ttfb_ms IS NOT NULL) AS urban_ttfb_observations,
-    COUNTIF(net_tier = (SELECT comparison_tier FROM comparison_tier) AND ttfb_ms IS NOT NULL) AS comparison_ttfb_observations,
+    COUNTIF(net_tier = (SELECT comparison_tier FROM comparison_tier_lookup) AND ttfb_ms IS NOT NULL) AS comparison_ttfb_observations,
     IFNULL(
       ROUND(100 * SAFE_DIVIDE(COUNTIF(net_tier = 'urban' AND lcp_ms IS NOT NULL), COUNTIF(net_tier = 'urban'))),
       0
@@ -148,8 +154,8 @@ race_inputs AS (
     IFNULL(
       ROUND(
         100 * SAFE_DIVIDE(
-          COUNTIF(net_tier = (SELECT comparison_tier FROM comparison_tier) AND lcp_ms IS NOT NULL),
-          COUNTIF(net_tier = (SELECT comparison_tier FROM comparison_tier))
+          COUNTIF(net_tier = (SELECT comparison_tier FROM comparison_tier_lookup) AND lcp_ms IS NOT NULL),
+          COUNTIF(net_tier = (SELECT comparison_tier FROM comparison_tier_lookup))
         )
       ),
       0
@@ -161,8 +167,8 @@ race_inputs AS (
     IFNULL(
       ROUND(
         100 * SAFE_DIVIDE(
-          COUNTIF(net_tier = (SELECT comparison_tier FROM comparison_tier) AND fcp_ms IS NOT NULL),
-          COUNTIF(net_tier = (SELECT comparison_tier FROM comparison_tier))
+          COUNTIF(net_tier = (SELECT comparison_tier FROM comparison_tier_lookup) AND fcp_ms IS NOT NULL),
+          COUNTIF(net_tier = (SELECT comparison_tier FROM comparison_tier_lookup))
         )
       ),
       0
@@ -174,8 +180,8 @@ race_inputs AS (
     IFNULL(
       ROUND(
         100 * SAFE_DIVIDE(
-          COUNTIF(net_tier = (SELECT comparison_tier FROM comparison_tier) AND ttfb_ms IS NOT NULL),
-          COUNTIF(net_tier = (SELECT comparison_tier FROM comparison_tier))
+          COUNTIF(net_tier = (SELECT comparison_tier FROM comparison_tier_lookup) AND ttfb_ms IS NOT NULL),
+          COUNTIF(net_tier = (SELECT comparison_tier FROM comparison_tier_lookup))
         )
       ),
       0
@@ -186,11 +192,11 @@ race_inputs AS (
 vitals AS (
   SELECT
     IF(COUNTIF(net_tier = 'urban' AND lcp_ms IS NOT NULL) > 0, APPROX_QUANTILES(IF(net_tier = 'urban', lcp_ms, NULL), 100 IGNORE NULLS)[OFFSET(75)], NULL) AS lu,
-    IF(COUNTIF(net_tier = (SELECT comparison_tier FROM comparison_tier) AND lcp_ms IS NOT NULL) > 0, APPROX_QUANTILES(IF(net_tier = (SELECT comparison_tier FROM comparison_tier), lcp_ms, NULL), 100 IGNORE NULLS)[OFFSET(75)], NULL) AS lt,
+    IF(COUNTIF(net_tier = (SELECT comparison_tier FROM comparison_tier_lookup) AND lcp_ms IS NOT NULL) > 0, APPROX_QUANTILES(IF(net_tier = (SELECT comparison_tier FROM comparison_tier_lookup), lcp_ms, NULL), 100 IGNORE NULLS)[OFFSET(75)], NULL) AS lt,
     IF(COUNTIF(net_tier = 'urban' AND fcp_ms IS NOT NULL) > 0, APPROX_QUANTILES(IF(net_tier = 'urban', fcp_ms, NULL), 100 IGNORE NULLS)[OFFSET(75)], NULL) AS fu,
-    IF(COUNTIF(net_tier = (SELECT comparison_tier FROM comparison_tier) AND fcp_ms IS NOT NULL) > 0, APPROX_QUANTILES(IF(net_tier = (SELECT comparison_tier FROM comparison_tier), fcp_ms, NULL), 100 IGNORE NULLS)[OFFSET(75)], NULL) AS ft,
+    IF(COUNTIF(net_tier = (SELECT comparison_tier FROM comparison_tier_lookup) AND fcp_ms IS NOT NULL) > 0, APPROX_QUANTILES(IF(net_tier = (SELECT comparison_tier FROM comparison_tier_lookup), fcp_ms, NULL), 100 IGNORE NULLS)[OFFSET(75)], NULL) AS ft,
     IF(COUNTIF(net_tier = 'urban' AND ttfb_ms IS NOT NULL) > 0, APPROX_QUANTILES(IF(net_tier = 'urban', ttfb_ms, NULL), 100 IGNORE NULLS)[OFFSET(75)], NULL) AS tu,
-    IF(COUNTIF(net_tier = (SELECT comparison_tier FROM comparison_tier) AND ttfb_ms IS NOT NULL) > 0, APPROX_QUANTILES(IF(net_tier = (SELECT comparison_tier FROM comparison_tier), ttfb_ms, NULL), 100 IGNORE NULLS)[OFFSET(75)], NULL) AS tt
+    IF(COUNTIF(net_tier = (SELECT comparison_tier FROM comparison_tier_lookup) AND ttfb_ms IS NOT NULL) > 0, APPROX_QUANTILES(IF(net_tier = (SELECT comparison_tier FROM comparison_tier_lookup), ttfb_ms, NULL), 100 IGNORE NULLS)[OFFSET(75)], NULL) AS tt
   FROM source_events
 ),
 race_choice AS (
@@ -294,6 +300,22 @@ funnel_activation AS (
   FROM stage_inputs
 ),
 funnel_rollup AS (
+  -- This CTE anchors on funnel_activation (always 1 row, computed from
+  -- stage_inputs which itself always emits 1 row even on empty input)
+  -- and LEFT JOINs source_events ON TRUE. Two invariants this preserves:
+  --   1. Always produces exactly 1 row, even when source_events is empty
+  --      (anchor + null right side = 1 row). Without LEFT JOIN, an empty
+  --      source_events would produce 0 rows here, dropping the entire
+  --      final cross-join to 0 rows and emitting NO signal_report_url —
+  --      the COALESCE fallback in `counts` cannot save that.
+  --   2. The COUNTIF predicates filter on source_events columns which
+  --      are NULL on the anchor-only row (when source is empty), so
+  --      every COUNTIF returns 0 — measured_session_coverage and
+  --      poor_session_share resolve to 0 cleanly via SAFE_DIVIDE + IFNULL.
+  -- The SELECT mixes COUNTIF aggregates with references to the three
+  -- funnel_activation carry-through columns, so BigQuery requires them
+  -- in GROUP BY. They're constant after the join, so one group is
+  -- produced — same single-row output as the multi-row case.
   SELECT
     CASE
       WHEN classified_sample_size = 0 THEN ''
@@ -339,7 +361,8 @@ funnel_rollup AS (
       ),
       0
     ) AS poor_session_share
-  FROM source_events, funnel_activation
+  FROM funnel_activation LEFT JOIN source_events ON TRUE
+  GROUP BY classified_sample_size, include_lcp, include_inp
 ),
 device_hardware AS (
   -- Bucket boundaries mirror aggregation.ts coresBucket() / memoryBucket().
@@ -403,7 +426,39 @@ env AS (
     IFNULL(ROUND(100 * SAFE_DIVIDE(COUNTIF(LOWER(browser) NOT IN ('chrome', 'safari', 'firefox', 'edge') OR browser IS NULL), COUNT(*))), 0) AS br_other
   FROM source_events
 )
-SELECT CONCAT(
+-- Three-state output, single column (`signal_report_url`):
+--
+--   sample_size = 0   → diagnostic message starting with NO_EVENTS_IN_WINDOW
+--   sample_size 1-99  → diagnostic message starting with SAMPLE_BELOW_RECOMMENDED_MINIMUM
+--   sample_size >= 100 → production /r URL (the application's documented
+--                        recommended-minimum is SIGNAL_PREVIEW_MINIMUM_SAMPLE = 100;
+--                        below that, percentile distributions and tier
+--                        shares are statistically unreliable, so we do
+--                        not emit a URL — we emit a clear diagnostic
+--                        instead so operators always have an actionable
+--                        result in BigQuery's result pane, never a blank
+--                        "There is no data to display" dead end and never
+--                        a misleading half-baked report).
+--
+-- Downstream consumers (the persistence table writer, the operator
+-- copy-paste flow, the /r renderer) can dispatch on the literal prefix:
+-- if the cell starts with `https://signal.stroma.design/r?` it's a URL,
+-- otherwise it's an actionable diagnostic.
+SELECT
+  CASE
+    WHEN sample_size = 0 THEN CONCAT(
+      'NO_EVENTS_IN_WINDOW: zero rows matched host=',
+      host,
+      ' in the last 7 complete calendar days. Run the validation SQL — if it also returns zero, your beacon/callback ingest is not delivering rows. If validation returns rows, your host literal or window is the issue. See docs/launch-troubleshooting.md.'
+    )
+    WHEN sample_size < 100 THEN CONCAT(
+      'SAMPLE_BELOW_RECOMMENDED_MINIMUM: captured ',
+      CAST(sample_size AS STRING),
+      ' events for host=',
+      host,
+      ' in the last 7 complete calendar days. The /r report needs at least 100 events to be statistically meaningful — below that, percentile distributions are noisy and tier shares are unreliable. Re-run after more traffic accumulates (typical timeline: 1-3 days for a moderate-traffic site). The validation SQL shows your event flow rate.'
+    )
+    ELSE CONCAT(
   'https://signal.stroma.design/r?rv=1&mode=production',
   '&d=', host,
   '&nt=', CAST(nt_urban AS STRING), ',', CAST(nt_moderate AS STRING), ',', CAST(nt_constrained_moderate AS STRING), ',', CAST(nt_constrained AS STRING), ',', CAST(nt_unknown AS STRING),
@@ -461,5 +516,6 @@ SELECT CONCAT(
   '&xb=', CAST(excluded_background_sessions AS STRING),
   -- freshness provenance
   '&ga=', CAST(UNIX_MILLIS(CURRENT_TIMESTAMP()) AS STRING)
-) AS signal_report_url
-FROM counts, vitals, comparison_tier, race_choice, stage_inputs, funnel_rollup, device_hardware, network_signals, downlink_quartiles, rtt_quartiles, env, visibility_counts;
+    )
+  END AS signal_report_url
+FROM counts, vitals, comparison_tier_lookup, race_inputs, race_choice, stage_inputs, funnel_rollup, device_hardware, network_signals, downlink_quartiles, rtt_quartiles, env, visibility_counts;

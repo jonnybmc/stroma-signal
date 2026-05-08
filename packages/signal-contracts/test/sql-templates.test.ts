@@ -239,6 +239,133 @@ describe('bigquery sql templates', () => {
     }
   });
 
+  it('final cross-join FROM clause includes race_inputs so urban_*_coverage and comparison_*_coverage resolve', () => {
+    // The CONCAT block in the final SELECT references urban_lcp_coverage,
+    // urban_fcp_coverage, urban_ttfb_coverage, comparison_lcp_coverage,
+    // comparison_fcp_coverage, comparison_ttfb_coverage — all columns of
+    // race_inputs. race_inputs MUST be in the final FROM cross-join, or
+    // BigQuery rejects with "Unrecognized name: urban_lcp_coverage".
+    // (race_choice already reads race_inputs internally, but its SELECT
+    // doesn't pass those raw coverage columns through; the CONCAT needs
+    // them directly.)
+    for (const fileName of ['ga4-bigquery-url-builder.sql', 'normalized-bigquery-url-builder.sql']) {
+      const sql = readSqlTemplate(fileName);
+      const finalFromMatch = sql.match(/^FROM\s+counts[^;]*;/m);
+      expect(finalFromMatch, `${fileName}: missing final FROM clause`).toBeTruthy();
+      const finalFrom = finalFromMatch?.[0] ?? '';
+      expect(
+        finalFrom,
+        `${fileName}: race_inputs must be in the final cross-join — its columns are referenced from the CONCAT block.`
+      ).toMatch(/\brace_inputs\b/);
+    }
+  });
+
+  it('emits a NO_EVENTS_IN_WINDOW diagnostic when sample_size = 0 instead of a misleading URL or empty result pane', () => {
+    // Operator-experience principle: never leave a user with a dead-end
+    // empty result pane and never emit a half-baked URL that would render
+    // a misleading /r report. When source_events is empty after the WHERE
+    // filter, the URL-builder must emit an actionable diagnostic message
+    // in the signal_report_url cell so the operator has a clear next step.
+    for (const fileName of ['ga4-bigquery-url-builder.sql', 'normalized-bigquery-url-builder.sql']) {
+      const sql = readSqlTemplate(fileName);
+      expect(sql).toMatch(/WHEN\s+sample_size\s*=\s*0\s+THEN/);
+      expect(sql).toContain("'NO_EVENTS_IN_WINDOW: ");
+    }
+  });
+
+  it('emits a SAMPLE_BELOW_RECOMMENDED_MINIMUM diagnostic when 0 < sample_size < 100', () => {
+    // Threshold matches SIGNAL_PREVIEW_MINIMUM_SAMPLE = 100 in
+    // packages/signal-contracts/src/types.ts. Below this, the /r report
+    // would render with noisy percentiles and unreliable tier shares —
+    // we explicitly do not emit a URL, we emit a diagnostic that names
+    // exactly how many events were captured so the operator can wait
+    // for traffic with a clear target in mind.
+    for (const fileName of ['ga4-bigquery-url-builder.sql', 'normalized-bigquery-url-builder.sql']) {
+      const sql = readSqlTemplate(fileName);
+      expect(sql).toMatch(/WHEN\s+sample_size\s*<\s*100\s+THEN/);
+      expect(sql).toContain("'SAMPLE_BELOW_RECOMMENDED_MINIMUM: captured '");
+      expect(sql).toContain('events for host=');
+    }
+  });
+
+  it('threshold for emitting the production URL matches SIGNAL_PREVIEW_MINIMUM_SAMPLE (100)', async () => {
+    // Imports the constant from the same source-of-truth module the SQL
+    // mirrors. If someone changes SIGNAL_PREVIEW_MINIMUM_SAMPLE in
+    // types.ts, this test fails until the SQL CASE threshold is updated
+    // in lockstep.
+    const { SIGNAL_PREVIEW_MINIMUM_SAMPLE } = await import('../src/index.js');
+    expect(SIGNAL_PREVIEW_MINIMUM_SAMPLE).toBe(100);
+    for (const fileName of ['ga4-bigquery-url-builder.sql', 'normalized-bigquery-url-builder.sql']) {
+      const sql = readSqlTemplate(fileName);
+      expect(
+        sql,
+        `${fileName}: SQL diagnostic threshold (sample_size < 100) must match SIGNAL_PREVIEW_MINIMUM_SAMPLE in types.ts.`
+      ).toMatch(new RegExp(`WHEN\\s+sample_size\\s*<\\s*${SIGNAL_PREVIEW_MINIMUM_SAMPLE}\\s+THEN`));
+    }
+  });
+
+  it('funnel_rollup anchors on funnel_activation with LEFT JOIN source_events so empty data still emits a row', () => {
+    // The previous CROSS JOIN form (FROM source_events, funnel_activation)
+    // produced 0 rows when source_events was empty after the WHERE filter
+    // (e.g. day-one operator, host typo, or daily-export not yet landed).
+    // 0 rows in funnel_rollup → final cross-join collapses to 0 rows →
+    // no signal_report_url emitted, even though the COALESCE fallback in
+    // `counts` was specifically designed for that case. Anchoring on
+    // funnel_activation (always 1 row) with LEFT JOIN source_events ON
+    // TRUE preserves the 1-row invariant in both data states.
+    for (const fileName of ['ga4-bigquery-url-builder.sql', 'normalized-bigquery-url-builder.sql']) {
+      const sql = readSqlTemplate(fileName);
+      const block = sql.match(/funnel_rollup AS \(([\s\S]*?)\n\)[,;]?/)?.[1] ?? '';
+      expect(
+        block,
+        `${fileName}: funnel_rollup must anchor on funnel_activation with LEFT JOIN source_events ON TRUE so empty source_events still produces a row.`
+      ).toMatch(/FROM\s+funnel_activation\s+LEFT JOIN\s+source_events\s+ON\s+TRUE/i);
+      expect(
+        block,
+        `${fileName}: funnel_rollup must NOT use the bare cross-join form (FROM source_events, funnel_activation) — that produces 0 rows when source_events is empty.`
+      ).not.toMatch(/FROM\s+source_events\s*,\s*funnel_activation/i);
+    }
+  });
+
+  it('funnel_rollup CTE has GROUP BY on funnel_activation carry-through columns', () => {
+    // funnel_rollup cross-joins source_events (many rows) with
+    // funnel_activation (1 row). The SELECT mixes COUNTIF aggregates
+    // with references to classified_sample_size / include_lcp /
+    // include_inp — BigQuery requires GROUP BY on those columns or
+    // ANY_VALUE wrapping. Without it, BigQuery rejects the query at
+    // execution time with "SELECT list expression references column X
+    // which is neither grouped nor aggregated". Regex tests cannot
+    // catch this kind of semantic-against-real-BQ mismatch in general,
+    // but we can lock in the specific GROUP BY clause that fixes it.
+    for (const fileName of ['ga4-bigquery-url-builder.sql', 'normalized-bigquery-url-builder.sql']) {
+      const sql = readSqlTemplate(fileName);
+      // Match "funnel_rollup AS (" through to the matching ")," (or ");" for the GA4 file's terminal comma).
+      const block = sql.match(/funnel_rollup AS \(([\s\S]*?)\n\)[,;]?/)?.[1] ?? '';
+      expect(
+        block,
+        `${fileName}: funnel_rollup must contain GROUP BY classified_sample_size, include_lcp, include_inp.`
+      ).toMatch(/GROUP BY classified_sample_size,\s*include_lcp,\s*include_inp/);
+    }
+  });
+
+  it('does not collide CTE names with column names in scalar subqueries', () => {
+    // BigQuery rejects `(SELECT col FROM col)` when the inner `col` is
+    // both a CTE name AND a column name in that CTE — the parser
+    // resolves the inner reference to the table struct, not the column,
+    // and the comparison fails with "No matching signature for operator =
+    // for argument types: STRING, STRUCT<col STRING>". Forbid the
+    // exact `(SELECT X FROM X)` shape so the comparison_tier-style trap
+    // can't recur in a future CTE. See the rename to *_lookup in both
+    // URL builders.
+    for (const fileName of ['ga4-bigquery-url-builder.sql', 'normalized-bigquery-url-builder.sql']) {
+      const sql = readSqlTemplate(fileName);
+      expect(
+        sql,
+        `${fileName}: scalar subquery (SELECT X FROM X) collides X-as-column with X-as-CTE. BigQuery rejects this with "No matching signature for operator =". Rename the CTE to <name>_lookup or qualify the column reference.`
+      ).not.toMatch(/\(\s*SELECT\s+(\w+)\s+FROM\s+\1\s*\)/);
+    }
+  });
+
   it('emits a literal-fallback host so empty-data still produces a complete URL', () => {
     // Without COALESCE, ANY_VALUE(host) returns NULL on empty source_events,
     // and BigQuery's CONCAT() returns NULL if any argument is NULL — which
