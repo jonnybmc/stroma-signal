@@ -239,6 +239,27 @@ describe('bigquery sql templates', () => {
     }
   });
 
+  it('final cross-join FROM clause includes race_inputs so urban_*_coverage and comparison_*_coverage resolve', () => {
+    // The CONCAT block in the final SELECT references urban_lcp_coverage,
+    // urban_fcp_coverage, urban_ttfb_coverage, comparison_lcp_coverage,
+    // comparison_fcp_coverage, comparison_ttfb_coverage — all columns of
+    // race_inputs. race_inputs MUST be in the final FROM cross-join, or
+    // BigQuery rejects with "Unrecognized name: urban_lcp_coverage".
+    // (race_choice already reads race_inputs internally, but its SELECT
+    // doesn't pass those raw coverage columns through; the CONCAT needs
+    // them directly.)
+    for (const fileName of ['ga4-bigquery-url-builder.sql', 'normalized-bigquery-url-builder.sql']) {
+      const sql = readSqlTemplate(fileName);
+      const finalFromMatch = sql.match(/^FROM\s+counts[^;]*;/m);
+      expect(finalFromMatch, `${fileName}: missing final FROM clause`).toBeTruthy();
+      const finalFrom = finalFromMatch?.[0] ?? '';
+      expect(
+        finalFrom,
+        `${fileName}: race_inputs must be in the final cross-join — its columns are referenced from the CONCAT block.`
+      ).toMatch(/\brace_inputs\b/);
+    }
+  });
+
   it('funnel_rollup CTE has GROUP BY on funnel_activation carry-through columns', () => {
     // funnel_rollup cross-joins source_events (many rows) with
     // funnel_activation (1 row). The SELECT mixes COUNTIF aggregates

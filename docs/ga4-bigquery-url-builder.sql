@@ -461,4 +461,4 @@ SELECT CONCAT(
   -- NOT included. See comment above the SELECT for why. Use the normalized
   -- warehouse recipe to get a report URL with the Actionable Signals slide.
 ) AS signal_report_url
-FROM counts, vitals, comparison_tier_lookup, race_choice, stage_inputs, funnel_rollup;
+FROM counts, vitals, comparison_tier_lookup, race_inputs, race_choice, stage_inputs, funnel_rollup;

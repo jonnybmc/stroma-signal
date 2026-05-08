@@ -477,4 +477,4 @@ SELECT CONCAT(
   -- freshness provenance
   '&ga=', CAST(UNIX_MILLIS(CURRENT_TIMESTAMP()) AS STRING)
 ) AS signal_report_url
-FROM counts, vitals, comparison_tier_lookup, race_choice, stage_inputs, funnel_rollup, device_hardware, network_signals, downlink_quartiles, rtt_quartiles, env, visibility_counts;
+FROM counts, vitals, comparison_tier_lookup, race_inputs, race_choice, stage_inputs, funnel_rollup, device_hardware, network_signals, downlink_quartiles, rtt_quartiles, env, visibility_counts;
