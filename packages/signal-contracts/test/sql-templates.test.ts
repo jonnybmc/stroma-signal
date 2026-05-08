@@ -260,6 +260,29 @@ describe('bigquery sql templates', () => {
     }
   });
 
+  it('funnel_rollup anchors on funnel_activation with LEFT JOIN source_events so empty data still emits a row', () => {
+    // The previous CROSS JOIN form (FROM source_events, funnel_activation)
+    // produced 0 rows when source_events was empty after the WHERE filter
+    // (e.g. day-one operator, host typo, or daily-export not yet landed).
+    // 0 rows in funnel_rollup → final cross-join collapses to 0 rows →
+    // no signal_report_url emitted, even though the COALESCE fallback in
+    // `counts` was specifically designed for that case. Anchoring on
+    // funnel_activation (always 1 row) with LEFT JOIN source_events ON
+    // TRUE preserves the 1-row invariant in both data states.
+    for (const fileName of ['ga4-bigquery-url-builder.sql', 'normalized-bigquery-url-builder.sql']) {
+      const sql = readSqlTemplate(fileName);
+      const block = sql.match(/funnel_rollup AS \(([\s\S]*?)\n\)[,;]?/)?.[1] ?? '';
+      expect(
+        block,
+        `${fileName}: funnel_rollup must anchor on funnel_activation with LEFT JOIN source_events ON TRUE so empty source_events still produces a row.`
+      ).toMatch(/FROM\s+funnel_activation\s+LEFT JOIN\s+source_events\s+ON\s+TRUE/i);
+      expect(
+        block,
+        `${fileName}: funnel_rollup must NOT use the bare cross-join form (FROM source_events, funnel_activation) — that produces 0 rows when source_events is empty.`
+      ).not.toMatch(/FROM\s+source_events\s*,\s*funnel_activation/i);
+    }
+  });
+
   it('funnel_rollup CTE has GROUP BY on funnel_activation carry-through columns', () => {
     // funnel_rollup cross-joins source_events (many rows) with
     // funnel_activation (1 row). The SELECT mixes COUNTIF aggregates

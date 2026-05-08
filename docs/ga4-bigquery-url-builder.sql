@@ -343,14 +343,22 @@ funnel_activation AS (
   FROM stage_inputs
 ),
 funnel_rollup AS (
-  -- This CTE cross-joins source_events (many rows) with funnel_activation
-  -- (1 row carrying classified_sample_size + include_lcp + include_inp).
-  -- The SELECT mixes COUNTIF aggregates with references to those three
-  -- carry-through columns, so BigQuery requires them in GROUP BY (or
-  -- wrapped in an aggregate). They're constant after the cross-join, so
-  -- one group is produced — same single-row output as before, but
-  -- legal SQL. Without GROUP BY, BigQuery rejects with "SELECT list
-  -- expression references column X which is neither grouped nor aggregated".
+  -- This CTE anchors on funnel_activation (always 1 row, computed from
+  -- stage_inputs which itself always emits 1 row even on empty input)
+  -- and LEFT JOINs source_events ON TRUE. Two invariants this preserves:
+  --   1. Always produces exactly 1 row, even when source_events is empty
+  --      (anchor + null right side = 1 row). Without LEFT JOIN, an empty
+  --      source_events would produce 0 rows here, dropping the entire
+  --      final cross-join to 0 rows and emitting NO signal_report_url —
+  --      the COALESCE fallback in `counts` cannot save that.
+  --   2. The COUNTIF predicates filter on source_events columns which
+  --      are NULL on the anchor-only row (when source is empty), so
+  --      every COUNTIF returns 0 — measured_session_coverage and
+  --      poor_session_share resolve to 0 cleanly via SAFE_DIVIDE + IFNULL.
+  -- The SELECT mixes COUNTIF aggregates with references to the three
+  -- funnel_activation carry-through columns, so BigQuery requires them
+  -- in GROUP BY. They're constant after the join, so one group is
+  -- produced — same single-row output as the multi-row case.
   SELECT
     CASE
       WHEN classified_sample_size = 0 THEN ''
@@ -396,7 +404,7 @@ funnel_rollup AS (
       ),
       0
     ) AS poor_session_share
-  FROM source_events, funnel_activation
+  FROM funnel_activation LEFT JOIN source_events ON TRUE
   GROUP BY classified_sample_size, include_lcp, include_inp
 )
 -- Iteration-6 blocks (device_hardware, network_signals, environment) are
