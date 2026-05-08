@@ -89,11 +89,10 @@ a {
   color: var(--ink-soft);
 }
 
-.brand-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 999px;
-  background: var(--accent);
+.brand-logo {
+  height: 18px;
+  width: auto;
+  display: block;
 }
 
 .chrome-meta {

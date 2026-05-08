@@ -66,10 +66,19 @@
 
       .eyebrow {
         margin: 0;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
         font-family: var(--font-mono);
         font-size: 11px;
         text-transform: uppercase;
         color: var(--ink-mute);
+      }
+
+      .eyebrow .brand-logo {
+        height: 18px;
+        width: auto;
+        display: block;
       }
 
       h1 {
@@ -128,7 +137,10 @@
   </head>
   <body>
     <main>
-      <p class="eyebrow">Signal report routes</p>
+      <p class="eyebrow">
+        <img class="brand-logo" src="/signal-stroma-logo.png" alt="Signal" />
+        <span>report routes</span>
+      </p>
       <h1>Local report routes</h1>
       <p>
         The report app exposes the hosted report shell at <code>/r</code> and the zero-code builder
