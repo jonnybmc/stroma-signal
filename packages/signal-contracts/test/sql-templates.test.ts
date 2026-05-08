@@ -239,6 +239,24 @@ describe('bigquery sql templates', () => {
     }
   });
 
+  it('does not collide CTE names with column names in scalar subqueries', () => {
+    // BigQuery rejects `(SELECT col FROM col)` when the inner `col` is
+    // both a CTE name AND a column name in that CTE — the parser
+    // resolves the inner reference to the table struct, not the column,
+    // and the comparison fails with "No matching signature for operator =
+    // for argument types: STRING, STRUCT<col STRING>". Forbid the
+    // exact `(SELECT X FROM X)` shape so the comparison_tier-style trap
+    // can't recur in a future CTE. See the rename to *_lookup in both
+    // URL builders.
+    for (const fileName of ['ga4-bigquery-url-builder.sql', 'normalized-bigquery-url-builder.sql']) {
+      const sql = readSqlTemplate(fileName);
+      expect(
+        sql,
+        `${fileName}: scalar subquery (SELECT X FROM X) collides X-as-column with X-as-CTE. BigQuery rejects this with "No matching signature for operator =". Rename the CTE to <name>_lookup or qualify the column reference.`
+      ).not.toMatch(/\(\s*SELECT\s+(\w+)\s+FROM\s+\1\s*\)/);
+    }
+  });
+
   it('emits a literal-fallback host so empty-data still produces a complete URL', () => {
     // Without COALESCE, ANY_VALUE(host) returns NULL on empty source_events,
     // and BigQuery's CONCAT() returns NULL if any argument is NULL — which

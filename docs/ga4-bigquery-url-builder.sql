@@ -156,10 +156,16 @@ counts AS (
     ) AS top_path
   FROM source_events
 ),
-comparison_tier AS (
+comparison_tier_lookup AS (
   -- Tie-break order: when two tiers have equal counts, prefer
   -- moderate > constrained_moderate > constrained. Mirrors
   -- aggregation.ts pickComparisonTier() (CLASSIFIED_TIERS insertion order).
+  -- CTE is named *_lookup to avoid the BigQuery name-collision trap where
+  -- `(SELECT comparison_tier FROM comparison_tier_lookup)` resolves the inner
+  -- `comparison_tier` to the table struct, not the column — which gives
+  -- "No matching signature for operator =". Keep the column name as
+  -- `comparison_tier` so the `&ct=<value>` URL param emit and the tests
+  -- that pin that column name remain valid.
   SELECT
     IF(
       MAX(tier_count) = 0,
@@ -177,13 +183,13 @@ comparison_tier AS (
 race_inputs AS (
   SELECT
     COUNTIF(net_tier = 'urban') AS urban_observations,
-    COUNTIF(net_tier = (SELECT comparison_tier FROM comparison_tier)) AS comparison_observations,
+    COUNTIF(net_tier = (SELECT comparison_tier FROM comparison_tier_lookup)) AS comparison_observations,
     COUNTIF(net_tier = 'urban' AND lcp_ms IS NOT NULL) AS urban_lcp_observations,
-    COUNTIF(net_tier = (SELECT comparison_tier FROM comparison_tier) AND lcp_ms IS NOT NULL) AS comparison_lcp_observations,
+    COUNTIF(net_tier = (SELECT comparison_tier FROM comparison_tier_lookup) AND lcp_ms IS NOT NULL) AS comparison_lcp_observations,
     COUNTIF(net_tier = 'urban' AND fcp_ms IS NOT NULL) AS urban_fcp_observations,
-    COUNTIF(net_tier = (SELECT comparison_tier FROM comparison_tier) AND fcp_ms IS NOT NULL) AS comparison_fcp_observations,
+    COUNTIF(net_tier = (SELECT comparison_tier FROM comparison_tier_lookup) AND fcp_ms IS NOT NULL) AS comparison_fcp_observations,
     COUNTIF(net_tier = 'urban' AND ttfb_ms IS NOT NULL) AS urban_ttfb_observations,
-    COUNTIF(net_tier = (SELECT comparison_tier FROM comparison_tier) AND ttfb_ms IS NOT NULL) AS comparison_ttfb_observations,
+    COUNTIF(net_tier = (SELECT comparison_tier FROM comparison_tier_lookup) AND ttfb_ms IS NOT NULL) AS comparison_ttfb_observations,
     IFNULL(
       ROUND(100 * SAFE_DIVIDE(COUNTIF(net_tier = 'urban' AND lcp_ms IS NOT NULL), COUNTIF(net_tier = 'urban'))),
       0
@@ -191,8 +197,8 @@ race_inputs AS (
     IFNULL(
       ROUND(
         100 * SAFE_DIVIDE(
-          COUNTIF(net_tier = (SELECT comparison_tier FROM comparison_tier) AND lcp_ms IS NOT NULL),
-          COUNTIF(net_tier = (SELECT comparison_tier FROM comparison_tier))
+          COUNTIF(net_tier = (SELECT comparison_tier FROM comparison_tier_lookup) AND lcp_ms IS NOT NULL),
+          COUNTIF(net_tier = (SELECT comparison_tier FROM comparison_tier_lookup))
         )
       ),
       0
@@ -204,8 +210,8 @@ race_inputs AS (
     IFNULL(
       ROUND(
         100 * SAFE_DIVIDE(
-          COUNTIF(net_tier = (SELECT comparison_tier FROM comparison_tier) AND fcp_ms IS NOT NULL),
-          COUNTIF(net_tier = (SELECT comparison_tier FROM comparison_tier))
+          COUNTIF(net_tier = (SELECT comparison_tier FROM comparison_tier_lookup) AND fcp_ms IS NOT NULL),
+          COUNTIF(net_tier = (SELECT comparison_tier FROM comparison_tier_lookup))
         )
       ),
       0
@@ -217,8 +223,8 @@ race_inputs AS (
     IFNULL(
       ROUND(
         100 * SAFE_DIVIDE(
-          COUNTIF(net_tier = (SELECT comparison_tier FROM comparison_tier) AND ttfb_ms IS NOT NULL),
-          COUNTIF(net_tier = (SELECT comparison_tier FROM comparison_tier))
+          COUNTIF(net_tier = (SELECT comparison_tier FROM comparison_tier_lookup) AND ttfb_ms IS NOT NULL),
+          COUNTIF(net_tier = (SELECT comparison_tier FROM comparison_tier_lookup))
         )
       ),
       0
@@ -229,11 +235,11 @@ race_inputs AS (
 vitals AS (
   SELECT
     IF(COUNTIF(net_tier = 'urban' AND lcp_ms IS NOT NULL) > 0, APPROX_QUANTILES(IF(net_tier = 'urban', lcp_ms, NULL), 100 IGNORE NULLS)[OFFSET(75)], NULL) AS lu,
-    IF(COUNTIF(net_tier = (SELECT comparison_tier FROM comparison_tier) AND lcp_ms IS NOT NULL) > 0, APPROX_QUANTILES(IF(net_tier = (SELECT comparison_tier FROM comparison_tier), lcp_ms, NULL), 100 IGNORE NULLS)[OFFSET(75)], NULL) AS lt,
+    IF(COUNTIF(net_tier = (SELECT comparison_tier FROM comparison_tier_lookup) AND lcp_ms IS NOT NULL) > 0, APPROX_QUANTILES(IF(net_tier = (SELECT comparison_tier FROM comparison_tier_lookup), lcp_ms, NULL), 100 IGNORE NULLS)[OFFSET(75)], NULL) AS lt,
     IF(COUNTIF(net_tier = 'urban' AND fcp_ms IS NOT NULL) > 0, APPROX_QUANTILES(IF(net_tier = 'urban', fcp_ms, NULL), 100 IGNORE NULLS)[OFFSET(75)], NULL) AS fu,
-    IF(COUNTIF(net_tier = (SELECT comparison_tier FROM comparison_tier) AND fcp_ms IS NOT NULL) > 0, APPROX_QUANTILES(IF(net_tier = (SELECT comparison_tier FROM comparison_tier), fcp_ms, NULL), 100 IGNORE NULLS)[OFFSET(75)], NULL) AS ft,
+    IF(COUNTIF(net_tier = (SELECT comparison_tier FROM comparison_tier_lookup) AND fcp_ms IS NOT NULL) > 0, APPROX_QUANTILES(IF(net_tier = (SELECT comparison_tier FROM comparison_tier_lookup), fcp_ms, NULL), 100 IGNORE NULLS)[OFFSET(75)], NULL) AS ft,
     IF(COUNTIF(net_tier = 'urban' AND ttfb_ms IS NOT NULL) > 0, APPROX_QUANTILES(IF(net_tier = 'urban', ttfb_ms, NULL), 100 IGNORE NULLS)[OFFSET(75)], NULL) AS tu,
-    IF(COUNTIF(net_tier = (SELECT comparison_tier FROM comparison_tier) AND ttfb_ms IS NOT NULL) > 0, APPROX_QUANTILES(IF(net_tier = (SELECT comparison_tier FROM comparison_tier), ttfb_ms, NULL), 100 IGNORE NULLS)[OFFSET(75)], NULL) AS tt
+    IF(COUNTIF(net_tier = (SELECT comparison_tier FROM comparison_tier_lookup) AND ttfb_ms IS NOT NULL) > 0, APPROX_QUANTILES(IF(net_tier = (SELECT comparison_tier FROM comparison_tier_lookup), ttfb_ms, NULL), 100 IGNORE NULLS)[OFFSET(75)], NULL) AS tt
   FROM source_events
 ),
 race_choice AS (
@@ -446,4 +452,4 @@ SELECT CONCAT(
   -- NOT included. See comment above the SELECT for why. Use the normalized
   -- warehouse recipe to get a report URL with the Actionable Signals slide.
 ) AS signal_report_url
-FROM counts, vitals, comparison_tier, race_choice, stage_inputs, funnel_rollup;
+FROM counts, vitals, comparison_tier_lookup, race_choice, stage_inputs, funnel_rollup;
