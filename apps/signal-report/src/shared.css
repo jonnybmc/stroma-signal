@@ -70,6 +70,18 @@ code {
   font-weight: 500;
 }
 
+.eyebrow.eyebrow-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.eyebrow.eyebrow-brand .brand-logo {
+  height: 18px;
+  width: auto;
+  display: block;
+}
+
 .headline {
   margin: 12px 0 14px;
   max-width: 14ch;

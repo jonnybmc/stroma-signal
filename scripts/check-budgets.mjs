@@ -130,6 +130,15 @@ for (const budget of budgets) {
 // self-hosted Geist-Variable display font (~24 KB), and the /build
 // companion route with its fixture registry. Same regression-tripwire
 // posture as the runtime budgets above.
+//
+// CRAWLER_ONLY_ASSETS sit in dist/ but are never downloaded by the
+// page — they are referenced exclusively by `<meta property="og:*">`
+// tags and fetched out-of-band by LinkedIn / Twitter / Slack crawlers
+// when a /r URL gets shared. Excluding them keeps the budget tracking
+// what actual users pay on first paint, which is the metric this
+// guard exists to defend.
+const CRAWLER_ONLY_ASSETS = new Set(['signal-stroma-og-linkedin.jpg']);
+
 async function walk(dir) {
   const entries = await readdir(dir, { withFileTypes: true });
   const files = await Promise.all(
@@ -145,6 +154,7 @@ async function walk(dir) {
 const reportFiles = await walk(reportDist);
 let reportWeight = 0;
 for (const file of reportFiles) {
+  if (CRAWLER_ONLY_ASSETS.has(path.basename(file))) continue;
   const fileStat = await stat(file);
   reportWeight += fileStat.size;
 }

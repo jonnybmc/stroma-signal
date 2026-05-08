@@ -1,6 +1,6 @@
 # Signal
 
-> 🧪 **Release Candidate** — currently published as `0.1.0-rc.3` on the `next` dist-tag.
+> 🧪 **Release Candidate** — currently published as `0.1.0-rc.4`. While we are pre-1.0 the rc sits on the `latest` dist-tag, so `npm install @stroma-labs/signal` (no version specifier) resolves to it directly.
 > The `0.x` line is pre-stable; the API can change before `1.0`.
 > See [CHANGELOG.md](https://github.com/jonnybmc/stroma-signal/blob/main/CHANGELOG.md) for what shipped and what closes the next version.
 
@@ -9,10 +9,12 @@ A small library that measures what your real users actually experience — their
 ## Install
 
 ```bash
-pnpm add @stroma-labs/signal@next
+pnpm add @stroma-labs/signal
 ```
 
 `pnpm`, `npm`, and `yarn` all work. Signal is ESM-only.
+
+If you want to pin to a specific rc instead of tracking `latest`, use the exact version: `pnpm add @stroma-labs/signal@0.1.0-rc.4`.
 
 ## What ships
 
