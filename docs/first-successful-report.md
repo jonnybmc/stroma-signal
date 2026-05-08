@@ -130,7 +130,11 @@ If you are preparing the package for live release rather than just proving the p
 
 Once events have flowed for 5–7 days, walk this list. The point is to feel confident the data is healthy *before* you share the URL with stakeholders.
 
-> **Sample-confidence band.** Every generated `signal_report_url` carries a `b=<band>` URL parameter — `preliminary` (sample < 100), `provisional` (100–499), or `stable` (≥ 500). The hosted `/r` cover renders a brand-olive note above the masthead when the band is **preliminary** or **provisional**, so a thin report can't masquerade as a stable read when shared externally. The thresholds live in `packages/signal-contracts/src/types.ts` (`SIGNAL_SAMPLE_BAND_PROVISIONAL_THRESHOLD` / `SIGNAL_SAMPLE_BAND_STABLE_THRESHOLD`) and the SQL URL-builders compute them inline. There is no gate stopping you from running the URL-builder query whenever you want — the band is purely an honesty signal.
+> **Sample-confidence band.** Every generated `signal_report_url` carries a `b=<band>` URL parameter — `provisional` (100–499 events) or `stable` (≥ 500 events). The hosted `/r` cover renders a brand-olive note above the masthead when the band is **provisional**, so a thin-but-still-readable report can't masquerade as a stable read when shared externally. The thresholds live in `packages/signal-contracts/src/types.ts` (`SIGNAL_PREVIEW_MINIMUM_SAMPLE = 100`, `SIGNAL_SAMPLE_BAND_STABLE_THRESHOLD = 500`) and the SQL URL-builders compute them inline.
+>
+> **Below 100 events** (`SIGNAL_PREVIEW_MINIMUM_SAMPLE`), the URL-builder does **not** emit a URL — it returns an actionable diagnostic message in the same `signal_report_url` column (`SAMPLE_BELOW_RECOMMENDED_MINIMUM: captured N events ...` for 1–99 events, or `NO_EVENTS_IN_WINDOW: ...` for zero). This is deliberate: a `b=preliminary` URL from the SQL path would render an /r report with noisy percentiles and unreliable tier shares, which is worse for trust than waiting for traffic to accumulate. The `b=preliminary` value still exists in the code and the renderer handles it gracefully for in-browser preview URLs (from `getReportUrl()`) and `/build`-route URLs, but the production warehouse path does not produce it.
+>
+> The SQL URL-builder is purely an honesty gate — there's nothing stopping you from running the query whenever you want, but it will only hand you a shareable URL when the data is meaningful enough to defend.
 
 | What to check | What "healthy" looks like | What to investigate if you see it |
 |---|---|---|

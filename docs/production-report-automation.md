@@ -90,8 +90,8 @@ What each field is for:
 - `host`: the site or domain the report is for
 - `window_start`: the beginning of the reporting window used to build the URL
 - `window_end`: the end of the reporting window used to build the URL
-- `sample_size`: the sample size behind the generated report
-- `signal_report_url`: the hosted `/r?...` URL to share internally
+- `sample_size`: the event count behind the generated report
+- `signal_report_url`: the single column the URL-builder query emits. Value depends on sample size — a hosted `/r?...` URL to share internally when ≥ 100 events, `NO_EVENTS_IN_WINDOW: ...` diagnostic when 0, `SAMPLE_BELOW_RECOMMENDED_MINIMUM: ...` diagnostic when 1–99. See "What The `signal_report_url` Column Can Contain" below.
 - `updated_at`: when the current row was last refreshed
 
 This table is intentionally small. It is not your raw event table and not your aggregate warehouse model. It is just the handoff layer for the latest shareable report URL.
