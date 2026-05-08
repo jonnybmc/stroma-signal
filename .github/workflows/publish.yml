@@ -96,26 +96,22 @@ jobs:
           RELEASE_TAG: ${{ github.event.release.tag_name }}
       - name: Resolve npm dist-tag from release type
         id: npm_tag
-        # Pre-releases publish to the `next` dist-tag; stable releases
-        # publish to `latest`. For release-event triggers the source of
-        # truth is the GitHub Release `prerelease` flag. For
-        # workflow_dispatch retries we infer from the tag string (any
-        # tag containing `-` is treated as a pre-release per semver
-        # convention; e.g. v0.1.0-rc.3, v1.0.0-beta.1).
+        # Pre-1.0 dist-tag policy: every release — prerelease or not —
+        # publishes to the `latest` dist-tag. While we are pre-1.0 the
+        # rc IS the install-by-default surface, and the npmjs.com
+        # package page sorts versions by which dist-tag points at them.
+        # Without this override the most recent rc would sit hidden
+        # behind the previous one on npm and `npm install
+        # @stroma-labs/signal` (no version specifier) would resolve to
+        # an older rc.
+        #
+        # REVERT WHEN: a stable 1.0.0 ships. At that point restore the
+        # split: prereleases → `next`, stable → `latest`. The previous
+        # release-event / workflow_dispatch resolution logic lives in
+        # git history at chore/qa-brand-logo HEAD~1 if you need to
+        # re-introduce it verbatim.
         run: |
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            if [[ "${{ inputs.tag }}" == *-* ]]; then
-              echo "tag=next" >> "$GITHUB_OUTPUT"
-            else
-              echo "tag=latest" >> "$GITHUB_OUTPUT"
-            fi
-          else
-            if [[ "${{ github.event.release.prerelease }}" == "true" ]]; then
-              echo "tag=next" >> "$GITHUB_OUTPUT"
-            else
-              echo "tag=latest" >> "$GITHUB_OUTPUT"
-            fi
-          fi
+          echo "tag=latest" >> "$GITHUB_OUTPUT"
       # Use `npm publish` directly (not `pnpm publish`). pnpm's publish
       # wrapper requests an OIDC token for sigstore (provenance signing)
       # but does NOT request the OIDC token for npm publish auth — its
