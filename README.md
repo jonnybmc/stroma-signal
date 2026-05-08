@@ -1,10 +1,10 @@
 <img src="./docs/images/signal-stroma-logo.png" alt="Signal" width="220" />
 
 [![CI](https://github.com/jonnybmc/stroma-signal/actions/workflows/ci.yml/badge.svg)](https://github.com/jonnybmc/stroma-signal/actions/workflows/ci.yml)
-[![npm @next](https://img.shields.io/npm/v/@stroma-labs/signal/next?label=npm%20%40next)](https://www.npmjs.com/package/@stroma-labs/signal)
+[![npm](https://img.shields.io/npm/v/@stroma-labs/signal?label=npm)](https://www.npmjs.com/package/@stroma-labs/signal)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 
-> 🧪 **Release Candidate** on the `next` dist-tag (see badge above for current version). The `0.x` line is pre-stable; the API can change before `1.0`.
+> 🧪 **Release Candidate** — while we are pre-1.0 the rc sits on the `latest` dist-tag (see badge above for current version), so `npm install @stroma-labs/signal` resolves to it directly. The API can change before `1.0`.
 
 **Other RUM tools tell you what your average user experiences. Signal tells you _who_ is getting which experience — and lets you act on it.**
 
@@ -176,7 +176,7 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for tone, commit conventions, and the p
 
 ### Release process
 
-The publish workflow runs on every GitHub Release tagged `vX.Y.Z`. Stable tags publish to `latest`; pre-release tags (`-rc.N`, `-beta.N`) publish to `next`. Auth is via [npm Trusted Publishing](https://docs.npmjs.com/trusted-publishers) — no long-lived `NPM_TOKEN` required.
+The publish workflow runs on every GitHub Release tagged `vX.Y.Z`. While we are pre-1.0 every release publishes to the `latest` dist-tag so the rc is install-by-default. Once `1.0.0` ships, prerelease tags (`-rc.N`, `-beta.N`) move back to `next` and stable tags stay on `latest`. Auth is via [npm Trusted Publishing](https://docs.npmjs.com/trusted-publishers) — no long-lived `NPM_TOKEN` required.
 
 ## License
 
