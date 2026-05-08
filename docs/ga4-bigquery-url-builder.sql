@@ -343,6 +343,14 @@ funnel_activation AS (
   FROM stage_inputs
 ),
 funnel_rollup AS (
+  -- This CTE cross-joins source_events (many rows) with funnel_activation
+  -- (1 row carrying classified_sample_size + include_lcp + include_inp).
+  -- The SELECT mixes COUNTIF aggregates with references to those three
+  -- carry-through columns, so BigQuery requires them in GROUP BY (or
+  -- wrapped in an aggregate). They're constant after the cross-join, so
+  -- one group is produced — same single-row output as before, but
+  -- legal SQL. Without GROUP BY, BigQuery rejects with "SELECT list
+  -- expression references column X which is neither grouped nor aggregated".
   SELECT
     CASE
       WHEN classified_sample_size = 0 THEN ''
@@ -389,6 +397,7 @@ funnel_rollup AS (
       0
     ) AS poor_session_share
   FROM source_events, funnel_activation
+  GROUP BY classified_sample_size, include_lcp, include_inp
 )
 -- Iteration-6 blocks (device_hardware, network_signals, environment) are
 -- NOT available in the GA4 recipe. The fields they require (device_cores,

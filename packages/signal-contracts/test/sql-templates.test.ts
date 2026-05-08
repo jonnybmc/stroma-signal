@@ -239,6 +239,27 @@ describe('bigquery sql templates', () => {
     }
   });
 
+  it('funnel_rollup CTE has GROUP BY on funnel_activation carry-through columns', () => {
+    // funnel_rollup cross-joins source_events (many rows) with
+    // funnel_activation (1 row). The SELECT mixes COUNTIF aggregates
+    // with references to classified_sample_size / include_lcp /
+    // include_inp — BigQuery requires GROUP BY on those columns or
+    // ANY_VALUE wrapping. Without it, BigQuery rejects the query at
+    // execution time with "SELECT list expression references column X
+    // which is neither grouped nor aggregated". Regex tests cannot
+    // catch this kind of semantic-against-real-BQ mismatch in general,
+    // but we can lock in the specific GROUP BY clause that fixes it.
+    for (const fileName of ['ga4-bigquery-url-builder.sql', 'normalized-bigquery-url-builder.sql']) {
+      const sql = readSqlTemplate(fileName);
+      // Match "funnel_rollup AS (" through to the matching ")," (or ");" for the GA4 file's terminal comma).
+      const block = sql.match(/funnel_rollup AS \(([\s\S]*?)\n\)[,;]?/)?.[1] ?? '';
+      expect(
+        block,
+        `${fileName}: funnel_rollup must contain GROUP BY classified_sample_size, include_lcp, include_inp.`
+      ).toMatch(/GROUP BY classified_sample_size,\s*include_lcp,\s*include_inp/);
+    }
+  });
+
   it('does not collide CTE names with column names in scalar subqueries', () => {
     // BigQuery rejects `(SELECT col FROM col)` when the inner `col` is
     // both a CTE name AND a column name in that CTE — the parser
