@@ -62,7 +62,12 @@ if (packageJson.dependencies && Object.keys(packageJson.dependencies).length > 0
 // that lives outside the public source tree. This guard is the defensive
 // backstop so a stray import does not pull private code into a public
 // build artifact.
-const FREE_TIER_ROOTS = ['packages/signal/src', 'packages/signal-contracts/src', 'apps/signal-spike-lab/src'];
+const FREE_TIER_ROOTS = [
+  'packages/signal/src',
+  'packages/signal-contracts/src',
+  'apps/signal-spike-lab/src',
+  'apps/signal-report/src'
+];
 const PI_IMPORT_PATTERNS = [
   /from\s+['"]@stroma-labs\/signal-pi(?:['"/])/,
   /from\s+['"][^'"]*\/signal-pi\//,
@@ -88,7 +93,8 @@ for (const relRoot of FREE_TIER_ROOTS) {
 const FREE_TIER_PACKAGE_JSONS = [
   'packages/signal/package.json',
   'packages/signal-contracts/package.json',
-  'apps/signal-spike-lab/package.json'
+  'apps/signal-spike-lab/package.json',
+  'apps/signal-report/package.json'
 ];
 for (const rel of FREE_TIER_PACKAGE_JSONS) {
   const pkg = JSON.parse(await readFile(path.join(root, rel), 'utf8'));
