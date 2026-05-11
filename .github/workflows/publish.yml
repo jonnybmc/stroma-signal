@@ -23,7 +23,7 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           # When triggered via workflow_dispatch with a tag input, check
           # out THAT tag instead of the default branch HEAD. Lets us
