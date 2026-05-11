@@ -1,3 +1,4 @@
+export * from './ad-context.js';
 export * from './aggregation.js';
 export * from './export.js';
 export * from './fixtures/index.js';
