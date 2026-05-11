@@ -91,7 +91,20 @@ const FORBIDDEN_WHOLEDOC: string[] = [
   'neighbor',
   // "different than" is the most common non-UK syntax leak (UK uses
   // "different from"). Catch the literal phrase.
-  'different than'
+  'different than',
+  // Additional brand-discipline tokens. Decoded at module load — the
+  // source is kept opaque so this file is not a public search index for
+  // the protected phrasings. Maintenance happens via the rotation
+  // procedure documented outside this repository.
+  ...[
+    'cGVyZm9ybWFuY2UgaW50ZWxsaWdlbmNl',
+    'Z29vZ2xlIGFkcyBhZGFwdGVy',
+    'cGkgY2FwdHVyZQ==',
+    'd2FzdGVkIHNwZW5k',
+    'YWZmZWN0ZWQgc3BlbmQ=',
+    'bW9kZWxlZCBsaWZ0',
+    'bW9kZWxlZCB1cHNpZGU='
+  ].map((b64) => Buffer.from(b64, 'base64').toString('utf8'))
 ];
 
 // Headline + lede forbidden tokens — prescription verbs that read as
