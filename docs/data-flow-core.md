@@ -12,53 +12,44 @@ For the broader privacy posture, see [`PRIVACY.md`](../PRIVACY.md). For retentio
 
 ```mermaid
 flowchart LR
-    %% Capture sources
-    Browser[Visitor's Browser<br/>Signal SDK runs here]
-    CLI[Developer's Terminal<br/>signal init wizard]
+    Browser["Visitor's Browser<br>Signal SDK runs here"]
+    CLI["Developer's Terminal<br>signal init wizard"]
 
-    %% Operator infra
-    OpSink[/Operator-configured sink<br/>(dataLayer / beacon / callback)/]
-    OpWarehouse[(Operator's Warehouse<br/>GA4 / BigQuery / Snowflake / etc.)]
-    OpReport[Operator opens / shares<br/>signal.stroma.design/r/?...]
+    OpSink["Operator-configured sink<br>dataLayer or beacon or callback"]
+    OpWarehouse[("Operator's Warehouse<br>GA4 or BigQuery or Snowflake or other")]
+    OpReport["Operator opens or shares<br>signal.stroma.design/r/ URL"]
 
-    %% Stroma infra
-    StromaEdge{{Cloudflare Edge<br/>signal.stroma.design<br/>api.stroma.design}}
-    StromaR[Static /r renderer<br/>Cloudflare Pages]
-    StromaIntent[(api.stroma.design<br/>/api/v1/intent)]
-    StromaInstall[(api.stroma.design<br/>/api/v1/install)]
-    StromaBackend[(Stroma backend storage<br/>see sub-processors.md)]
+    StromaEdge{{"Cloudflare Edge<br>signal.stroma.design<br>api.stroma.design"}}
+    StromaR["Static /r renderer<br>Cloudflare Pages"]
+    StromaIntent[("api.stroma.design<br>/api/v1/intent")]
+    StromaInstall[("api.stroma.design<br>/api/v1/install")]
+    StromaBackend[("Stroma backend storage<br>see sub-processors.md")]
 
-    %% Recipient
-    Recipient[Anyone with the report URL<br/>opens it in a browser]
+    Recipient["Anyone with the report URL<br>opens it in a browser"]
 
-    %% --- Performance-event path (operator-owned, Stroma not involved) ---
-    Browser -- "SignalEventV1 payload<br/>(no PII, no IP, no cookies)" --> OpSink
+    Browser -- "SignalEventV1 payload, no PII, no IP, no cookies" --> OpSink
     OpSink --> OpWarehouse
 
-    %% --- Hosted /r report (URL-encoded payload) ---
-    OpWarehouse -- "Operator runs the URL-builder SQL<br/>once per refresh cadence" --> OpReport
-    OpReport -- "GET signal.stroma.design/r/?sa=..." --> StromaEdge
+    OpWarehouse -- "Operator runs URL-builder SQL on refresh cadence" --> OpReport
+    OpReport -- "GET signal.stroma.design/r/ with sa query string" --> StromaEdge
     StromaEdge --> StromaR
-    StromaR -- "Static HTML + JS + CSS<br/>(zero Stroma-side state)" --> Recipient
-    Recipient -- "Decodes ?sa=... client-side<br/>renders the report locally" --> Recipient
+    StromaR -- "Static HTML plus JS plus CSS, zero Stroma-side state" --> Recipient
+    Recipient -- "Decodes sa client-side, renders report locally" --> Recipient
 
-    %% --- Optional intent-capture (only when reader interacts with closing modal) ---
-    Recipient -- "Reader picks a modal option<br/>+ optional email" --> StromaIntent
+    Recipient -- "Reader picks a modal option plus optional email" --> StromaIntent
     StromaIntent --> StromaBackend
 
-    %% --- Install telemetry (opt-out, never PII) ---
-    CLI -- "Install lifecycle events<br/>(framework / version / outcome only)" --> StromaInstall
+    CLI -- "Install lifecycle events: framework, version, outcome only" --> StromaInstall
     StromaInstall --> StromaBackend
 
-    %% --- Note: opt-out path ---
-    CLI -.->|"--no-telemetry,<br/>STROMA_TELEMETRY=0,<br/>DO_NOT_TRACK=1,<br/>or CI/non-TTY auto-disable"| CLI
+    CLI -. "no-telemetry flag, STROMA_TELEMETRY env, DO_NOT_TRACK env, or CI auto-disable" .-> CLI
 
     classDef stroma fill:#fff1e8,stroke:#d97706,stroke-width:1px,color:#000;
     classDef operator fill:#e6f3ff,stroke:#2563eb,stroke-width:1px,color:#000;
     classDef visitor fill:#f0fdf4,stroke:#16a34a,stroke-width:1px,color:#000;
-    class StromaEdge,StromaR,StromaIntent,StromaInstall,StromaBackend stroma;
-    class OpSink,OpWarehouse,OpReport operator;
-    class Browser,CLI,Recipient visitor;
+    class StromaEdge,StromaR,StromaIntent,StromaInstall,StromaBackend stroma
+    class OpSink,OpWarehouse,OpReport operator
+    class Browser,CLI,Recipient visitor
 ```
 
 ---
