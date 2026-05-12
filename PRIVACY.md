@@ -158,7 +158,7 @@ For data captured via the optional Stroma-hosted endpoints:
 - **Install events**: capture is keyed by an anonymous UUID (`install_capture_id`) generated at CLI invocation. There is no link to identifiable information. Erasure is mechanically not applicable since there is no identity to erase. If you nonetheless wish to have your install telemetry purged, email **admin@stroma.design** with the `install_capture_id` (visible in the CLI's first-run disclosure when telemetry is enabled).
 - **Intent events** with optional email: if a visitor voluntarily provided an email through the report's closing modal, Stroma will erase the corresponding row(s) on request to **admin@stroma.design**. Standard GDPR 30-day response window applies.
 
-Detailed procedure: [`docs/right-to-erasure.md`](./docs/right-to-erasure.md) _(forthcoming)_.
+Detailed procedure: [`docs/right-to-erasure.md`](./docs/right-to-erasure.md).
 
 ---
 
